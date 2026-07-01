@@ -1,0 +1,999 @@
+use super::commands::*;
+use super::utils::*;
+use super::*;
+
+impl App {
+    pub(super) fn handle_msg(
+        &mut self,
+        msg: AppMsg,
+        sender: ComponentSender<Self>,
+        root: &<Self as Component>::Root,
+    ) {
+        match msg {
+            AppMsg::Loaded(Ok(state)) => {
+                self.contexts = state.contexts;
+                self.namespaces = state.namespaces;
+                self.projects = state.projects;
+                let visible_contexts = self.visible_contexts();
+                self.selected_context = visible_contexts
+                    .iter()
+                    .find(|context| context.is_current)
+                    .or_else(|| visible_contexts.first())
+                    .map(|context| context.name.clone());
+                self.selected_namespace = self
+                    .namespaces
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| String::from("default"));
+                self.sync_dropdowns(Some(sender.clone()));
+                self.loading = false;
+                self.status = String::from("Select a project.");
+                self.show_projects();
+                self.sync_status();
+            }
+            AppMsg::Loaded(Err(error)) => {
+                self.loading = false;
+                self.contexts.clear();
+                self.resources.clear();
+                self.objects.clear();
+                self.selected_context = None;
+                self.status = String::from("Kubeconfig unavailable.");
+                self.toaster.add_toast(adw::Toast::new(&error));
+                self.show_setup();
+                self.sync_dropdowns(Some(sender.clone()));
+                self.rebuild_resource_list(Some(sender.clone()));
+                self.rebuild_object_list();
+                self.sync_status();
+            }
+            AppMsg::StateLoadedForCluster(context_name, Ok(state)) => {
+                self.contexts = state.contexts;
+                self.namespaces = state.namespaces;
+                self.projects = state.projects;
+                let visible_contexts = self.visible_contexts();
+                self.selected_context = visible_contexts
+                    .iter()
+                    .find(|context| context.name == context_name)
+                    .map(|context| context.name.clone());
+                if !self.namespace_is_known(&self.selected_namespace) {
+                    self.selected_namespace = self
+                        .namespaces
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| String::from("default"));
+                }
+                self.loading = false;
+                self.sync_dropdowns(Some(sender.clone()));
+                self.enter_clusters_page(sender);
+                self.status = String::from("Cluster saved.");
+                self.sync_status();
+            }
+            AppMsg::StateLoadedForCluster(_context_name, Err(error)) => {
+                self.loading = false;
+                self.status = String::from("Unable to reload kubeconfig.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::ShowProjects => {
+                self.stop_log_stream();
+                self.stop_port_forward();
+                self.show_object_list();
+                self.show_projects();
+                self.loading = false;
+                self.status = String::from("Select a project.");
+                self.sync_port_forward_controls();
+                self.sync_status();
+            }
+            AppMsg::ShowClusters => {
+                self.stop_log_stream();
+                self.stop_port_forward();
+                self.show_object_list();
+                self.enter_clusters_page(sender);
+                self.loading = false;
+                self.status = String::from("Select a cluster.");
+                self.sync_port_forward_controls();
+                self.sync_status();
+            }
+            AppMsg::ClusterSummaryLoaded(context_name, result) => {
+                let state = match result {
+                    Ok(summary) => ClusterSummaryState::Loaded(summary),
+                    Err(error) => ClusterSummaryState::Error(error),
+                };
+                self.cluster_summaries.insert(context_name, state);
+                self.rebuild_cluster_list(Some(sender));
+            }
+            AppMsg::ProjectChanged(index) => {
+                let Some(project_name) = self
+                    .projects
+                    .projects
+                    .get(index as usize)
+                    .map(|project| project.name.clone())
+                else {
+                    return;
+                };
+                if self.projects.selected_project.as_deref() != Some(project_name.as_str()) {
+                    self.projects.selected_project = Some(project_name);
+                    self.save_projects_or_toast();
+                }
+                self.switch_to_project(sender);
+            }
+            AppMsg::ShowAddProjectDialog => {
+                self.editing_project_name = None;
+                self.project_dialog.set_title("New Project");
+                self.project_dialog_description
+                    .set_label("Separate clusters by environment or company");
+                self.project_create_button.set_label("Create");
+                self.project_name_entry.set_text("");
+                self.project_dialog.present(Some(root));
+            }
+            AppMsg::ShowRenameProjectDialog => {
+                let current = self.projects.selected_project_name().to_owned();
+                self.editing_project_name = Some(current.clone());
+                self.project_dialog.set_title("Rename Project");
+                self.project_dialog_description
+                    .set_label("Choose a new name for this project");
+                self.project_create_button.set_label("Rename");
+                self.project_name_entry.set_text(&current);
+                self.project_dialog.present(Some(root));
+            }
+            AppMsg::AddProject => {
+                let name = self.project_name_entry.text().trim().to_owned();
+                if name.is_empty() {
+                    return;
+                }
+
+                if let Some(original) = self.editing_project_name.clone() {
+                    if name != original && self.projects.has_project(&name) {
+                        self.toaster.add_toast(adw::Toast::new(
+                            "A project with this name already exists.",
+                        ));
+                        return;
+                    }
+                    if let Some(project) = self
+                        .projects
+                        .projects
+                        .iter_mut()
+                        .find(|project| project.name == original)
+                    {
+                        project.name = name.clone();
+                    }
+                    if self.projects.selected_project.as_deref() == Some(original.as_str()) {
+                        self.projects.selected_project = Some(name);
+                    }
+                    self.save_projects_or_toast();
+                    self.editing_project_name = None;
+                    self.project_dialog.close();
+                    self.sync_dropdowns(Some(sender.clone()));
+                    self.sync_status();
+                    return;
+                }
+
+                if self.projects.has_project(&name) {
+                    self.toaster
+                        .add_toast(adw::Toast::new("A project with this name already exists."));
+                    return;
+                }
+
+                self.projects.projects.push(Project {
+                    name: name.clone(),
+                    contexts: Vec::new(),
+                    custom_namespaces: Vec::new(),
+                });
+                self.projects.selected_project = Some(name.clone());
+                self.save_projects_or_toast();
+                self.selected_context = None;
+                self.project_dialog.close();
+                self.switch_to_project(sender);
+            }
+            AppMsg::DuplicateProject => {
+                let Some(source) = self.projects.selected_project().cloned() else {
+                    return;
+                };
+                let mut new_name = format!("{} copy", source.name);
+                let mut suffix = 2;
+                while self.projects.has_project(&new_name) {
+                    new_name = format!("{} copy {suffix}", source.name);
+                    suffix += 1;
+                }
+                self.projects.projects.push(Project {
+                    name: new_name.clone(),
+                    contexts: source.contexts,
+                    custom_namespaces: source.custom_namespaces,
+                });
+                self.projects.selected_project = Some(new_name.clone());
+                self.save_projects_or_toast();
+                self.toaster
+                    .add_toast(adw::Toast::new(&format!("Duplicated as {new_name}")));
+                self.switch_to_project(sender);
+            }
+            AppMsg::DeleteProject => {
+                if self.projects.projects.len() <= 1 {
+                    self.toaster
+                        .add_toast(adw::Toast::new("At least one project must remain."));
+                    return;
+                }
+                let name = self.projects.selected_project_name().to_owned();
+                let dialog = adw::AlertDialog::new(
+                    Some("Delete project?"),
+                    Some(&format!(
+                        "This removes \"{name}\" from Aetheris, including its saved clusters \
+                         and namespaces. The clusters themselves are not affected."
+                    )),
+                );
+                dialog.add_responses(&[("cancel", "Cancel"), ("delete", "Delete")]);
+                dialog.set_close_response("cancel");
+                dialog.set_default_response(Some("cancel"));
+                dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+                let sender = sender.clone();
+                dialog.choose(Some(root), gtk::gio::Cancellable::NONE, move |response| {
+                    if response.as_str() == "delete" {
+                        sender.input(AppMsg::ConfirmDeleteProject);
+                    }
+                });
+            }
+            AppMsg::ConfirmDeleteProject => {
+                let name = self.projects.selected_project_name().to_owned();
+                self.projects.projects.retain(|project| project.name != name);
+                self.projects.selected_project =
+                    self.projects.projects.first().map(|project| project.name.clone());
+                self.save_projects_or_toast();
+                self.switch_to_project(sender);
+            }
+            AppMsg::ClusterLoaded(Ok(state)) => {
+                self.loading = false;
+                if let Some(warning) = state.namespace_warning {
+                    self.toaster.add_toast(adw::Toast::new(&warning));
+                }
+                self.namespaces = with_all_namespace(state.namespaces);
+                self.resources = state.resources;
+                if !self.namespace_is_known(&self.selected_namespace) {
+                    self.selected_namespace = self
+                        .namespaces
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| String::from("all"));
+                }
+                self.selected_resource = select_default_resource(&self.resources);
+                self.selected_resource_section = self
+                    .selected_resource_kind()
+                    .map(ResourceSection::for_resource)
+                    .unwrap_or(ResourceSection::Workloads);
+                self.sync_dropdowns(Some(sender.clone()));
+                self.rebuild_resource_list(Some(sender.clone()));
+
+                if self.selected_resource.is_some() {
+                    self.refresh_objects(sender);
+                } else {
+                    self.status = String::from("No listable Kubernetes resources found.");
+                    self.sync_status();
+                    self.rebuild_object_list();
+                }
+            }
+            AppMsg::ClusterLoaded(Err(error)) => {
+                self.loading = false;
+                self.resources.clear();
+                self.objects.clear();
+                self.selected_resource = None;
+                self.status = String::from("Unable to discover resources.");
+                self.toaster.add_toast(adw::Toast::new(&error));
+                self.rebuild_resource_list(Some(sender.clone()));
+                self.rebuild_object_list();
+                self.sync_status();
+            }
+            AppMsg::ClusterChanged(index) => {
+                let visible_contexts = self.visible_contexts();
+                if let Some(context) = visible_contexts.get(index as usize) {
+                    self.selected_context = Some(context.name.clone());
+                    self.show_browser();
+                    self.present_content_panel();
+                    self.load_cluster(sender);
+                }
+            }
+            AppMsg::EditCluster(index) => {
+                let visible_contexts = self.visible_contexts();
+                let Some((name, server)) = visible_contexts
+                    .get(index as usize)
+                    .map(|context| (context.name.clone(), context.server.clone()))
+                else {
+                    return;
+                };
+                self.open_cluster_edit_dialog(&name, &server, root);
+            }
+            AppMsg::EditCurrentCluster => {
+                let Some((name, server)) = self
+                    .selected_context
+                    .as_deref()
+                    .and_then(|selected| self.contexts.iter().find(|c| c.name == selected))
+                    .map(|context| (context.name.clone(), context.server.clone()))
+                else {
+                    return;
+                };
+                self.open_cluster_edit_dialog(&name, &server, root);
+            }
+            AppMsg::NamespaceChanged(index) => {
+                let choices = self.namespace_choices();
+                if index as usize == choices.len() {
+                    self.show_custom_namespace_dialog(root);
+                    return;
+                }
+                if let Some(namespace) = choices.get(index as usize) {
+                    if self.selected_namespace != *namespace {
+                        self.selected_namespace.clone_from(namespace);
+                        self.sync_dropdowns(Some(sender.clone()));
+                        self.show_object_list();
+                        self.stop_log_stream();
+                        self.stop_port_forward();
+                        self.refresh_objects(sender);
+                    }
+                }
+            }
+            AppMsg::CustomNamespaceEntered => {
+                let namespace = self.custom_namespace_entry.text().trim().to_owned();
+                if namespace.is_empty() {
+                    return;
+                }
+
+                self.remember_namespace(&namespace);
+                if self.selected_namespace != namespace {
+                    self.selected_namespace = namespace;
+                    self.sync_dropdowns(Some(sender.clone()));
+                    self.show_object_list();
+                    self.stop_log_stream();
+                    self.stop_port_forward();
+                    self.refresh_objects(sender);
+                } else {
+                    self.sync_dropdowns(Some(sender.clone()));
+                }
+
+                self.custom_namespace_dialog.close();
+            }
+            AppMsg::StatusFilterChanged(index) => {
+                let next = StatusFilter::ALL
+                    .get(index as usize)
+                    .copied()
+                    .unwrap_or(StatusFilter::All);
+                if self.selected_status_filter != next {
+                    self.selected_status_filter = next;
+                    self.sync_status();
+                    self.sync_status_filter();
+                    self.rebuild_object_list();
+                }
+            }
+            AppMsg::ObjectColumnToggled(index) => {
+                let Some(column) = self
+                    .offerable_object_columns()
+                    .get(index as usize)
+                    .copied()
+                else {
+                    return;
+                };
+                let visible = !self.projects.visible_object_columns.contains(&column);
+                self.projects.set_object_column_visible(column, visible);
+                self.save_projects_or_toast();
+                self.sync_object_columns();
+                self.rebuild_object_list();
+            }
+            AppMsg::ResourceChanged(index) => {
+                if self.resources.get(index).is_some() {
+                    let next = Some(index);
+                    if self.selected_resource != next {
+                        self.selected_resource = next;
+                        self.selected_resource_section =
+                            ResourceSection::for_resource(&self.resources[index]);
+                        self.rebuild_resource_list(Some(sender.clone()));
+                        self.present_content_panel();
+                        self.show_object_list();
+                        self.sync_object_columns();
+                        self.stop_log_stream();
+                        self.stop_port_forward();
+                        self.refresh_objects(sender);
+                    }
+                }
+            }
+            AppMsg::SearchChanged(query) => {
+                self.search_query = query;
+                self.sync_status();
+                self.rebuild_object_list();
+            }
+            AppMsg::ObjectActivated(index) => {
+                let Some((context, resource, namespace, name)) = self.detail_request(index) else {
+                    return;
+                };
+                self.open_object_detail(context, resource, namespace, name, sender);
+            }
+            AppMsg::RelatedPodActivated(index) => {
+                let Some(pod) = self.detail_related_pods.get(index as usize).cloned() else {
+                    return;
+                };
+                let Some(target) = self.detail_target.clone() else {
+                    return;
+                };
+                let namespace = Some(pod.namespace.clone());
+                self.open_object_detail(
+                    target.context,
+                    pod_resource_kind(),
+                    namespace,
+                    pod.name,
+                    sender,
+                );
+            }
+            AppMsg::ObjectDetailLoaded(token, Ok(detail)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.status = format!("Showing details for {}", detail.name);
+                self.populate_detail_dialog(&detail);
+                self.update_log_target_containers(&detail);
+                self.show_detail_page(&detail.name);
+                self.maybe_start_visible_logs(sender);
+                self.sync_status();
+            }
+            AppMsg::ObjectDetailLoaded(token, Err(error)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.detail_target = None;
+                self.detail_log_target = None;
+                self.detail_port_forward_target = None;
+                self.sync_log_controls();
+                self.sync_port_forward_controls();
+                self.status = String::from("Unable to load object detail.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::StartPodLogs => {
+                self.start_pod_logs(sender);
+            }
+            AppMsg::StopPodLogs => {
+                self.stop_log_stream();
+                self.sync_log_controls();
+            }
+            AppMsg::StartPodPortForward => {
+                self.start_pod_port_forward(sender);
+            }
+            AppMsg::StopPodPortForward => {
+                self.stop_port_forward();
+                self.sync_port_forward_controls();
+            }
+            AppMsg::ClearPodLogs => {
+                self.detail_log_buffer.set_text("");
+            }
+            AppMsg::ToggleDetailOverview => {
+                let collapsed = self.detail_overview_section.is_visible();
+                self.detail_overview_section.set_visible(!collapsed);
+                self.detail_expand_logs_button.set_icon_name(if collapsed {
+                    "view-restore-symbolic"
+                } else {
+                    "view-fullscreen-symbolic"
+                });
+                self.detail_expand_logs_button
+                    .set_tooltip_text(Some(if collapsed {
+                        "Show summary"
+                    } else {
+                        "Hide summary to see more of this tab"
+                    }));
+            }
+            AppMsg::BackToObjects => {
+                self.show_object_list();
+                self.stop_log_stream();
+                self.stop_port_forward();
+                self.sync_log_controls();
+                self.sync_port_forward_controls();
+            }
+            AppMsg::DetailTabChanged(name) => {
+                if name == "logs" {
+                    self.maybe_start_visible_logs(sender);
+                }
+            }
+            AppMsg::ShowCreateYamlDialog => {
+                if self.selected_resource_kind().is_none() {
+                    self.toaster
+                        .add_toast(adw::Toast::new("Select a resource before creating YAML."));
+                    return;
+                }
+                self.create_yaml_dialog.present(Some(root));
+            }
+            AppMsg::CreateYaml => {
+                let Some(context) = self.selected_context.clone() else {
+                    return;
+                };
+                let Some(resource) = self.selected_resource_kind().cloned() else {
+                    return;
+                };
+                let namespace = resource
+                    .is_namespaced()
+                    .then(|| self.selected_namespace.clone());
+                let yaml = text_buffer_text(&self.create_yaml_buffer);
+                self.loading = true;
+                self.status = format!("Creating {}...", resource.label());
+                self.sync_status();
+                sender.oneshot_command(async move {
+                    create_object_yaml(context, resource, namespace, yaml).await
+                });
+            }
+            AppMsg::ObjectCreated(Ok(name)) => {
+                self.loading = false;
+                self.create_yaml_dialog.close();
+                self.create_yaml_buffer.set_text("");
+                self.toaster
+                    .add_toast(adw::Toast::new(&format!("Created {name}.")));
+                self.refresh_objects(sender);
+            }
+            AppMsg::ObjectCreated(Err(error)) => {
+                self.loading = false;
+                self.status = String::from("Unable to create object.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::ScaleDeployment => {
+                let Some(target) = self.detail_target.clone() else {
+                    return;
+                };
+                if !is_deployment_resource(&target.resource) {
+                    return;
+                }
+                let replicas = self.detail_scale_spin.value_as_int();
+                self.detail_request_token = self.detail_request_token.saturating_add(1);
+                let token = self.detail_request_token;
+                self.loading = true;
+                self.status = format!("Scaling {}...", target.name);
+                self.sync_status();
+                sender.oneshot_command(
+                    async move { scale_deployment(token, target, replicas).await },
+                );
+            }
+            AppMsg::ObjectScaled(token, Ok(detail)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.status = format!("Scaled {}", detail.name);
+                self.populate_detail_dialog(&detail);
+                self.update_log_target_containers(&detail);
+                self.sync_status();
+                self.toaster
+                    .add_toast(adw::Toast::new("Deployment scaled."));
+            }
+            AppMsg::ObjectScaled(token, Err(error)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.status = String::from("Unable to scale deployment.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::ToggleNodeScheduling => {
+                let Some(target) = self.detail_target.clone() else {
+                    return;
+                };
+                if !is_node_resource(&target.resource) {
+                    return;
+                }
+                let unschedulable = !self.detail_node_unschedulable.unwrap_or(false);
+                self.detail_request_token = self.detail_request_token.saturating_add(1);
+                let token = self.detail_request_token;
+                self.loading = true;
+                self.status = format!("Updating {}...", target.name);
+                self.sync_status();
+                sender.oneshot_command(async move {
+                    set_node_unschedulable(token, target, unschedulable).await
+                });
+            }
+            AppMsg::NodeSchedulingUpdated(token, Ok(detail)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.status = format!("Updated {}", detail.name);
+                self.populate_detail_dialog(&detail);
+                self.update_log_target_containers(&detail);
+                self.sync_status();
+                self.toaster
+                    .add_toast(adw::Toast::new("Node scheduling updated."));
+            }
+            AppMsg::NodeSchedulingUpdated(token, Err(error)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.status = String::from("Unable to update node scheduling.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::DrainNode => {
+                let Some(target) = self.detail_target.clone() else {
+                    return;
+                };
+                if !is_node_resource(&target.resource) {
+                    return;
+                }
+                let dialog = adw::AlertDialog::new(
+                    Some("Drain node?"),
+                    Some(&format!(
+                        "This will remove eligible Pods from node {}. DaemonSet, mirror and completed Pods are skipped.",
+                        target.name
+                    )),
+                );
+                dialog.add_responses(&[("cancel", "Cancel"), ("drain", "Drain")]);
+                dialog.set_close_response("cancel");
+                dialog.set_default_response(Some("cancel"));
+                dialog.set_response_appearance("drain", adw::ResponseAppearance::Destructive);
+                let sender = sender.clone();
+                dialog.choose(Some(root), gtk::gio::Cancellable::NONE, move |response| {
+                    if response.as_str() == "drain" {
+                        sender.input(AppMsg::ConfirmDrainNode);
+                    }
+                });
+            }
+            AppMsg::ConfirmDrainNode => {
+                let Some(target) = self.detail_target.clone() else {
+                    return;
+                };
+                if !is_node_resource(&target.resource) {
+                    return;
+                }
+                self.detail_request_token = self.detail_request_token.saturating_add(1);
+                let token = self.detail_request_token;
+                self.loading = true;
+                self.status = format!("Draining {}...", target.name);
+                self.sync_status();
+                sender.oneshot_command(async move { drain_node(token, target).await });
+            }
+            AppMsg::NodeDrained(token, Ok((detail, count))) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.status = format!("Drained {}", detail.name);
+                self.populate_detail_dialog(&detail);
+                self.update_log_target_containers(&detail);
+                self.sync_status();
+                self.toaster
+                    .add_toast(adw::Toast::new(&format!("Drain started for {count} Pods.")));
+            }
+            AppMsg::NodeDrained(token, Err(error)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.status = String::from("Unable to drain node.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::ExplainYaml => {
+                self.show_yaml_explanation(root);
+            }
+            AppMsg::ApplyYaml => {
+                let Some(target) = self.detail_target.clone() else {
+                    return;
+                };
+                let yaml = text_buffer_text(&self.detail_yaml_buffer);
+                self.detail_request_token = self.detail_request_token.saturating_add(1);
+                let token = self.detail_request_token;
+                self.loading = true;
+                self.status = format!("Applying {}...", target.name);
+                self.sync_status();
+                sender.oneshot_command(async move { apply_object_yaml(token, target, yaml).await });
+            }
+            AppMsg::ObjectApplied(token, Ok(detail)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.status = format!("Applied {}", detail.name);
+                self.populate_detail_dialog(&detail);
+                self.update_log_target_containers(&detail);
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new("YAML applied."));
+            }
+            AppMsg::ObjectApplied(token, Err(error)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.status = String::from("Unable to apply YAML.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::DownloadYaml => {
+                let yaml = text_buffer_text(&self.detail_yaml_buffer);
+                let name = self
+                    .detail_target
+                    .as_ref()
+                    .map(|target| format!("{}.yaml", target.name))
+                    .unwrap_or_else(|| String::from("object.yaml"));
+                let dialog = gtk::FileDialog::builder()
+                    .title("Save YAML")
+                    .accept_label("Save")
+                    .initial_name(name)
+                    .modal(true)
+                    .build();
+                let sender = sender.clone();
+                dialog.save(
+                    Some(root),
+                    gtk::gio::Cancellable::NONE,
+                    move |result| match result {
+                        Ok(file) => {
+                            if let Some(path) = file.path() {
+                                sender.input(AppMsg::SaveYamlTo(path, yaml.clone()));
+                            } else {
+                                sender.input(AppMsg::Toast(String::from(
+                                    "Selected destination is not available on the local filesystem.",
+                                )));
+                            }
+                        }
+                        Err(error) => {
+                            if !error.matches(gtk::gio::IOErrorEnum::Cancelled) {
+                                sender.input(AppMsg::Toast(error.to_string()));
+                            }
+                        }
+                    },
+                );
+            }
+            AppMsg::SaveYamlTo(path, yaml) => match fs::write(&path, yaml) {
+                Ok(()) => self
+                    .toaster
+                    .add_toast(adw::Toast::new(&format!("Saved {}.", path.display()))),
+                Err(error) => self.toaster.add_toast(adw::Toast::new(&format!(
+                    "Unable to save {}: {error}",
+                    path.display()
+                ))),
+            },
+            AppMsg::DownloadLogs => {
+                let logs = text_buffer_text(&self.detail_log_buffer);
+                let name = self
+                    .detail_target
+                    .as_ref()
+                    .map(|target| format!("{}.log", target.name))
+                    .unwrap_or_else(|| String::from("pod.log"));
+                let dialog = gtk::FileDialog::builder()
+                    .title("Save Logs")
+                    .accept_label("Save")
+                    .initial_name(name)
+                    .modal(true)
+                    .build();
+                let sender = sender.clone();
+                dialog.save(
+                    Some(root),
+                    gtk::gio::Cancellable::NONE,
+                    move |result| match result {
+                        Ok(file) => {
+                            if let Some(path) = file.path() {
+                                sender.input(AppMsg::SaveLogsTo(path, logs.clone()));
+                            } else {
+                                sender.input(AppMsg::Toast(String::from(
+                                    "Selected destination is not available on the local filesystem.",
+                                )));
+                            }
+                        }
+                        Err(error) => {
+                            if !error.matches(gtk::gio::IOErrorEnum::Cancelled) {
+                                sender.input(AppMsg::Toast(error.to_string()));
+                            }
+                        }
+                    },
+                );
+            }
+            AppMsg::SaveLogsTo(path, logs) => match fs::write(&path, logs) {
+                Ok(()) => self
+                    .toaster
+                    .add_toast(adw::Toast::new(&format!("Saved {}.", path.display()))),
+                Err(error) => self.toaster.add_toast(adw::Toast::new(&format!(
+                    "Unable to save {}: {error}",
+                    path.display()
+                ))),
+            },
+            AppMsg::DeleteObject => {
+                let Some(target) = self.detail_target.clone() else {
+                    return;
+                };
+                let dialog = adw::AlertDialog::new(
+                    Some("Delete object?"),
+                    Some(&format!(
+                        "This will delete {} {}.",
+                        target.resource.kind, target.name
+                    )),
+                );
+                dialog.add_responses(&[("cancel", "Cancel"), ("delete", "Delete")]);
+                dialog.set_close_response("cancel");
+                dialog.set_default_response(Some("cancel"));
+                dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+                let sender = sender.clone();
+                dialog.choose(Some(root), gtk::gio::Cancellable::NONE, move |response| {
+                    if response.as_str() == "delete" {
+                        sender.input(AppMsg::ConfirmDeleteObject);
+                    }
+                });
+            }
+            AppMsg::ConfirmDeleteObject => {
+                let Some(target) = self.detail_target.clone() else {
+                    return;
+                };
+                self.detail_request_token = self.detail_request_token.saturating_add(1);
+                let token = self.detail_request_token;
+                self.loading = true;
+                self.status = format!("Deleting {}...", target.name);
+                self.sync_status();
+                sender.oneshot_command(async move { delete_object(token, target).await });
+            }
+            AppMsg::ObjectDeleted(token, Ok(name)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.detail_target = None;
+                self.detail_log_target = None;
+                self.detail_port_forward_target = None;
+                self.stop_log_stream();
+                self.stop_port_forward();
+                self.show_object_list();
+                self.sync_log_controls();
+                self.sync_port_forward_controls();
+                self.toaster
+                    .add_toast(adw::Toast::new(&format!("Deleted {name}.")));
+                self.refresh_objects(sender);
+            }
+            AppMsg::ObjectDeleted(token, Err(error)) => {
+                if token != self.detail_request_token {
+                    return;
+                }
+                self.loading = false;
+                self.status = String::from("Unable to delete object.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::PodLogLine(token, line) => {
+                if token == self.log_stream_token {
+                    self.append_log_line(&line);
+                }
+            }
+            AppMsg::PodLogFinished(token, result) => {
+                if token == self.log_stream_token {
+                    self.log_streaming = false;
+                    self.log_abort_handle = None;
+                    self.sync_log_controls();
+                    if let Err(error) = result {
+                        self.toaster.add_toast(adw::Toast::new(&error));
+                    }
+                }
+            }
+            AppMsg::PodPortForwardEvent(token, event) => {
+                if token == self.port_forward_token {
+                    self.handle_port_forward_event(event);
+                }
+            }
+            AppMsg::PodPortForwardFinished(token, result) => {
+                if token == self.port_forward_token {
+                    self.port_forwarding = false;
+                    self.port_forward_abort_handle = None;
+                    self.sync_port_forward_controls();
+                    if let Err(error) = result {
+                        self.detail_port_status_label
+                            .set_label("Port-forward stopped.");
+                        self.toaster.add_toast(adw::Toast::new(&error));
+                    }
+                }
+            }
+            AppMsg::ShowAddClusterDialog => {
+                self.set_cluster_dialog_editing(false);
+                self.cluster_dialog_stack.set_visible_child_name("options");
+                self.cluster_dialog.present(Some(root));
+            }
+            AppMsg::ShowTokenForm => {
+                self.set_cluster_dialog_editing(false);
+                self.cluster_dialog_stack.set_visible_child_name("token");
+            }
+            AppMsg::ShowImportFile => {
+                let dialog = gtk::FileDialog::builder()
+                    .title("Import Kubeconfig")
+                    .accept_label("Import")
+                    .modal(true)
+                    .build();
+                let sender = sender.clone();
+                dialog.open(
+                    Some(root),
+                    gtk::gio::Cancellable::NONE,
+                    move |result| match result {
+                        Ok(file) => {
+                            if let Some(path) = file.path() {
+                                sender.input(AppMsg::ImportKubeconfig(path));
+                            } else {
+                                sender.input(AppMsg::Toast(String::from(
+                                    "Selected file is not available on the local filesystem.",
+                                )));
+                            }
+                        }
+                        Err(error) => {
+                            if !error.matches(gtk::gio::IOErrorEnum::Cancelled) {
+                                sender.input(AppMsg::Toast(error.to_string()));
+                            }
+                        }
+                    },
+                );
+            }
+            AppMsg::Refresh => {
+                if self.resources.is_empty() {
+                    self.load_cluster(sender);
+                } else {
+                    self.refresh_objects(sender);
+                }
+            }
+            AppMsg::ObjectsLoaded(Ok(objects)) => {
+                self.loading = false;
+                let count = objects.len();
+                self.objects = objects;
+                self.set_object_status(count);
+                self.sync_status();
+                self.rebuild_object_list();
+            }
+            AppMsg::ObjectsLoaded(Err(error)) => {
+                self.loading = false;
+                self.objects.clear();
+                self.status = String::from("Unable to list selected resource.");
+                self.sync_status();
+                self.rebuild_object_list();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::AddCluster => {
+                let request = AddClusterRequest {
+                    context_name: self.setup_name_entry.text().to_string(),
+                    server: self.setup_server_entry.text().to_string(),
+                    bearer_token: self.setup_token_entry.text().to_string(),
+                    certificate_authority_data: Some(self.setup_ca_entry.text().to_string()),
+                    insecure_skip_tls_verify: self.setup_insecure_check.is_active(),
+                    original_context_name: self.editing_context_name.clone(),
+                };
+                self.loading = true;
+                self.status = if self.editing_cluster {
+                    String::from("Saving cluster...")
+                } else {
+                    String::from("Adding cluster...")
+                };
+                self.setup_button.set_sensitive(false);
+                self.sync_status();
+                sender.oneshot_command(async move { add_cluster(request).await });
+            }
+            AppMsg::ClusterAdded(Ok((path, context_name))) => {
+                self.loading = true;
+                self.status = String::from("Loading kubeconfig...");
+                self.setup_button.set_sensitive(true);
+                self.setup_token_entry.set_text("");
+                self.editing_context_name = None;
+                self.cluster_dialog.close();
+                self.toaster
+                    .add_toast(adw::Toast::new(&format!("Cluster saved to {path}")));
+                sender.oneshot_command(async move { load_state_for_cluster(context_name).await });
+            }
+            AppMsg::ClusterAdded(Err(error)) => {
+                self.loading = false;
+                self.setup_button.set_sensitive(true);
+                self.status = String::from("Unable to add cluster.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::ImportKubeconfig(path) => {
+                self.loading = true;
+                self.status = String::from("Importing kubeconfig...");
+                self.sync_status();
+                sender.oneshot_command(async move { import_kubeconfig(path).await });
+            }
+            AppMsg::KubeconfigImported(Ok(path)) => {
+                self.loading = true;
+                self.status = String::from("Loading kubeconfig...");
+                self.cluster_dialog.close();
+                self.toaster
+                    .add_toast(adw::Toast::new(&format!("Kubeconfig imported to {path}")));
+                sender.oneshot_command(load_state());
+            }
+            AppMsg::KubeconfigImported(Err(error)) => {
+                self.loading = false;
+                self.status = String::from("Unable to import kubeconfig.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::Toast(text) => self.toaster.add_toast(adw::Toast::new(&text)),
+        }
+    }
+}

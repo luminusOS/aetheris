@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.luminusos.Aetheris</id>
+  <name>Aetheris</name>
+  <summary>Native Kubernetes client for GNOME</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>
+      Aetheris connects to Kubernetes clusters through kubeconfig and provides a
+      native GTK interface for browsing cluster resources.
+    </p>
+  </description>
+  <launchable type="desktop-id">org.luminusos.Aetheris.desktop</launchable>
+</component>

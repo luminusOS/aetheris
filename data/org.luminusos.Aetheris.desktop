@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Aetheris
+Comment=Operate Kubernetes clusters from a native GNOME interface
+Exec=aetheris
+Icon=org.luminusos.Aetheris
+Terminal=false
+Type=Application
+Categories=Development;System;
+StartupNotify=true

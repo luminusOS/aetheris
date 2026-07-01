@@ -1,0 +1,33 @@
+{
+  "id": "org.luminusos.Aetheris",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "50",
+  "sdk": "org.gnome.Sdk",
+  "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
+  "command": "aetheris",
+  "finish-args": [
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--share=network",
+    "--filesystem=~/.kube:ro",
+    "--filesystem=xdg-config/aetheris:create"
+  ],
+  "build-options": {
+    "append-path": "/usr/lib/sdk/rust-stable/bin",
+    "env": { "CARGO_HOME": "/run/build/aetheris/cargo" }
+  },
+  "modules": [
+    {
+      "name": "aetheris",
+      "buildsystem": "simple",
+      "build-commands": [
+        "cargo build --release --offline",
+        "install -Dm755 target/release/aetheris /app/bin/aetheris",
+        "install -Dm644 data/org.luminusos.Aetheris.desktop /app/share/applications/org.luminusos.Aetheris.desktop",
+        "install -Dm644 data/org.luminusos.Aetheris.metainfo.xml /app/share/metainfo/org.luminusos.Aetheris.metainfo.xml",
+        "install -Dm644 data/icons/hicolor/scalable/apps/org.luminusos.Aetheris.svg /app/share/icons/hicolor/scalable/apps/org.luminusos.Aetheris.svg"
+      ],
+      "sources": [{ "type": "dir", "path": ".." }]
+    }
+  ]
+}
