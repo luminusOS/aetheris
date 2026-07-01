@@ -1,0 +1,829 @@
+use super::ansi::*;
+use super::commands::*;
+use super::dialogs::*;
+use super::layout::*;
+use super::object_detail::*;
+use super::widgets::{
+    action_menu_popover, menu_action_button, rebuild_column_filter_list,
+    rebuild_status_filter_list, selector_button_child, selector_popover,
+};
+use super::yaml::*;
+use super::*;
+
+#[relm4::component(pub)]
+impl Component for App {
+    type Init = ();
+    type Input = AppMsg;
+    type Output = ();
+    type CommandOutput = AppMsg;
+
+    view! {
+        adw::ApplicationWindow {
+            set_title: Some("Aetheris"),
+            set_default_size: (1040, 720),
+
+            #[local_ref]
+            toaster -> adw::ToastOverlay {
+                #[local_ref]
+                root_stack -> gtk::Stack {}
+            },
+        }
+    }
+
+    fn init(
+        _init: Self::Init,
+        root: Self::Root,
+        sender: ComponentSender<Self>,
+    ) -> ComponentParts<Self> {
+        load_app_css();
+
+        let project_list = gtk::ListBox::new();
+        project_list.add_css_class("boxed-list");
+        project_list.set_selection_mode(gtk::SelectionMode::None);
+        let project_title_label = gtk::Label::new(Some(DEFAULT_PROJECT_NAME));
+        project_title_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        project_title_label.set_max_width_chars(22);
+        let add_project_button = gtk::Button::builder()
+            .icon_name("list-add-symbolic")
+            .tooltip_text("Add project")
+            .build();
+        add_project_button.add_css_class("flat");
+        let context_selector_label = gtk::Label::new(Some("No cluster"));
+        context_selector_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        context_selector_label.set_max_width_chars(22);
+        let cluster_back_button = gtk::Button::builder()
+            .icon_name("go-previous-symbolic")
+            .tooltip_text("Back to clusters")
+            .build();
+        cluster_back_button.add_css_class("flat");
+        let cluster_menu_button = gtk::MenuButton::builder()
+            .icon_name("open-menu-symbolic")
+            .tooltip_text("Cluster options")
+            .build();
+        let cluster_edit_button = menu_action_button("document-edit-symbolic", "Edit Cluster…");
+        cluster_menu_button.set_popover(Some(&action_menu_popover(&[&cluster_edit_button])));
+        let cluster_list = gtk::ListBox::new();
+        cluster_list.add_css_class("boxed-list");
+        cluster_list.set_selection_mode(gtk::SelectionMode::None);
+        let add_cluster_button = gtk::Button::builder().label("Add Cluster").build();
+        let import_cluster_button = gtk::Button::builder().label("Import").build();
+        let namespace_selector_label = gtk::Label::new(Some("default"));
+        let namespace_menu_button = gtk::MenuButton::new();
+        namespace_menu_button.set_size_request(170, -1);
+        namespace_menu_button.set_child(Some(&selector_button_child(&namespace_selector_label)));
+        let namespace_list = gtk::ListBox::new();
+        namespace_menu_button.set_popover(Some(&selector_popover(&namespace_list)));
+        let custom_namespace_entry = gtk::Entry::builder()
+            .placeholder_text("my-namespace")
+            .hexpand(true)
+            .build();
+        let custom_namespace_button = gtk::Button::builder()
+            .label("Use")
+            .tooltip_text("Use and save this namespace")
+            .build();
+        custom_namespace_button.add_css_class("suggested-action");
+        let project_name_entry = gtk::Entry::builder()
+            .placeholder_text("Production")
+            .hexpand(true)
+            .build();
+        let project_create_button = gtk::Button::builder().label("Create").build();
+        project_create_button.add_css_class("suggested-action");
+        let project_dialog_description =
+            gtk::Label::new(Some("Separate clusters by environment or company"));
+        let project_menu_button = gtk::MenuButton::builder()
+            .icon_name("open-menu-symbolic")
+            .tooltip_text("Project options")
+            .build();
+        let project_rename_button = menu_action_button("document-edit-symbolic", "Rename Project…");
+        let project_duplicate_button = menu_action_button("edit-copy-symbolic", "Duplicate Project");
+        let project_delete_button = menu_action_button("user-trash-symbolic", "Delete Project…");
+        project_delete_button.add_css_class("destructive-action");
+        project_menu_button.set_popover(Some(&action_menu_popover(&[
+            &project_rename_button,
+            &project_duplicate_button,
+            &project_delete_button,
+        ])));
+        let search_entry = gtk::SearchEntry::builder()
+            .placeholder_text("Search")
+            .width_chars(28)
+            .max_width_chars(75)
+            .build();
+        let status_filter_list = gtk::FlowBox::new();
+        status_filter_list.set_selection_mode(gtk::SelectionMode::None);
+        status_filter_list.set_activate_on_single_click(true);
+        status_filter_list.set_min_children_per_line(2);
+        status_filter_list.set_max_children_per_line(3);
+        status_filter_list.set_column_spacing(8);
+        status_filter_list.set_row_spacing(8);
+        rebuild_status_filter_list(&status_filter_list, StatusFilter::All);
+        let default_columns = ProjectStore::default().visible_object_columns;
+        let column_filter_list = gtk::FlowBox::new();
+        column_filter_list.set_selection_mode(gtk::SelectionMode::None);
+        column_filter_list.set_activate_on_single_click(true);
+        column_filter_list.set_min_children_per_line(2);
+        column_filter_list.set_max_children_per_line(3);
+        column_filter_list.set_column_spacing(8);
+        column_filter_list.set_row_spacing(8);
+        rebuild_column_filter_list(&column_filter_list, &ObjectColumn::ALL, &default_columns);
+        let projects_home_button = gtk::Button::builder()
+            .icon_name("go-home-symbolic")
+            .tooltip_text("Back to projects")
+            .build();
+        projects_home_button.add_css_class("flat");
+        let create_yaml_button = gtk::Button::builder()
+            .label("Create")
+            .icon_name("document-new-symbolic")
+            .tooltip_text("Create object from YAML")
+            .sensitive(false)
+            .build();
+        let refresh_button = gtk::Button::builder()
+            .icon_name("view-refresh-symbolic")
+            .tooltip_text("Refresh resources")
+            .sensitive(false)
+            .build();
+        let detail_back_button = gtk::Button::builder()
+            .icon_name("go-previous-symbolic")
+            .tooltip_text("Back to objects")
+            .visible(false)
+            .build();
+        detail_back_button.add_css_class("flat");
+        let content_title_label = gtk::Label::new(Some("Objects"));
+        content_title_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        content_title_label.set_max_width_chars(24);
+        let content_header_stack = gtk::Stack::new();
+        content_header_stack.set_hhomogeneous(false);
+        content_header_stack.set_vhomogeneous(false);
+        let content_stack = gtk::Stack::builder()
+            .hhomogeneous(false)
+            .vhomogeneous(false)
+            .transition_type(gtk::StackTransitionType::Crossfade)
+            .build();
+        let status_label = gtk::Label::builder()
+            .label("Loading kubeconfig...")
+            .xalign(0.0)
+            .hexpand(true)
+            .build();
+        let spinner = gtk::Spinner::builder().spinning(true).visible(true).build();
+        let resource_list = gtk::ListBox::new();
+        resource_list.add_css_class("boxed-list");
+        resource_list.set_selection_mode(gtk::SelectionMode::None);
+        let object_list = gtk::ListBox::new();
+        object_list.add_css_class("boxed-list");
+        object_list.set_selection_mode(gtk::SelectionMode::None);
+        let detail_name_label = detail_value_label();
+        let detail_namespace_label = detail_value_label();
+        let detail_status_label = detail_value_label();
+        let detail_kind_label = detail_value_label();
+        let detail_api_label = detail_value_label();
+        let detail_age_label = detail_value_label();
+        let detail_cpu_label = detail_value_label();
+        let detail_memory_label = detail_value_label();
+        let detail_container_metrics_list = gtk::ListBox::new();
+        detail_container_metrics_list.add_css_class("boxed-list");
+        detail_container_metrics_list.set_selection_mode(gtk::SelectionMode::None);
+        let detail_scale_spin = gtk::SpinButton::with_range(0.0, 10000.0, 1.0);
+        detail_scale_spin.set_numeric(true);
+        detail_scale_spin.set_visible(false);
+        let detail_scale_button = gtk::Button::builder()
+            .label("Scale")
+            .icon_name("view-grid-symbolic")
+            .tooltip_text("Scale deployment replicas")
+            .sensitive(false)
+            .visible(false)
+            .build();
+        let detail_cordon_button = gtk::Button::builder()
+            .label("Cordon")
+            .icon_name("changes-prevent-symbolic")
+            .tooltip_text("Toggle node scheduling")
+            .sensitive(false)
+            .visible(false)
+            .build();
+        let detail_drain_button = gtk::Button::builder()
+            .label("Drain")
+            .icon_name("edit-delete-symbolic")
+            .tooltip_text("Drain eligible pods from this node")
+            .sensitive(false)
+            .visible(false)
+            .build();
+        detail_drain_button.add_css_class("destructive-action");
+        let detail_explain_yaml_button = gtk::Button::builder()
+            .label("Explain")
+            .icon_name("dialog-information-symbolic")
+            .tooltip_text("Explain this YAML manifest")
+            .sensitive(false)
+            .build();
+        let detail_apply_button = gtk::Button::builder()
+            .label("Apply YAML")
+            .icon_name("document-send-symbolic")
+            .tooltip_text("Apply edited YAML to the cluster")
+            .sensitive(false)
+            .build();
+        detail_apply_button.add_css_class("suggested-action");
+        let detail_download_yaml_button = gtk::Button::builder()
+            .label("Save YAML")
+            .icon_name("document-save-as-symbolic")
+            .tooltip_text("Save YAML to a local file")
+            .sensitive(false)
+            .build();
+        let detail_delete_button = gtk::Button::builder()
+            .icon_name("user-trash-symbolic")
+            .tooltip_text("Delete this object")
+            .sensitive(false)
+            .visible(false)
+            .build();
+        detail_delete_button.add_css_class("destructive-action");
+        detail_delete_button.add_css_class("flat");
+        let detail_port_forward_group = gtk::Box::new(gtk::Orientation::Vertical, 8);
+        let detail_overview_section = gtk::Box::new(gtk::Orientation::Vertical, 12);
+        let detail_expand_logs_button = gtk::Button::builder()
+            .icon_name("view-fullscreen-symbolic")
+            .tooltip_text("Hide summary to see more of this tab")
+            .build();
+        let detail_yaml_buffer = sourceview5::Buffer::new(None);
+        let detail_yaml_error_label = gtk::Label::new(None);
+        setup_yaml_buffer(&detail_yaml_buffer, &detail_yaml_error_label);
+        let detail_events_list = gtk::ListBox::new();
+        detail_events_list.add_css_class("boxed-list");
+        detail_events_list.set_selection_mode(gtk::SelectionMode::None);
+        let detail_conditions_list = gtk::ListBox::new();
+        detail_conditions_list.add_css_class("boxed-list");
+        detail_conditions_list.set_selection_mode(gtk::SelectionMode::None);
+        let detail_related_pods_list = gtk::ListBox::new();
+        detail_related_pods_list.add_css_class("boxed-list");
+        detail_related_pods_list.set_selection_mode(gtk::SelectionMode::None);
+        let detail_log_container_dropdown = gtk::DropDown::from_strings(&["No containers"]);
+        detail_log_container_dropdown.set_sensitive(false);
+        let detail_log_follow_check = gtk::CheckButton::builder().label("Follow").build();
+        detail_log_follow_check.set_active(true);
+        detail_log_follow_check.set_sensitive(false);
+        let detail_log_timestamps_check = gtk::CheckButton::builder().label("Timestamps").build();
+        detail_log_timestamps_check.set_active(false);
+        detail_log_timestamps_check.set_sensitive(false);
+        let detail_log_start_button = gtk::Button::builder()
+            .label("Start")
+            .icon_name("media-playback-start-symbolic")
+            .tooltip_text("Start log streaming")
+            .sensitive(false)
+            .build();
+        let detail_log_stop_button = gtk::Button::builder()
+            .label("Stop")
+            .icon_name("media-playback-stop-symbolic")
+            .tooltip_text("Stop log streaming")
+            .sensitive(false)
+            .build();
+        let detail_log_clear_button = gtk::Button::builder()
+            .label("Clear")
+            .icon_name("edit-clear-symbolic")
+            .tooltip_text("Clear visible logs")
+            .build();
+        let detail_log_download_button = gtk::Button::builder()
+            .icon_name("document-save-as-symbolic")
+            .tooltip_text("Save logs to a local file")
+            .build();
+        let detail_log_status_label = gtk::Label::builder()
+            .label("Logs are available for Pods.")
+            .xalign(0.0)
+            .hexpand(true)
+            .build();
+        let detail_log_buffer = gtk::TextBuffer::new(None::<&gtk::TextTagTable>);
+        setup_log_highlighting(&detail_log_buffer);
+        let detail_log_view = gtk::TextView::with_buffer(&detail_log_buffer);
+        let detail_port_local_spin = gtk::SpinButton::with_range(0.0, 65535.0, 1.0);
+        detail_port_local_spin.set_numeric(true);
+        detail_port_local_spin.set_value(0.0);
+        detail_port_local_spin.set_tooltip_text(Some("Local port, or 0 for an automatic port"));
+        let detail_port_remote_spin = gtk::SpinButton::with_range(1.0, 65535.0, 1.0);
+        detail_port_remote_spin.set_numeric(true);
+        detail_port_remote_spin.set_value(8080.0);
+        detail_port_remote_spin.set_tooltip_text(Some("Pod port to forward"));
+        let detail_port_start_button = gtk::Button::builder()
+            .label("Start")
+            .icon_name("media-playback-start-symbolic")
+            .tooltip_text("Start port forwarding")
+            .sensitive(false)
+            .build();
+        let detail_port_stop_button = gtk::Button::builder()
+            .label("Stop")
+            .icon_name("media-playback-stop-symbolic")
+            .tooltip_text("Stop port forwarding")
+            .sensitive(false)
+            .build();
+        let detail_port_status_label = gtk::Label::builder()
+            .label("Port forwarding is available for Pods.")
+            .xalign(0.0)
+            .hexpand(true)
+            .wrap(true)
+            .build();
+        let detail_stack = gtk::Stack::builder()
+            .hhomogeneous(false)
+            .vhomogeneous(false)
+            .transition_type(gtk::StackTransitionType::Crossfade)
+            .vexpand(true)
+            .build();
+        let detail_page = build_object_detail_page(ObjectDetailWidgets {
+            stack: &detail_stack,
+            name: &detail_name_label,
+            namespace: &detail_namespace_label,
+            status: &detail_status_label,
+            kind: &detail_kind_label,
+            api_version: &detail_api_label,
+            age: &detail_age_label,
+            cpu: &detail_cpu_label,
+            memory: &detail_memory_label,
+            container_metrics_list: &detail_container_metrics_list,
+            scale_spin: &detail_scale_spin,
+            scale_button: &detail_scale_button,
+            cordon_button: &detail_cordon_button,
+            drain_button: &detail_drain_button,
+            explain_yaml_button: &detail_explain_yaml_button,
+            apply_button: &detail_apply_button,
+            download_yaml_button: &detail_download_yaml_button,
+            yaml_buffer: &detail_yaml_buffer,
+            yaml_error_label: &detail_yaml_error_label,
+            events_list: &detail_events_list,
+            conditions_list: &detail_conditions_list,
+            related_pods_list: &detail_related_pods_list,
+            log_container_dropdown: &detail_log_container_dropdown,
+            log_follow_check: &detail_log_follow_check,
+            log_timestamps_check: &detail_log_timestamps_check,
+            log_start_button: &detail_log_start_button,
+            log_stop_button: &detail_log_stop_button,
+            log_clear_button: &detail_log_clear_button,
+            log_download_button: &detail_log_download_button,
+            log_status_label: &detail_log_status_label,
+            log_view: &detail_log_view,
+            port_local_spin: &detail_port_local_spin,
+            port_remote_spin: &detail_port_remote_spin,
+            port_start_button: &detail_port_start_button,
+            port_stop_button: &detail_port_stop_button,
+            port_status_label: &detail_port_status_label,
+            port_forward_group: &detail_port_forward_group,
+            overview_section: &detail_overview_section,
+            expand_logs_button: &detail_expand_logs_button,
+        });
+
+        let setup_name_entry = gtk::Entry::builder()
+            .placeholder_text("production")
+            .hexpand(true)
+            .build();
+        let setup_server_entry = gtk::Entry::builder()
+            .placeholder_text("https://127.0.0.1:6443")
+            .hexpand(true)
+            .build();
+        let setup_token_entry = gtk::PasswordEntry::builder()
+            .placeholder_text("Bearer token")
+            .hexpand(true)
+            .show_peek_icon(true)
+            .build();
+        let setup_ca_entry = gtk::Entry::builder()
+            .placeholder_text("Optional base64 CA data")
+            .hexpand(true)
+            .build();
+        let setup_insecure_check = gtk::CheckButton::builder()
+            .label("Skip TLS verification")
+            .build();
+        let setup_button = gtk::Button::builder()
+            .label("Add Cluster")
+            .sensitive(true)
+            .build();
+        setup_button.add_css_class("suggested-action");
+        let cluster_token_title_label = gtk::Label::new(Some("Connect with token"));
+        let cluster_token_back_button = gtk::Button::builder()
+            .icon_name("go-previous-symbolic")
+            .build();
+        let open_dialog_button = gtk::Button::builder().halign(gtk::Align::Center).build();
+        open_dialog_button.add_css_class("suggested-action");
+        let custom_namespace_dialog =
+            build_custom_namespace_dialog(&custom_namespace_entry, &custom_namespace_button);
+        let project_dialog = build_project_dialog(
+            &project_name_entry,
+            &project_create_button,
+            &project_dialog_description,
+        );
+        let create_yaml_buffer = sourceview5::Buffer::new(None);
+        let create_yaml_error_label = gtk::Label::new(None);
+        setup_yaml_buffer(&create_yaml_buffer, &create_yaml_error_label);
+        let create_yaml_apply_button = gtk::Button::builder().label("Create").build();
+        create_yaml_apply_button.add_css_class("suggested-action");
+        let create_yaml_dialog = build_create_yaml_dialog(
+            &create_yaml_buffer,
+            &create_yaml_apply_button,
+            &create_yaml_error_label,
+        );
+
+        let cluster_dialog_stack = gtk::Stack::new();
+        let cluster_dialog = build_cluster_dialog(
+            ClusterDialogWidgets {
+                stack: &cluster_dialog_stack,
+                name_entry: &setup_name_entry,
+                server_entry: &setup_server_entry,
+                token_entry: &setup_token_entry,
+                ca_entry: &setup_ca_entry,
+                insecure_check: &setup_insecure_check,
+                add_button: &setup_button,
+                title_label: &cluster_token_title_label,
+                back_button: &cluster_token_back_button,
+            },
+            sender.clone(),
+        );
+
+        let toaster = adw::ToastOverlay::new();
+        let root_stack = gtk::Stack::new();
+        root_stack.set_hhomogeneous(false);
+        root_stack.set_vhomogeneous(false);
+        let split_view = adw::NavigationSplitView::builder()
+            .min_sidebar_width(180.0)
+            .max_sidebar_width(240.0)
+            .sidebar_width_fraction(0.22)
+            .collapsed(false)
+            .show_content(true)
+            .build();
+        let compact_layout = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            900.0,
+            adw::LengthUnit::Sp,
+        ));
+        compact_layout.add_setters(&[
+            (&split_view, "collapsed", true),
+            (&split_view, "show-content", false),
+        ]);
+        root.add_breakpoint(compact_layout);
+
+        let sidebar = build_sidebar(SidebarWidgets {
+            cluster_title: &context_selector_label,
+            cluster_back_button: &cluster_back_button,
+            cluster_menu_button: &cluster_menu_button,
+            namespace_menu_button: &namespace_menu_button,
+            resource_list: &resource_list,
+        });
+        let content = build_content(ContentWidgets {
+            detail_back_button: &detail_back_button,
+            delete_button: &detail_delete_button,
+            create_yaml_button: &create_yaml_button,
+            refresh_button: &refresh_button,
+            search_entry: &search_entry,
+            status_filter_list: &status_filter_list,
+            column_filter_list: &column_filter_list,
+            title: &content_title_label,
+            header_stack: &content_header_stack,
+            content_stack: &content_stack,
+            status_label: &status_label,
+            spinner: &spinner,
+            object_list: &object_list,
+            detail_page: &detail_page,
+        });
+        split_view.set_sidebar(Some(&sidebar));
+        split_view.set_content(Some(&content));
+        root_stack.add_named(&build_empty_setup_page(&open_dialog_button), Some("setup"));
+        root_stack.add_named(
+            &build_projects_page(&project_list, &add_project_button),
+            Some("projects"),
+        );
+        root_stack.add_named(
+            &build_clusters_page(ClustersPageWidgets {
+                projects_home_button: &projects_home_button,
+                project_title: &project_title_label,
+                project_menu_button: &project_menu_button,
+                cluster_list: &cluster_list,
+                add_cluster_button: &add_cluster_button,
+                import_cluster_button: &import_cluster_button,
+            }),
+            Some("clusters"),
+        );
+        root_stack.add_named(&split_view, Some("browser"));
+        root_stack.set_visible_child_name("projects");
+
+        project_list.connect_row_activated({
+            let sender = sender.clone();
+            move |_, row| sender.input(AppMsg::ProjectChanged(row.index() as u32))
+        });
+        cluster_list.connect_row_activated({
+            let sender = sender.clone();
+            move |_, row| sender.input(AppMsg::ClusterChanged(row.index() as u32))
+        });
+        cluster_back_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowClusters)
+        });
+        cluster_edit_button.connect_clicked({
+            let sender = sender.clone();
+            let menu_button = cluster_menu_button.clone();
+            move |_| {
+                menu_button.popdown();
+                sender.input(AppMsg::EditCurrentCluster);
+            }
+        });
+        add_cluster_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowAddClusterDialog)
+        });
+        import_cluster_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowImportFile)
+        });
+        namespace_list.connect_row_activated({
+            let sender = sender.clone();
+            move |_, row| sender.input(AppMsg::NamespaceChanged(row.index() as u32))
+        });
+        add_project_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowAddProjectDialog)
+        });
+        custom_namespace_entry.connect_activate({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::CustomNamespaceEntered)
+        });
+        custom_namespace_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::CustomNamespaceEntered)
+        });
+        status_filter_list.connect_child_activated({
+            let sender = sender.clone();
+            move |_, child| sender.input(AppMsg::StatusFilterChanged(child.index() as u32))
+        });
+        column_filter_list.connect_child_activated({
+            let sender = sender.clone();
+            move |_, child| sender.input(AppMsg::ObjectColumnToggled(child.index() as u32))
+        });
+        project_name_entry.connect_activate({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::AddProject)
+        });
+        project_create_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::AddProject)
+        });
+        project_rename_button.connect_clicked({
+            let sender = sender.clone();
+            let menu_button = project_menu_button.clone();
+            move |_| {
+                menu_button.popdown();
+                sender.input(AppMsg::ShowRenameProjectDialog);
+            }
+        });
+        project_duplicate_button.connect_clicked({
+            let sender = sender.clone();
+            let menu_button = project_menu_button.clone();
+            move |_| {
+                menu_button.popdown();
+                sender.input(AppMsg::DuplicateProject);
+            }
+        });
+        project_delete_button.connect_clicked({
+            let sender = sender.clone();
+            let menu_button = project_menu_button.clone();
+            move |_| {
+                menu_button.popdown();
+                sender.input(AppMsg::DeleteProject);
+            }
+        });
+        search_entry.connect_search_changed({
+            let sender = sender.clone();
+            move |entry| sender.input(AppMsg::SearchChanged(entry.text().to_string()))
+        });
+        object_list.connect_row_activated({
+            let sender = sender.clone();
+            move |_, row| {
+                if row.index() > 0 {
+                    sender.input(AppMsg::ObjectActivated(row.index() - 1));
+                }
+            }
+        });
+        create_yaml_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowCreateYamlDialog)
+        });
+        create_yaml_apply_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::CreateYaml)
+        });
+        detail_related_pods_list.connect_row_activated({
+            let sender = sender.clone();
+            move |_, row| sender.input(AppMsg::RelatedPodActivated(row.index()))
+        });
+        detail_back_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::BackToObjects)
+        });
+        projects_home_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowProjects)
+        });
+        detail_stack.connect_visible_child_name_notify({
+            let sender = sender.clone();
+            move |stack| {
+                if let Some(name) = stack.visible_child_name() {
+                    sender.input(AppMsg::DetailTabChanged(name.to_string()));
+                }
+            }
+        });
+        detail_apply_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ApplyYaml)
+        });
+        detail_explain_yaml_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ExplainYaml)
+        });
+        detail_download_yaml_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::DownloadYaml)
+        });
+        detail_delete_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::DeleteObject)
+        });
+        detail_scale_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ScaleDeployment)
+        });
+        detail_cordon_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ToggleNodeScheduling)
+        });
+        detail_drain_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::DrainNode)
+        });
+        detail_log_start_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::StartPodLogs)
+        });
+        detail_log_stop_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::StopPodLogs)
+        });
+        detail_log_clear_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ClearPodLogs)
+        });
+        detail_expand_logs_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ToggleDetailOverview)
+        });
+        detail_log_download_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::DownloadLogs)
+        });
+        detail_port_start_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::StartPodPortForward)
+        });
+        detail_port_stop_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::StopPodPortForward)
+        });
+        refresh_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::Refresh)
+        });
+        open_dialog_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowAddClusterDialog)
+        });
+        setup_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::AddCluster)
+        });
+
+        let model = App {
+            projects: ProjectStore::default(),
+            contexts: Vec::new(),
+            namespaces: vec![String::from("default")],
+            resources: Vec::new(),
+            objects: Vec::new(),
+            object_list_generation: std::rc::Rc::new(std::cell::Cell::new(0)),
+            selected_context: None,
+            selected_namespace: String::from("default"),
+            selected_resource_section: ResourceSection::Workloads,
+            selected_resource: None,
+            search_query: String::new(),
+            selected_status_filter: StatusFilter::All,
+            loading: true,
+            status: String::from("Loading kubeconfig..."),
+            toaster,
+            root_stack,
+            split_view,
+            project_list,
+            project_title_label,
+            add_project_button,
+            cluster_back_button,
+            cluster_menu_button,
+            context_selector_label,
+            cluster_list,
+            add_cluster_button,
+            import_cluster_button,
+            cluster_summaries: std::collections::HashMap::new(),
+            namespace_menu_button,
+            namespace_selector_label,
+            namespace_list,
+            search_entry,
+            status_filter_list,
+            column_filter_list,
+            create_yaml_button,
+            refresh_button,
+            detail_back_button,
+            content_title_label,
+            content_header_stack,
+            content_stack,
+            status_label,
+            spinner,
+            resource_list,
+            object_list,
+            detail_stack,
+            detail_name_label,
+            detail_namespace_label,
+            detail_status_label,
+            detail_kind_label,
+            detail_api_label,
+            detail_age_label,
+            detail_cpu_label,
+            detail_memory_label,
+            detail_container_metrics_list,
+            detail_scale_spin,
+            detail_scale_button,
+            detail_cordon_button,
+            detail_drain_button,
+            detail_explain_yaml_button,
+            detail_apply_button,
+            detail_download_yaml_button,
+            detail_delete_button,
+            detail_yaml_buffer,
+            detail_events_list,
+            detail_conditions_list,
+            detail_related_pods_list,
+            detail_log_container_dropdown,
+            detail_log_follow_check,
+            detail_log_timestamps_check,
+            detail_log_start_button,
+            detail_log_stop_button,
+            detail_log_status_label,
+            detail_log_buffer,
+            detail_log_view,
+            detail_port_local_spin,
+            detail_port_remote_spin,
+            detail_port_start_button,
+            detail_port_stop_button,
+            detail_port_status_label,
+            detail_port_forward_group,
+            detail_overview_section,
+            detail_expand_logs_button,
+            detail_target: None,
+            detail_log_target: None,
+            detail_port_forward_target: None,
+            detail_related_pods: Vec::new(),
+            detail_node_unschedulable: None,
+            detail_request_token: 0,
+            log_streaming: false,
+            log_stream_token: 0,
+            log_abort_handle: None,
+            port_forwarding: false,
+            port_forward_token: 0,
+            port_forward_abort_handle: None,
+            custom_namespace_dialog,
+            custom_namespace_entry,
+            custom_namespace_button,
+            project_dialog,
+            project_dialog_description,
+            project_name_entry,
+            project_create_button,
+            editing_project_name: None,
+            create_yaml_dialog,
+            create_yaml_buffer,
+            create_yaml_apply_button,
+            cluster_dialog,
+            cluster_dialog_stack,
+            cluster_token_title_label,
+            cluster_token_back_button,
+            setup_name_entry,
+            setup_server_entry,
+            setup_token_entry,
+            setup_ca_entry,
+            setup_insecure_check,
+            setup_button,
+            editing_cluster: false,
+            editing_context_name: None,
+        };
+
+        let toaster = model.toaster.clone();
+        let root_stack = model.root_stack.clone();
+        let widgets = view_output!();
+
+        sender.oneshot_command(load_state());
+
+        ComponentParts { model, widgets }
+    }
+
+    fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
+        self.handle_msg(msg, sender, _root);
+    }
+
+    fn update_cmd(
+        &mut self,
+        msg: Self::CommandOutput,
+        sender: ComponentSender<Self>,
+        _root: &Self::Root,
+    ) {
+        self.handle_msg(msg, sender, _root);
+    }
+}

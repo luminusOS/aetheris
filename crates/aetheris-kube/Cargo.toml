@@ -1,0 +1,21 @@
+[package]
+name = "aetheris-kube"
+description = "Kubernetes backend for Aetheris"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+dirs.workspace = true
+futures.workspace = true
+k8s-openapi.workspace = true
+kube.workspace = true
+secrecy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true

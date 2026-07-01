@@ -1,0 +1,25 @@
+[package]
+name = "aetheris-app"
+description = "Aetheris native Kubernetes client for GNOME"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "aetheris"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+aetheris-kube = { path = "../aetheris-kube" }
+dirs.workspace = true
+futures.workspace = true
+relm4.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+sourceview5 = "0.11"
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
