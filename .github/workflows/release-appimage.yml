@@ -12,10 +12,32 @@ jobs:
   appimage:
     name: Build AppImage
     runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
     outputs:
       artifact-name: ${{ steps.names.outputs.artifact_name }}
       appimage-name: ${{ steps.names.outputs.appimage_name }}
     steps:
+      - name: Install system dependencies
+        run: |
+          dnf install -y \
+            appstream \
+            curl \
+            desktop-file-utils \
+            file \
+            findutils \
+            gcc \
+            gcc-c++ \
+            git \
+            gtk4-devel \
+            gtksourceview5-devel \
+            libadwaita-devel \
+            make \
+            openssl-devel \
+            patchelf \
+            pkgconf-pkg-config \
+            vte291-gtk4-devel
+
       - name: Check out sources
         uses: actions/checkout@v4
 
@@ -47,22 +69,6 @@ jobs:
           echo "artifact_name=appimage-bundle" >> "$GITHUB_OUTPUT"
           echo "appimage_name=aetheris-${VERSION}-x86_64.AppImage" >> "$GITHUB_OUTPUT"
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            appstream \
-            curl \
-            desktop-file-utils \
-            file \
-            libadwaita-1-dev \
-            libgtk-4-dev \
-            libgtksourceview-5-dev \
-            libssl-dev \
-            libvte-2.91-gtk4-dev \
-            patchelf \
-            pkg-config
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -70,20 +76,20 @@ jobs:
         run: |
           set -euo pipefail
           cargo install cargo-appimage
-          sudo mkdir -p /usr/local/share/appimagetool
-          sudo curl -fL \
+          mkdir -p /usr/local/share/appimagetool
+          curl -fL \
             "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage" \
             -o /usr/local/bin/appimagetool-bin
-          sudo curl -fL \
+          curl -fL \
             "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64" \
             -o /usr/local/share/appimagetool/runtime-x86_64
-          sudo chmod +x /usr/local/bin/appimagetool-bin /usr/local/share/appimagetool/runtime-x86_64
-          sudo tee /usr/local/bin/appimagetool >/dev/null <<'EOF'
+          chmod +x /usr/local/bin/appimagetool-bin /usr/local/share/appimagetool/runtime-x86_64
+          tee /usr/local/bin/appimagetool >/dev/null <<'EOF'
           #!/usr/bin/env bash
           set -euo pipefail
           exec /usr/local/bin/appimagetool-bin --runtime-file /usr/local/share/appimagetool/runtime-x86_64 "$@"
           EOF
-          sudo chmod +x /usr/local/bin/appimagetool
+          chmod +x /usr/local/bin/appimagetool
 
       - name: Build AppImage
         run: |

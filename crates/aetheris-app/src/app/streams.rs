@@ -510,6 +510,17 @@ impl App {
     }
 
     #[cfg(not(target_os = "windows"))]
+    pub(super) fn finish_terminal_session(&mut self, token: u64) {
+        if let Some(session) = self.terminal_sessions.get_mut(&token) {
+            session.abort_handle = None;
+            session.input_tx = None;
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    pub(super) fn finish_terminal_session(&mut self, _token: u64) {}
+
+    #[cfg(not(target_os = "windows"))]
     pub(super) fn send_terminal_input(&self, token: u64, text: String) {
         if let Some(input_tx) = self
             .terminal_sessions

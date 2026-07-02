@@ -68,7 +68,6 @@ copy_dylib() {
 
 fix_binary() {
   local binary="$1"
-  local new_libs=()
   local rpath
   rpath="@loader_path/$(python3 -c 'import os, sys; print(os.path.relpath(sys.argv[1], os.path.dirname(sys.argv[2])))' "$frameworks" "$binary")"
 
@@ -84,7 +83,7 @@ fix_binary() {
 
     if [ -f "$src" ]; then
       if copy_dylib "$src"; then
-        new_libs+=("$frameworks/$name")
+        printf '%s\n' "$frameworks/$name"
       fi
       install_name_tool -change "$lib" "@rpath/$name" "$binary" 2>/dev/null || true
     fi
@@ -93,17 +92,19 @@ fix_binary() {
   if ! otool -l "$binary" 2>/dev/null | grep -q "$rpath"; then
     install_name_tool -add_rpath "$rpath" "$binary" 2>/dev/null || true
   fi
-
-  printf '%s\n' "${new_libs[@]}"
 }
 
 queue=()
+queue_count=0
 while IFS= read -r lib; do
-  [ -n "$lib" ] && queue+=("$lib")
+  if [ -n "$lib" ]; then
+    queue+=("$lib")
+    queue_count=$((queue_count + 1))
+  fi
 done < <(fix_binary "$main_binary")
 
 pass=0
-while [ "${#queue[@]}" -gt 0 ]; do
+while [ "$queue_count" -gt 0 ]; do
   pass=$((pass + 1))
   if [ "$pass" -gt 30 ]; then
     echo "Stopping dylib recursion after 30 passes." >&2
@@ -111,12 +112,21 @@ while [ "${#queue[@]}" -gt 0 ]; do
   fi
 
   next=()
+  next_count=0
   for lib in "${queue[@]}"; do
     while IFS= read -r new_lib; do
-      [ -n "$new_lib" ] && next+=("$new_lib")
+      if [ -n "$new_lib" ]; then
+        next+=("$new_lib")
+        next_count=$((next_count + 1))
+      fi
     done < <(fix_binary "$lib")
   done
-  queue=("${next[@]}")
+  if [ "$next_count" -gt 0 ]; then
+    queue=("${next[@]}")
+  else
+    queue=()
+  fi
+  queue_count="$next_count"
 done
 
 copy_tree "$brew_prefix/share/glib-2.0/schemas" "$share/glib-2.0/schemas"
