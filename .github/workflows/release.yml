@@ -74,6 +74,5 @@ jobs:
             dist/aetheris-*-macos-*.dmg
             dist/${{ needs.windows.outputs.bundle-name }}
             dist/${{ needs.windows.outputs.setup-name }}
-            dist/${{ needs.flatpak.outputs.source-name }}
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
