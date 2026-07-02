@@ -17,13 +17,17 @@
   "build-options": {
     "append-path": "/usr/lib/sdk/rust-stable/bin",
     "build-args": ["--share=network"],
-    "env": { "CARGO_HOME": "/run/build/aetheris/cargo" }
+    "env": {
+      "CARGO_HOME": "/run/build/aetheris/cargo",
+      "PKG_CONFIG_PATH": "/app/lib/pkgconfig:/app/lib64/pkgconfig:/app/lib/x86_64-linux-gnu/pkgconfig:/app/share/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
+    }
   },
   "modules": [
     {
       "name": "vte",
       "buildsystem": "meson",
       "config-opts": [
+        "--libdir=lib",
         "-Dgtk4=true",
         "-Dgtk3=false",
         "-Dgir=false",
@@ -32,6 +36,10 @@
         "-Dapp=false",
         "-Dglade=false",
         "-D_systemd=false"
+      ],
+      "post-install": [
+        "find /app -name 'vte-*.pc' -print",
+        "test -f /app/lib/pkgconfig/vte-2.91-gtk4.pc"
       ],
       "sources": [
         {

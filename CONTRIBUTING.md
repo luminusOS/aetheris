@@ -99,10 +99,11 @@ To build a local Flatpak bundle:
 
 ```sh
 sudo dnf install flatpak flatpak-builder
-sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
 mkdir -p target/flatpak
 flatpak-builder \
+  --user \
   --force-clean \
   --disable-rofiles-fuse \
   --install-deps-from=flathub \
