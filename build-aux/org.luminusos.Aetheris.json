@@ -6,6 +6,7 @@
   "sdk": "org.gnome.Sdk",
   "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
   "command": "aetheris",
+  "appstream-compose": false,
   "finish-args": [
     "--socket=wayland",
     "--socket=fallback-x11",
@@ -20,6 +21,27 @@
   },
   "modules": [
     {
+      "name": "vte",
+      "buildsystem": "meson",
+      "config-opts": [
+        "-Dgtk4=true",
+        "-Dgtk3=false",
+        "-Dgir=false",
+        "-Dvapi=false",
+        "-Ddocs=false",
+        "-Dapp=false",
+        "-Dglade=false",
+        "-D_systemd=false"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://gitlab.gnome.org/GNOME/vte.git",
+          "tag": "0.83.91"
+        }
+      ]
+    },
+    {
       "name": "aetheris",
       "buildsystem": "simple",
       "build-commands": [
@@ -27,11 +49,14 @@
         "install -Dm755 target/release/aetheris /app/bin/aetheris",
         "install -Dm644 data/org.luminusos.Aetheris.desktop /app/share/applications/org.luminusos.Aetheris.desktop",
         "install -Dm644 data/org.luminusos.Aetheris.metainfo.xml /app/share/metainfo/org.luminusos.Aetheris.metainfo.xml",
-        "install -Dm644 data/icons/hicolor/scalable/apps/org.luminusos.Aetheris.svg /app/share/icons/hicolor/scalable/apps/org.luminusos.Aetheris.svg",
+        "install -Dm644 data/icons/hicolor/64x64/apps/org.luminusos.Aetheris.png /app/share/icons/hicolor/64x64/apps/org.luminusos.Aetheris.png",
+        "install -Dm644 data/icons/hicolor/128x128/apps/org.luminusos.Aetheris.png /app/share/icons/hicolor/128x128/apps/org.luminusos.Aetheris.png",
+        "install -Dm644 data/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png /app/share/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png",
+        "install -Dm644 data/icons/hicolor/512x512/apps/org.luminusos.Aetheris.png /app/share/icons/hicolor/512x512/apps/org.luminusos.Aetheris.png",
         "install -Dm644 data/icons/hicolor/symbolic/apps/org.luminusos.Aetheris-symbolic.svg /app/share/icons/hicolor/symbolic/apps/org.luminusos.Aetheris-symbolic.svg",
         "install -Dm644 data/icons/hicolor/scalable/actions/nautilus-search-filters-symbolic.svg /app/share/icons/hicolor/scalable/actions/nautilus-search-filters-symbolic.svg"
       ],
-      "sources": [{ "type": "dir", "path": "." }]
+      "sources": [{ "type": "dir", "path": ".." }]
     }
   ]
 }

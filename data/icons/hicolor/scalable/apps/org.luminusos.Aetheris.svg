@@ -2,53 +2,51 @@
 <!-- Aetheris app icon.
 
      Concept: the Aether — the highest, purest, brightest layer of the sky in
-     classical mythology. A radiant core with an orbit of cluster nodes floats
-     high above the dark curve of the world below: your clusters, running
-     clean and untouchable in the bright upper air.
+     classical mythology. A radiant orb floating in the upper air, with a ring
+     of cluster nodes in orbit around it: your clusters, running clean and
+     untouchable above the world.
 
-     Follows the GNOME HIG for app icons: 128px grid, flat straight-on
-     perspective, GNOME palette blues, and a silhouette that stays readable
-     at 16px (bright orb + arc). -->
+     Follows the GNOME HIG for app icons: 128px grid, a distinct object
+     silhouette instead of a full-bleed tile, simple geometric shapes, GNOME
+     palette blues, flat colors with a gradient only on the curved orb, and a
+     darker 4px profile at the bottom of the object. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <!-- Upper sky: brighter toward the top where the aether lives. -->
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#62a0ea"/>
-      <stop offset="0.62" stop-color="#3584e4"/>
-      <stop offset="1" stop-color="#1a5fb4"/>
+    <!-- Gradient only on the curved surface of the orb, brighter toward
+         the top where the light comes from. -->
+    <linearGradient id="orb" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#99c1f1"/>
+      <stop offset="0.55" stop-color="#62a0ea"/>
+      <stop offset="1" stop-color="#3584e4"/>
     </linearGradient>
-    <!-- The radiance of the aether around the core. -->
-    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
-      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.38"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="world" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1a5fb4"/>
-      <stop offset="1" stop-color="#0f2b57"/>
-    </linearGradient>
-    <clipPath id="canvas">
-      <rect width="128" height="128" rx="26"/>
+    <clipPath id="orb-clip">
+      <circle cx="64" cy="64" r="40"/>
     </clipPath>
+    <clipPath id="node-a"><circle cx="64" cy="85" r="9"/></clipPath>
+    <clipPath id="node-b"><circle cx="21.1" cy="77.5" r="7"/></clipPath>
+    <clipPath id="node-c"><circle cx="106.9" cy="77.5" r="7"/></clipPath>
   </defs>
 
-  <rect width="128" height="128" rx="26" fill="url(#sky)"/>
+  <!-- Back half of the orbit ring, passing behind the orb. -->
+  <path d="M 8 64 A 56 21 0 0 1 120 64" fill="none" stroke="#deddda" stroke-width="6"/>
 
-  <g clip-path="url(#canvas)">
-    <!-- Faint upper band of the lower atmosphere, separating the pure
-         layer above from the world below. -->
-    <circle cx="64" cy="198" r="126" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="2.5"/>
-    <!-- The world below: a dark horizon with a thin bright rim of air. -->
-    <circle cx="64" cy="198" r="112" fill="url(#world)"/>
-    <circle cx="64" cy="198" r="112" fill="none" stroke="#99c1f1" stroke-opacity="0.9" stroke-width="3"/>
+  <!-- The orb: dark base circle shows through as the 4px bottom profile. -->
+  <circle cx="64" cy="64" r="40" fill="#1a5fb4"/>
+  <g clip-path="url(#orb-clip)">
+    <circle cx="64" cy="60" r="40" fill="url(#orb)"/>
   </g>
+  <!-- The radiant core of the aether. -->
+  <circle cx="64" cy="56" r="15" fill="#ffffff" fill-opacity="0.35"/>
+  <circle cx="64" cy="56" r="10" fill="#ffffff"/>
 
-  <!-- The aether: a radiant core high above the horizon... -->
-  <circle cx="64" cy="52" r="44" fill="url(#glow)"/>
-  <!-- ...with the cluster orbiting inside it. -->
-  <circle cx="64" cy="52" r="28" fill="none" stroke="#ffffff" stroke-opacity="0.85" stroke-width="3.5"/>
-  <circle cx="64" cy="52" r="13" fill="#ffffff"/>
-  <circle cx="64" cy="24" r="7" fill="#ffffff"/>
-  <circle cx="39.8" cy="66" r="7" fill="#ffffff"/>
-  <circle cx="88.2" cy="66" r="7" fill="#ffffff"/>
+  <!-- Front half of the orbit ring, passing in front of the orb. -->
+  <path d="M 8 64 A 56 21 0 0 0 120 64" fill="none" stroke="#f6f5f4" stroke-width="6"/>
+
+  <!-- Cluster nodes riding the orbit, each with a darker bottom profile. -->
+  <circle cx="64" cy="85" r="9" fill="#c0bfbc"/>
+  <g clip-path="url(#node-a)"><circle cx="64" cy="83" r="9" fill="#ffffff"/></g>
+  <circle cx="21.1" cy="77.5" r="7" fill="#c0bfbc"/>
+  <g clip-path="url(#node-b)"><circle cx="21.1" cy="75.5" r="7" fill="#ffffff"/></g>
+  <circle cx="106.9" cy="77.5" r="7" fill="#c0bfbc"/>
+  <g clip-path="url(#node-c)"><circle cx="106.9" cy="75.5" r="7" fill="#ffffff"/></g>
 </svg>
