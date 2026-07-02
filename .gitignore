@@ -1,5 +1,7 @@
 /target
+/target/flatpak/
 .flatpak-builder/
 .flatpak/
 builddir/
 dist/
+crates/aetheris-app/libs/

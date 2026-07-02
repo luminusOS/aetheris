@@ -1,0 +1,168 @@
+name: Release Windows
+
+on:
+  workflow_call:
+    outputs:
+      artifact-name:
+        value: ${{ jobs.windows.outputs.artifact-name }}
+      bundle-name:
+        value: ${{ jobs.windows.outputs.bundle-name }}
+      setup-name:
+        value: ${{ jobs.windows.outputs.setup-name }}
+
+jobs:
+  windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    outputs:
+      artifact-name: ${{ steps.names.outputs.artifact_name }}
+      bundle-name: ${{ steps.names.outputs.windows_name }}
+      setup-name: ${{ steps.names.outputs.setup_name }}
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Read release metadata
+        id: names
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          BASE_VERSION="${VERSION%%-*}"
+          CARGO_VERSION="$(
+            python -c 'import pathlib, tomllib; data = tomllib.loads(pathlib.Path("Cargo.toml").read_text()); print(data["workspace"]["package"]["version"])'
+          )"
+
+          if [ "$BASE_VERSION" != "$CARGO_VERSION" ]; then
+            echo "Tag ${TAG} does not match workspace version ${CARGO_VERSION}." >&2
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=windows-bundle" >> "$GITHUB_OUTPUT"
+          echo "windows_name=aetheris-${VERSION}-windows-x86_64.zip" >> "$GITHUB_OUTPUT"
+          echo "setup_name=aetheris-${VERSION}-windows-x86_64-setup.exe" >> "$GITHUB_OUTPUT"
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          path-type: inherit
+          update: true
+          install: >-
+            git
+            mingw-w64-clang-x86_64-gtk4
+            mingw-w64-clang-x86_64-gtksourceview5
+            mingw-w64-clang-x86_64-libadwaita
+            mingw-w64-clang-x86_64-imagemagick
+            mingw-w64-clang-x86_64-openssl
+            mingw-w64-clang-x86_64-pkg-config
+            mingw-w64-clang-x86_64-toolchain
+            zip
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnullvm
+
+      - name: Build Windows executable
+        run: |
+          set -euo pipefail
+          export PKG_CONFIG_ALLOW_CROSS=1
+          export PKG_CONFIG_PATH="/clang64/lib/pkgconfig"
+          export CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER="clang"
+          cargo build --release --locked --target x86_64-pc-windows-gnullvm --bin aetheris
+
+      - name: Bundle Windows runtime
+        run: |
+          set -euo pipefail
+          bundle="target/windows/aetheris"
+          rm -rf "$bundle"
+          mkdir -p "$bundle/bin" "$bundle/share" "$bundle/lib" "$bundle/ssl/certs" dist
+
+          cp target/x86_64-pc-windows-gnullvm/release/aetheris.exe "$bundle/bin/aetheris.exe"
+
+          copy_deps() {
+            local binary="$1"
+            ldd "$binary" \
+              | awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^\/clang64\//) print $i }' \
+              | sort -u \
+              | while read -r dep; do
+                  local dest="$bundle/bin/$(basename "$dep")"
+                  if [ ! -f "$dest" ]; then
+                    cp "$dep" "$dest"
+                    copy_deps "$dest"
+                  fi
+                done
+          }
+
+          copy_deps "$bundle/bin/aetheris.exe"
+
+          cp -r /clang64/share/glib-2.0 "$bundle/share/" || true
+          cp -r /clang64/share/gtksourceview-5 "$bundle/share/" || true
+          cp -r /clang64/share/icons "$bundle/share/" || true
+          cp -r /clang64/share/themes "$bundle/share/" || true
+          cp -r /clang64/lib/gdk-pixbuf-2.0 "$bundle/lib/" || true
+          cp -r /clang64/lib/gio "$bundle/lib/" || true
+          cp /clang64/ssl/certs/ca-bundle.crt "$bundle/ssl/certs/" 2>/dev/null || true
+          cp /clang64/etc/ssl/certs/ca-bundle.crt "$bundle/ssl/certs/" 2>/dev/null || true
+
+          cat > "$bundle/aetheris.bat" <<'EOF'
+          @echo off
+          set "AETHERIS_DIR=%~dp0"
+          set "PATH=%AETHERIS_DIR%bin;%PATH%"
+          set "XDG_DATA_DIRS=%AETHERIS_DIR%share"
+          set "GSETTINGS_SCHEMA_DIR=%AETHERIS_DIR%share\glib-2.0\schemas"
+          set "GDK_PIXBUF_MODULEDIR=%AETHERIS_DIR%lib\gdk-pixbuf-2.0\2.10.0\loaders"
+          set "GIO_MODULE_DIR=%AETHERIS_DIR%lib\gio\modules"
+          set "SSL_CERT_FILE=%AETHERIS_DIR%ssl\certs\ca-bundle.crt"
+          "%AETHERIS_DIR%bin\aetheris.exe" %*
+          EOF
+
+          (
+            cd target/windows
+            zip -r "../../dist/${{ steps.names.outputs.windows_name }}" aetheris
+          )
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build Windows setup
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          mkdir -p target/windows
+          magick \
+            data/icons/hicolor/64x64/apps/org.luminusos.Aetheris.png \
+            data/icons/hicolor/128x128/apps/org.luminusos.Aetheris.png \
+            data/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png \
+            data/icons/hicolor/512x512/apps/org.luminusos.Aetheris.png \
+            target/windows/aetheris.ico
+          cp target/windows/aetheris.ico target/windows/aetheris/aetheris.ico
+
+          iscc \
+            "/DAppVersion=${{ steps.names.outputs.version }}" \
+            "/DSourceDir=$(cygpath -w "$(pwd)/target/windows/aetheris")" \
+            "/DOutputDir=$(cygpath -w "$(pwd)/dist")" \
+            "/DTargetArch=x64" \
+            "/DSetupIconFile=$(cygpath -w "$(pwd)/target/windows/aetheris.ico")" \
+            build-aux/inno/aetheris.iss
+
+          mv dist/aetheris-setup.exe "dist/${{ steps.names.outputs.setup_name }}"
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle
+          path: |
+            dist/${{ steps.names.outputs.windows_name }}
+            dist/${{ steps.names.outputs.setup_name }}
+          retention-days: 1

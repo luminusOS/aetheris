@@ -101,17 +101,18 @@ To build a local Flatpak bundle:
 sudo dnf install flatpak flatpak-builder
 sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
-mkdir -p dist
+mkdir -p target/flatpak
 flatpak-builder \
   --force-clean \
+  --disable-rofiles-fuse \
   --install-deps-from=flathub \
-  --repo=dist/repo \
-  dist/build \
+  --repo=target/flatpak/repo \
+  target/flatpak/build \
   build-aux/org.luminusos.Aetheris.json
 
 flatpak build-bundle \
-  dist/repo \
-  dist/aetheris-dev.flatpak \
+  target/flatpak/repo \
+  target/flatpak/aetheris-dev.flatpak \
   org.luminusos.Aetheris \
   stable
 ```
@@ -119,9 +120,43 @@ flatpak build-bundle \
 Install and run it with:
 
 ```sh
-flatpak install --user --reinstall dist/aetheris-dev.flatpak
+flatpak install --user --reinstall target/flatpak/aetheris-dev.flatpak
 flatpak run org.luminusos.Aetheris
 ```
+
+To build a local AppImage, install the native GTK build dependencies,
+`cargo-appimage`, and `appimagetool`:
+
+```sh
+sudo dnf install -y \
+  rust cargo curl file patchelf pkgconf-pkg-config \
+  gtk4-devel libadwaita-devel gtksourceview5-devel vte291-gtk4-devel \
+  openssl-devel desktop-file-utils appstream
+
+cargo install cargo-appimage
+mkdir -p ~/.local/bin
+curl -fL \
+  https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage \
+  -o ~/.local/bin/appimagetool-bin
+mkdir -p ~/.local/share/appimagetool
+curl -fL \
+  https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 \
+  -o ~/.local/share/appimagetool/runtime-x86_64
+chmod +x ~/.local/bin/appimagetool-bin ~/.local/share/appimagetool/runtime-x86_64
+cat > ~/.local/bin/appimagetool <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+exec "$HOME/.local/bin/appimagetool-bin" --runtime-file "$HOME/.local/share/appimagetool/runtime-x86_64" "$@"
+EOF
+chmod +x ~/.local/bin/appimagetool
+
+cd crates/aetheris-app
+APPIMAGE_EXTRACT_AND_RUN=1 cargo appimage --locked
+```
+
+`cargo-appimage` reads `[package.metadata.appimage]` from
+`crates/aetheris-app/Cargo.toml`, so run it from that directory instead of the
+workspace root.
 
 Release tags use the workspace version:
 
@@ -137,7 +172,14 @@ git tag -a v0.1.0-rc1 -m "Release v0.1.0-rc1"
 git push origin v0.1.0-rc1
 ```
 
-The release workflow validates the tag against `[workspace.package].version`, runs CI, builds a Flatpak bundle, creates a source zip, and publishes both to GitHub Releases.
+The release workflow validates the tag against `[workspace.package].version`
+in `Cargo.toml` and `[package].version` in `crates/aetheris-app/Cargo.toml`,
+runs CI, builds Flatpak, AppImage, macOS `.dmg`, Windows portable `.zip`, and
+Windows setup `.exe` bundles, creates a source zip, and publishes the artifacts
+to GitHub Releases. The macOS bundles are generated with `cargo-bundle`,
+Homebrew GTK runtime dylibs, and `create-dmg`. The Windows portable bundle
+contains `bin/aetheris.exe` plus the GTK runtime files it needs, and the setup
+`.exe` is generated with Inno Setup.
 
 ## Pull Request Checklist
 

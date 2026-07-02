@@ -377,13 +377,14 @@ pub(super) fn cluster_row(
 
     let title_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     title_row.set_hexpand(true);
-    title_row.append(&cluster_state_chip(summary));
     let title = gtk::Label::new(Some(context.name.as_str()));
     title.set_xalign(0.0);
-    title.set_hexpand(true);
+    title.set_hexpand(false);
+    title.set_max_width_chars(34);
     title.set_ellipsize(gtk::pango::EllipsizeMode::End);
     title.add_css_class("heading");
     title_row.append(&title);
+    title_row.append(&cluster_state_chip(summary));
     text.append(&title_row);
 
     let subtitle = gtk::Label::new(Some(&cluster_subtitle_text(summary)));

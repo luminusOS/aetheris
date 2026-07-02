@@ -77,7 +77,10 @@ impl Component for App {
         cluster_list.set_hexpand(true);
         cluster_list.add_css_class("boxed-list");
         cluster_list.set_selection_mode(gtk::SelectionMode::None);
-        let add_cluster_button = gtk::Button::builder().label("Add Cluster").build();
+        let add_cluster_button = gtk::Button::builder()
+            .icon_name("list-add-symbolic")
+            .tooltip_text("Add cluster")
+            .build();
         let import_cluster_button = gtk::Button::builder().label("Import").build();
         let namespace_selector_label = gtk::Label::new(Some("default"));
         let namespace_menu_button = gtk::MenuButton::new();

@@ -14,89 +14,55 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   flatpak:
-    name: Build Flatpak
     if: ${{ !contains(github.ref_name, '-') || contains(github.ref_name, '-rc') }}
-    runs-on: ubuntu-latest
     needs: [ci]
-    outputs:
-      artifact-name: flatpak-bundle
-      bundle-name: ${{ steps.names.outputs.bundle_name }}
-      source-name: ${{ steps.names.outputs.source_name }}
-    steps:
-      - name: Check out sources
-        uses: actions/checkout@v4
+    uses: ./.github/workflows/release-flatpak.yml
 
-      - name: Read release metadata
-        id: names
-        run: |
-          set -euo pipefail
+  appimage:
+    if: ${{ !contains(github.ref_name, '-') || contains(github.ref_name, '-rc') }}
+    needs: [ci]
+    uses: ./.github/workflows/release-appimage.yml
 
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
-          BASE_VERSION="${VERSION%%-*}"
-          CARGO_VERSION="$(
-            python3 -c 'import pathlib, tomllib; data = tomllib.loads(pathlib.Path("Cargo.toml").read_text()); print(data["workspace"]["package"]["version"])'
-          )"
+  macos:
+    if: ${{ !contains(github.ref_name, '-') || contains(github.ref_name, '-rc') }}
+    needs: [ci]
+    uses: ./.github/workflows/release-macos.yml
 
-          if [ "$BASE_VERSION" != "$CARGO_VERSION" ]; then
-            echo "Tag ${TAG} does not match workspace version ${CARGO_VERSION}." >&2
-            exit 1
-          fi
-
-          mkdir -p dist
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "bundle_name=aetheris-${VERSION}.flatpak" >> "$GITHUB_OUTPUT"
-          echo "source_name=aetheris-${VERSION}-source.zip" >> "$GITHUB_OUTPUT"
-
-      - name: Install Flatpak builder
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
-          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-
-      - name: Build Flatpak
-        run: |
-          set -euo pipefail
-          flatpak-builder \
-            --force-clean \
-            --install-deps-from=flathub \
-            --repo=dist/repo \
-            dist/build \
-            build-aux/org.luminusos.Aetheris.json
-          flatpak build-bundle \
-            dist/repo \
-            "dist/${{ steps.names.outputs.bundle_name }}" \
-            org.luminusos.Aetheris \
-            stable
-
-      - name: Create source archive
-        run: |
-          git archive \
-            --format=zip \
-            --prefix="aetheris-${{ steps.names.outputs.version }}/" \
-            --output="dist/${{ steps.names.outputs.source_name }}" \
-            HEAD
-
-      - name: Upload release assets
-        uses: actions/upload-artifact@v4
-        with:
-          name: flatpak-bundle
-          path: |
-            dist/${{ steps.names.outputs.bundle_name }}
-            dist/${{ steps.names.outputs.source_name }}
-          retention-days: 1
+  windows:
+    if: ${{ !contains(github.ref_name, '-') || contains(github.ref_name, '-rc') }}
+    needs: [ci]
+    uses: ./.github/workflows/release-windows.yml
 
   release:
     name: Create GitHub Release
     if: ${{ !contains(github.ref_name, '-') || contains(github.ref_name, '-rc') }}
     runs-on: ubuntu-latest
-    needs: [flatpak]
+    needs: [flatpak, appimage, macos, windows]
     steps:
-      - name: Download release assets
+      - name: Download Flatpak assets
         uses: actions/download-artifact@v4
         with:
           name: ${{ needs.flatpak.outputs.artifact-name }}
           path: dist
+
+      - name: Download AppImage assets
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.appimage.outputs.artifact-name }}
+          path: dist
+
+      - name: Download Windows assets
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.windows.outputs.artifact-name }}
+          path: dist
+
+      - name: Download macOS assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-*
+          path: dist
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -104,6 +70,10 @@ jobs:
           name: ${{ github.ref_name }}
           files: |
             dist/${{ needs.flatpak.outputs.bundle-name }}
+            dist/${{ needs.appimage.outputs.appimage-name }}
+            dist/aetheris-*-macos-*.dmg
+            dist/${{ needs.windows.outputs.bundle-name }}
+            dist/${{ needs.windows.outputs.setup-name }}
             dist/${{ needs.flatpak.outputs.source-name }}
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}

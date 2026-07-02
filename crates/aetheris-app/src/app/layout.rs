@@ -292,11 +292,10 @@ pub(super) fn build_clusters_page(widgets: ClustersPageWidgets<'_>) -> adw::Tool
     header.pack_start(widgets.projects_home_button);
     header.pack_start(widgets.refresh_button);
     header.set_title_widget(Some(widgets.project_title));
-    widgets.add_cluster_button.add_css_class("suggested-action");
+    widgets.add_cluster_button.add_css_class("flat");
     widgets.import_cluster_button.add_css_class("flat");
     header.pack_end(widgets.project_menu_button);
     header.pack_end(widgets.add_cluster_button);
-    header.pack_end(widgets.import_cluster_button);
     toolbar.add_top_bar(&header);
     let cluster_list = widgets.cluster_list;
 

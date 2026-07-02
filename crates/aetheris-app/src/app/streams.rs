@@ -152,6 +152,7 @@ impl App {
         self.log_streaming = false;
     }
 
+    #[cfg(not(target_os = "windows"))]
     pub(super) fn show_pod_terminal(
         &mut self,
         root: &<Self as Component>::Root,
@@ -206,6 +207,18 @@ impl App {
         self.start_terminal_session(token, sender);
     }
 
+    #[cfg(target_os = "windows")]
+    pub(super) fn show_pod_terminal(
+        &mut self,
+        _root: &<Self as Component>::Root,
+        _sender: ComponentSender<Self>,
+    ) {
+        self.toaster.add_toast(adw::Toast::new(
+            "Terminal windows are not available in the Windows build yet.",
+        ));
+    }
+
+    #[cfg(not(target_os = "windows"))]
     pub(super) fn start_terminal_session(&mut self, token: u64, sender: ComponentSender<Self>) {
         let Some((context, namespace, pod, container, input_rx, abort_registration)) =
             self.prepare_terminal_session(token)
@@ -245,6 +258,10 @@ impl App {
         });
     }
 
+    #[cfg(target_os = "windows")]
+    pub(super) fn start_terminal_session(&mut self, _token: u64, _sender: ComponentSender<Self>) {}
+
+    #[cfg(not(target_os = "windows"))]
     fn prepare_terminal_session(&mut self, token: u64) -> Option<TerminalStart> {
         let session = self.terminal_sessions.get_mut(&token)?;
         if let Some(handle) = session.abort_handle.take() {
@@ -270,6 +287,7 @@ impl App {
         ))
     }
 
+    #[cfg(not(target_os = "windows"))]
     pub(super) fn close_terminal_session(&mut self, token: u64, close_window: bool) {
         let Some(mut session) = self.terminal_sessions.remove(&token) else {
             return;
@@ -282,6 +300,9 @@ impl App {
             session.window.close();
         }
     }
+
+    #[cfg(target_os = "windows")]
+    pub(super) fn close_terminal_session(&mut self, _token: u64, _close_window: bool) {}
 
     pub(super) fn start_pod_port_forward(&mut self, sender: ComponentSender<Self>) {
         let Some(target) = self.detail_port_forward_target.clone() else {
@@ -431,6 +452,7 @@ impl App {
             });
     }
 
+    #[cfg(not(target_os = "windows"))]
     pub(super) fn sync_terminal_controls(&self) {
         let Some(target) = &self.detail_exec_target else {
             self.detail_terminal_button.set_visible(false);
@@ -441,6 +463,12 @@ impl App {
         let available = !target.containers.is_empty();
         self.detail_terminal_button.set_visible(true);
         self.detail_terminal_button.set_sensitive(available);
+    }
+
+    #[cfg(target_os = "windows")]
+    pub(super) fn sync_terminal_controls(&self) {
+        self.detail_terminal_button.set_visible(false);
+        self.detail_terminal_button.set_sensitive(false);
     }
 
     pub(super) fn append_log_line(&self, line: &str) {
@@ -454,6 +482,7 @@ impl App {
         self.detail_log_buffer.delete_mark(&mark);
     }
 
+    #[cfg(not(target_os = "windows"))]
     pub(super) fn feed_terminal_event(&self, token: u64, event: PodExecEvent) {
         let text = match event {
             PodExecEvent::Stdout(text) | PodExecEvent::Stderr(text) => text,
@@ -463,6 +492,10 @@ impl App {
         }
     }
 
+    #[cfg(target_os = "windows")]
+    pub(super) fn feed_terminal_event(&self, _token: u64, _event: PodExecEvent) {}
+
+    #[cfg(not(target_os = "windows"))]
     pub(super) fn show_terminal_error(&self, token: u64, error: &str) {
         if let Some(session) = self.terminal_sessions.get(&token) {
             let message = terminal_error_message(error);
@@ -470,6 +503,13 @@ impl App {
         }
     }
 
+    #[cfg(target_os = "windows")]
+    pub(super) fn show_terminal_error(&self, _token: u64, error: &str) {
+        self.toaster
+            .add_toast(adw::Toast::new(&terminal_error_message(error)));
+    }
+
+    #[cfg(not(target_os = "windows"))]
     pub(super) fn send_terminal_input(&self, token: u64, text: String) {
         if let Some(input_tx) = self
             .terminal_sessions
@@ -479,6 +519,9 @@ impl App {
             let _ = input_tx.send(text.into_bytes());
         }
     }
+
+    #[cfg(target_os = "windows")]
+    pub(super) fn send_terminal_input(&self, _token: u64, _text: String) {}
 
     pub(super) fn show_yaml_explanation(&self, root: &<Self as Component>::Root) {
         let explanation = build_yaml_explanation_content(
@@ -504,6 +547,7 @@ impl App {
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 fn terminal_container_dropdown(target: &PodLogTarget) -> gtk::DropDown {
     let refs = target
         .containers
@@ -517,6 +561,7 @@ fn terminal_container_dropdown(target: &PodLogTarget) -> gtk::DropDown {
     dropdown
 }
 
+#[cfg(not(target_os = "windows"))]
 fn terminal_view() -> vte4::Terminal {
     let view = vte4::Terminal::new();
     view.set_hexpand(true);
@@ -531,6 +576,7 @@ fn terminal_view() -> vte4::Terminal {
     view
 }
 
+#[cfg(not(target_os = "windows"))]
 fn terminal_window(
     root: &<App as Component>::Root,
     target: &PodLogTarget,

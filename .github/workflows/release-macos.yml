@@ -1,0 +1,102 @@
+name: Release macOS
+
+on:
+  workflow_call:
+
+jobs:
+  macos:
+    name: Build macOS DMG (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: aarch64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Read release metadata
+        id: names
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          BASE_VERSION="${VERSION%%-*}"
+          CARGO_VERSION="$(
+            python3 -c 'import pathlib, tomllib; data = tomllib.loads(pathlib.Path("Cargo.toml").read_text()); print(data["workspace"]["package"]["version"])'
+          )"
+          APP_VERSION="$(
+            python3 -c 'import pathlib, tomllib; data = tomllib.loads(pathlib.Path("crates/aetheris-app/Cargo.toml").read_text()); print(data["package"]["version"])'
+          )"
+
+          if [ "$BASE_VERSION" != "$CARGO_VERSION" ]; then
+            echo "Tag ${TAG} does not match workspace version ${CARGO_VERSION}." >&2
+            exit 1
+          fi
+          if [ "$BASE_VERSION" != "$APP_VERSION" ]; then
+            echo "Tag ${TAG} does not match aetheris-app version ${APP_VERSION}." >&2
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "dmg_name=aetheris-${VERSION}-macos-${{ matrix.arch }}.dmg" >> "$GITHUB_OUTPUT"
+
+      - name: Install system dependencies
+        run: |
+          brew update
+          brew install \
+            create-dmg \
+            gtk4 \
+            gtksourceview5 \
+            imagemagick \
+            libadwaita \
+            pkgconf \
+            vte3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-bundle
+        run: cargo install cargo-bundle
+
+      - name: Build app bundle
+        run: |
+          set -euo pipefail
+          export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+
+          bash scripts/make-macos-icns.sh \
+            crates/aetheris-app/target/macos/aetheris.icns \
+            target/macos/aetheris.iconset
+
+          cargo build --release --locked --package aetheris-app
+          cargo bundle --release --package aetheris-app
+
+          app_bundle="$(find target -path '*/bundle/osx/Aetheris.app' -type d -print -quit)"
+          if [ -z "$app_bundle" ]; then
+            echo "cargo-bundle did not produce Aetheris.app." >&2
+            exit 1
+          fi
+
+          bash scripts/bundle-macos-runtime.sh "$app_bundle"
+
+          mkdir -p dist
+          rm -f "dist/${{ steps.names.outputs.dmg_name }}"
+          create-dmg \
+            --volname "Aetheris" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --app-drop-link 450 185 \
+            "dist/${{ steps.names.outputs.dmg_name }}" \
+            "$app_bundle"
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: dist/${{ steps.names.outputs.dmg_name }}
+          retention-days: 1
