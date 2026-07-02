@@ -25,7 +25,7 @@ impl App {
                     .first()
                     .cloned()
                     .unwrap_or_else(|| String::from("default"));
-                self.sync_dropdowns(Some(sender.clone()));
+                self.sync_dropdowns();
                 self.loading = false;
                 self.status = String::from("Select a project.");
                 self.show_projects();
@@ -40,15 +40,18 @@ impl App {
                 self.status = String::from("Kubeconfig unavailable.");
                 self.toaster.add_toast(adw::Toast::new(&error));
                 self.show_setup();
-                self.sync_dropdowns(Some(sender.clone()));
+                self.sync_dropdowns();
                 self.rebuild_resource_list(Some(sender.clone()));
-                self.rebuild_object_list();
+                self.rebuild_object_list(Some(sender.clone()));
                 self.sync_status();
             }
             AppMsg::StateLoadedForCluster(context_name, Ok(state)) => {
                 self.contexts = state.contexts;
                 self.namespaces = state.namespaces;
                 self.projects = state.projects;
+                self.projects
+                    .add_contexts_to_selected_project([context_name.clone()]);
+                self.save_projects_or_toast();
                 let visible_contexts = self.visible_contexts();
                 self.selected_context = visible_contexts
                     .iter()
@@ -62,7 +65,7 @@ impl App {
                         .unwrap_or_else(|| String::from("default"));
                 }
                 self.loading = false;
-                self.sync_dropdowns(Some(sender.clone()));
+                self.sync_dropdowns();
                 self.enter_clusters_page(sender);
                 self.status = String::from("Cluster saved.");
                 self.sync_status();
@@ -74,12 +77,14 @@ impl App {
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
             AppMsg::ShowProjects => {
+                self.stop_object_watch();
                 self.stop_log_stream();
                 self.stop_port_forward();
                 self.show_object_list();
                 self.show_projects();
                 self.loading = false;
                 self.status = String::from("Select a project.");
+                self.sync_terminal_controls();
                 self.sync_port_forward_controls();
                 self.sync_status();
             }
@@ -90,7 +95,13 @@ impl App {
                 self.enter_clusters_page(sender);
                 self.loading = false;
                 self.status = String::from("Select a cluster.");
+                self.sync_terminal_controls();
                 self.sync_port_forward_controls();
+                self.sync_status();
+            }
+            AppMsg::RefreshClusters => {
+                self.refresh_cluster_summaries(sender);
+                self.status = String::from("Refreshing clusters.");
                 self.sync_status();
             }
             AppMsg::ClusterSummaryLoaded(context_name, result) => {
@@ -99,7 +110,7 @@ impl App {
                     Err(error) => ClusterSummaryState::Error(error),
                 };
                 self.cluster_summaries.insert(context_name, state);
-                self.rebuild_cluster_list(Some(sender));
+                self.rebuild_cluster_list();
             }
             AppMsg::ProjectChanged(index) => {
                 let Some(project_name) = self
@@ -143,9 +154,8 @@ impl App {
 
                 if let Some(original) = self.editing_project_name.clone() {
                     if name != original && self.projects.has_project(&name) {
-                        self.toaster.add_toast(adw::Toast::new(
-                            "A project with this name already exists.",
-                        ));
+                        self.toaster
+                            .add_toast(adw::Toast::new("A project with this name already exists."));
                         return;
                     }
                     if let Some(project) = self
@@ -162,7 +172,7 @@ impl App {
                     self.save_projects_or_toast();
                     self.editing_project_name = None;
                     self.project_dialog.close();
-                    self.sync_dropdowns(Some(sender.clone()));
+                    self.sync_dropdowns();
                     self.sync_status();
                     return;
                 }
@@ -232,9 +242,14 @@ impl App {
             }
             AppMsg::ConfirmDeleteProject => {
                 let name = self.projects.selected_project_name().to_owned();
-                self.projects.projects.retain(|project| project.name != name);
-                self.projects.selected_project =
-                    self.projects.projects.first().map(|project| project.name.clone());
+                self.projects
+                    .projects
+                    .retain(|project| project.name != name);
+                self.projects.selected_project = self
+                    .projects
+                    .projects
+                    .first()
+                    .map(|project| project.name.clone());
                 self.save_projects_or_toast();
                 self.switch_to_project(sender);
             }
@@ -257,7 +272,7 @@ impl App {
                     .selected_resource_kind()
                     .map(ResourceSection::for_resource)
                     .unwrap_or(ResourceSection::Workloads);
-                self.sync_dropdowns(Some(sender.clone()));
+                self.sync_dropdowns();
                 self.rebuild_resource_list(Some(sender.clone()));
 
                 if self.selected_resource.is_some() {
@@ -265,18 +280,19 @@ impl App {
                 } else {
                     self.status = String::from("No listable Kubernetes resources found.");
                     self.sync_status();
-                    self.rebuild_object_list();
+                    self.rebuild_object_list(Some(sender.clone()));
                 }
             }
             AppMsg::ClusterLoaded(Err(error)) => {
                 self.loading = false;
+                self.stop_object_watch();
                 self.resources.clear();
                 self.objects.clear();
                 self.selected_resource = None;
                 self.status = String::from("Unable to discover resources.");
                 self.toaster.add_toast(adw::Toast::new(&error));
                 self.rebuild_resource_list(Some(sender.clone()));
-                self.rebuild_object_list();
+                self.rebuild_object_list(Some(sender.clone()));
                 self.sync_status();
             }
             AppMsg::ClusterChanged(index) => {
@@ -287,16 +303,6 @@ impl App {
                     self.present_content_panel();
                     self.load_cluster(sender);
                 }
-            }
-            AppMsg::EditCluster(index) => {
-                let visible_contexts = self.visible_contexts();
-                let Some((name, server)) = visible_contexts
-                    .get(index as usize)
-                    .map(|context| (context.name.clone(), context.server.clone()))
-                else {
-                    return;
-                };
-                self.open_cluster_edit_dialog(&name, &server, root);
             }
             AppMsg::EditCurrentCluster => {
                 let Some((name, server)) = self
@@ -309,6 +315,26 @@ impl App {
                 };
                 self.open_cluster_edit_dialog(&name, &server, root);
             }
+            AppMsg::RemoveClusterFromProject => {
+                let Some(context) = self.selected_context.clone() else {
+                    return;
+                };
+                self.projects.remove_context_from_selected_project(&context);
+                self.save_projects_or_toast();
+                self.selected_context = None;
+                self.stop_object_watch();
+                self.stop_log_stream();
+                self.stop_port_forward();
+                self.resources.clear();
+                self.objects.clear();
+                self.selected_resource = None;
+                self.show_object_list();
+                self.enter_clusters_page(sender);
+                self.status = format!("Removed {context} from this project.");
+                self.sync_terminal_controls();
+                self.sync_port_forward_controls();
+                self.sync_status();
+            }
             AppMsg::NamespaceChanged(index) => {
                 let choices = self.namespace_choices();
                 if index as usize == choices.len() {
@@ -318,7 +344,7 @@ impl App {
                 if let Some(namespace) = choices.get(index as usize) {
                     if self.selected_namespace != *namespace {
                         self.selected_namespace.clone_from(namespace);
-                        self.sync_dropdowns(Some(sender.clone()));
+                        self.sync_dropdowns();
                         self.show_object_list();
                         self.stop_log_stream();
                         self.stop_port_forward();
@@ -335,34 +361,32 @@ impl App {
                 self.remember_namespace(&namespace);
                 if self.selected_namespace != namespace {
                     self.selected_namespace = namespace;
-                    self.sync_dropdowns(Some(sender.clone()));
+                    self.sync_dropdowns();
                     self.show_object_list();
                     self.stop_log_stream();
                     self.stop_port_forward();
                     self.refresh_objects(sender);
                 } else {
-                    self.sync_dropdowns(Some(sender.clone()));
+                    self.sync_dropdowns();
                 }
 
                 self.custom_namespace_dialog.close();
             }
             AppMsg::StatusFilterChanged(index) => {
-                let next = StatusFilter::ALL
-                    .get(index as usize)
-                    .copied()
-                    .unwrap_or(StatusFilter::All);
-                if self.selected_status_filter != next {
-                    self.selected_status_filter = next;
-                    self.sync_status();
-                    self.sync_status_filter();
-                    self.rebuild_object_list();
+                let Some(filter) = StatusFilter::ALL.get(index as usize).copied() else {
+                    return;
+                };
+                if self.selected_status_filters.contains(&filter) {
+                    self.selected_status_filters.remove(&filter);
+                } else {
+                    self.selected_status_filters.insert(filter);
                 }
+                self.sync_status();
+                self.sync_status_filter();
+                self.rebuild_object_list(Some(sender.clone()));
             }
             AppMsg::ObjectColumnToggled(index) => {
-                let Some(column) = self
-                    .offerable_object_columns()
-                    .get(index as usize)
-                    .copied()
+                let Some(column) = self.offerable_object_columns().get(index as usize).copied()
                 else {
                     return;
                 };
@@ -370,7 +394,13 @@ impl App {
                 self.projects.set_object_column_visible(column, visible);
                 self.save_projects_or_toast();
                 self.sync_object_columns();
-                self.rebuild_object_list();
+                self.rebuild_object_list(Some(sender.clone()));
+            }
+            AppMsg::ObjectColumnResized(column, width) => {
+                if self.projects.set_object_table_column_width(column, width) {
+                    self.save_projects_or_toast();
+                    self.rebuild_object_list(Some(sender.clone()));
+                }
             }
             AppMsg::ResourceChanged(index) => {
                 if self.resources.get(index).is_some() {
@@ -392,7 +422,7 @@ impl App {
             AppMsg::SearchChanged(query) => {
                 self.search_query = query;
                 self.sync_status();
-                self.rebuild_object_list();
+                self.rebuild_object_list(Some(sender.clone()));
             }
             AppMsg::ObjectActivated(index) => {
                 let Some((context, resource, namespace, name)) = self.detail_request(index) else {
@@ -424,6 +454,7 @@ impl App {
                 self.status = format!("Showing details for {}", detail.name);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
+                self.update_exec_target_containers(&detail);
                 self.show_detail_page(&detail.name);
                 self.maybe_start_visible_logs(sender);
                 self.sync_status();
@@ -435,8 +466,10 @@ impl App {
                 self.loading = false;
                 self.detail_target = None;
                 self.detail_log_target = None;
+                self.detail_exec_target = None;
                 self.detail_port_forward_target = None;
                 self.sync_log_controls();
+                self.sync_terminal_controls();
                 self.sync_port_forward_controls();
                 self.status = String::from("Unable to load object detail.");
                 self.sync_status();
@@ -459,6 +492,18 @@ impl App {
             AppMsg::ClearPodLogs => {
                 self.detail_log_buffer.set_text("");
             }
+            AppMsg::ShowPodTerminal => {
+                self.show_pod_terminal(root, sender);
+            }
+            AppMsg::RestartPodTerminal(token) => {
+                self.start_terminal_session(token, sender);
+            }
+            AppMsg::StopPodTerminal(token) => {
+                self.close_terminal_session(token, false);
+            }
+            AppMsg::PodTerminalInput(token, text) => {
+                self.send_terminal_input(token, text);
+            }
             AppMsg::ToggleDetailOverview => {
                 let collapsed = self.detail_overview_section.is_visible();
                 self.detail_overview_section.set_visible(!collapsed);
@@ -479,6 +524,7 @@ impl App {
                 self.stop_log_stream();
                 self.stop_port_forward();
                 self.sync_log_controls();
+                self.sync_terminal_controls();
                 self.sync_port_forward_controls();
             }
             AppMsg::DetailTabChanged(name) => {
@@ -551,6 +597,7 @@ impl App {
                 self.status = format!("Scaled {}", detail.name);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
+                self.update_exec_target_containers(&detail);
                 self.sync_status();
                 self.toaster
                     .add_toast(adw::Toast::new("Deployment scaled."));
@@ -589,6 +636,7 @@ impl App {
                 self.status = format!("Updated {}", detail.name);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
+                self.update_exec_target_containers(&detail);
                 self.sync_status();
                 self.toaster
                     .add_toast(adw::Toast::new("Node scheduling updated."));
@@ -649,6 +697,7 @@ impl App {
                 self.status = format!("Drained {}", detail.name);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
+                self.update_exec_target_containers(&detail);
                 self.sync_status();
                 self.toaster
                     .add_toast(adw::Toast::new(&format!("Drain started for {count} Pods.")));
@@ -685,6 +734,7 @@ impl App {
                 self.status = format!("Applied {}", detail.name);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
+                self.update_exec_target_containers(&detail);
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new("YAML applied."));
             }
@@ -825,11 +875,13 @@ impl App {
                 self.loading = false;
                 self.detail_target = None;
                 self.detail_log_target = None;
+                self.detail_exec_target = None;
                 self.detail_port_forward_target = None;
                 self.stop_log_stream();
                 self.stop_port_forward();
                 self.show_object_list();
                 self.sync_log_controls();
+                self.sync_terminal_controls();
                 self.sync_port_forward_controls();
                 self.toaster
                     .add_toast(adw::Toast::new(&format!("Deleted {name}.")));
@@ -857,6 +909,20 @@ impl App {
                     if let Err(error) = result {
                         self.toaster.add_toast(adw::Toast::new(&error));
                     }
+                }
+            }
+            AppMsg::PodExecEvent(token, event) => {
+                self.feed_terminal_event(token, event);
+            }
+            AppMsg::PodExecFinished(token, result) => {
+                if let Some(session) = self.terminal_sessions.get_mut(&token) {
+                    session.abort_handle = None;
+                    session.input_tx = None;
+                }
+                if let Err(error) = result {
+                    let message = terminal_error_message(&error);
+                    self.show_terminal_error(token, &error);
+                    self.toaster.add_toast(adw::Toast::new(&message));
                 }
             }
             AppMsg::PodPortForwardEvent(token, event) => {
@@ -926,15 +992,57 @@ impl App {
                 self.objects = objects;
                 self.set_object_status(count);
                 self.sync_status();
-                self.rebuild_object_list();
+                self.rebuild_object_list(Some(sender.clone()));
+                self.start_object_watch(sender);
             }
             AppMsg::ObjectsLoaded(Err(error)) => {
                 self.loading = false;
+                self.stop_object_watch();
                 self.objects.clear();
                 self.status = String::from("Unable to list selected resource.");
                 self.sync_status();
-                self.rebuild_object_list();
+                self.rebuild_object_list(Some(sender.clone()));
                 self.toaster.add_toast(adw::Toast::new(&error));
+            }
+            AppMsg::ObjectWatchEvent(token, event) => {
+                if token != self.object_watch_token || self.loading {
+                    return;
+                }
+                match event {
+                    ObjectWatchEvent::Restarted(objects) => {
+                        let count = objects.len();
+                        self.objects = objects;
+                        self.set_object_status(count);
+                        self.sync_status();
+                        self.rebuild_object_list(Some(sender.clone()));
+                    }
+                    ObjectWatchEvent::Applied(object) => {
+                        self.upsert_object(object);
+                        self.set_object_status(self.objects.len());
+                        self.sync_status();
+                        self.rebuild_object_list(Some(sender.clone()));
+                    }
+                    ObjectWatchEvent::Deleted(object) => {
+                        self.remove_object(&object);
+                        self.set_object_status(self.objects.len());
+                        self.sync_status();
+                        self.rebuild_object_list(Some(sender.clone()));
+                    }
+                    ObjectWatchEvent::Error(error) => {
+                        self.status = format!("Live watch reconnecting: {error}");
+                        self.sync_status();
+                    }
+                }
+            }
+            AppMsg::ObjectWatchFinished(token, result) => {
+                if token != self.object_watch_token {
+                    return;
+                }
+                self.object_watch_abort_handle = None;
+                if let Err(error) = result {
+                    self.status = format!("Live watch stopped: {error}");
+                    self.sync_status();
+                }
             }
             AppMsg::AddCluster => {
                 let request = AddClusterRequest {
@@ -979,13 +1087,47 @@ impl App {
                 self.sync_status();
                 sender.oneshot_command(async move { import_kubeconfig(path).await });
             }
-            AppMsg::KubeconfigImported(Ok(path)) => {
+            AppMsg::KubeconfigImported(Ok((path, context_names))) => {
                 self.loading = true;
                 self.status = String::from("Loading kubeconfig...");
                 self.cluster_dialog.close();
                 self.toaster
                     .add_toast(adw::Toast::new(&format!("Kubeconfig imported to {path}")));
-                sender.oneshot_command(load_state());
+                sender.oneshot_command(async move {
+                    load_state_for_imported_clusters(context_names).await
+                });
+            }
+            AppMsg::StateLoadedForImportedClusters(context_names, Ok(state)) => {
+                self.contexts = state.contexts;
+                self.namespaces = state.namespaces;
+                self.projects = state.projects;
+                self.projects
+                    .add_contexts_to_selected_project(context_names.clone());
+                self.save_projects_or_toast();
+                let visible_contexts = self.visible_contexts();
+                self.selected_context = visible_contexts
+                    .iter()
+                    .find(|context| context_names.iter().any(|name| name == &context.name))
+                    .or_else(|| visible_contexts.first())
+                    .map(|context| context.name.clone());
+                if !self.namespace_is_known(&self.selected_namespace) {
+                    self.selected_namespace = self
+                        .namespaces
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| String::from("default"));
+                }
+                self.loading = false;
+                self.sync_dropdowns();
+                self.enter_clusters_page(sender);
+                self.status = String::from("Kubeconfig imported.");
+                self.sync_status();
+            }
+            AppMsg::StateLoadedForImportedClusters(_, Err(error)) => {
+                self.loading = false;
+                self.status = String::from("Unable to reload kubeconfig.");
+                self.sync_status();
+                self.toaster.add_toast(adw::Toast::new(&error));
             }
             AppMsg::KubeconfigImported(Err(error)) => {
                 self.loading = false;

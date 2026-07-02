@@ -160,13 +160,13 @@ pub(super) fn status_tone(status: &str) -> StatusTone {
     }
 }
 
-pub(super) fn rebuild_status_filter_list(list: &gtk::FlowBox, selected: StatusFilter) {
+pub(super) fn rebuild_status_filter_list(list: &gtk::FlowBox, selected: &BTreeSet<StatusFilter>) {
     while let Some(child) = list.first_child() {
         list.remove(&child);
     }
 
     for filter in StatusFilter::ALL {
-        list.insert(&status_filter_chip(filter, filter == selected), -1);
+        list.insert(&status_filter_chip(filter, selected.contains(&filter)), -1);
     }
 }
 
@@ -213,6 +213,7 @@ fn filter_chip(
     let chip = gtk::Box::new(gtk::Orientation::Horizontal, 7);
     chip.add_css_class("filter-chip");
     chip.set_valign(gtk::Align::Center);
+    chip.set_size_request(92, 34);
     if active {
         chip.add_css_class("filter-chip-active");
     }
@@ -222,6 +223,7 @@ fn filter_chip(
         dot.add_css_class("filter-status-dot");
         dot.add_css_class(tone.css_class());
         dot.set_valign(gtk::Align::Center);
+        dot.set_size_request(10, 10);
         chip.append(&dot);
     } else {
         let icon = gtk::Image::from_icon_name(icon_name);
@@ -253,7 +255,6 @@ fn status_filter_tone(filter: StatusFilter) -> StatusTone {
         StatusFilter::Ready | StatusFilter::Running => StatusTone::Good,
         StatusFilter::Pending | StatusFilter::Unavailable => StatusTone::Warning,
         StatusFilter::Failed => StatusTone::Bad,
-        StatusFilter::All => StatusTone::Neutral,
     }
 }
 
@@ -276,6 +277,7 @@ pub(super) fn project_row(project: &Project, selected: bool) -> gtk::ListBoxRow 
     }
 
     let container = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+    container.set_hexpand(true);
     container.set_margin_top(14);
     container.set_margin_bottom(14);
     container.set_margin_start(14);
@@ -330,22 +332,15 @@ pub(super) fn rebuild_cluster_list(
     contexts: &[&ContextInfo],
     summaries: &std::collections::HashMap<String, ClusterSummaryState>,
     selected: Option<&str>,
-    sender: Option<ComponentSender<App>>,
 ) {
     while let Some(child) = list.first_child() {
         list.remove(&child);
     }
 
-    for (index, context) in contexts.iter().enumerate() {
+    for context in contexts {
         let is_selected = selected == Some(context.name.as_str());
         let summary = summaries.get(&context.name);
-        list.append(&cluster_row(
-            context,
-            summary,
-            is_selected,
-            index as u32,
-            sender.clone(),
-        ));
+        list.append(&cluster_row(context, summary, is_selected));
     }
 }
 
@@ -353,8 +348,6 @@ pub(super) fn cluster_row(
     context: &ContextInfo,
     summary: Option<&ClusterSummaryState>,
     selected: bool,
-    index: u32,
-    sender: Option<ComponentSender<App>>,
 ) -> gtk::ListBoxRow {
     let row = gtk::ListBoxRow::new();
     row.set_activatable(true);
@@ -383,9 +376,11 @@ pub(super) fn cluster_row(
     text.set_valign(gtk::Align::Center);
 
     let title_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    title_row.set_hexpand(true);
     title_row.append(&cluster_state_chip(summary));
     let title = gtk::Label::new(Some(context.name.as_str()));
     title.set_xalign(0.0);
+    title.set_hexpand(true);
     title.set_ellipsize(gtk::pango::EllipsizeMode::End);
     title.add_css_class("heading");
     title_row.append(&title);
@@ -397,17 +392,6 @@ pub(super) fn cluster_row(
     subtitle.add_css_class("dim-label");
     text.append(&subtitle);
     container.append(&text);
-
-    let edit = gtk::Button::builder()
-        .icon_name("document-edit-symbolic")
-        .tooltip_text("Edit cluster")
-        .valign(gtk::Align::Center)
-        .build();
-    edit.add_css_class("flat");
-    if let Some(sender) = sender {
-        edit.connect_clicked(move |_| sender.input(AppMsg::EditCluster(index)));
-    }
-    container.append(&edit);
 
     let arrow = gtk::Image::from_icon_name("go-next-symbolic");
     arrow.add_css_class("dim-label");
@@ -574,8 +558,11 @@ pub(super) fn object_header() -> gtk::Box {
     object_header_with_columns(&RELATED_POD_COLUMNS)
 }
 
-const RELATED_POD_COLUMNS: [ObjectColumn; 3] =
-    [ObjectColumn::Namespace, ObjectColumn::Api, ObjectColumn::Age];
+const RELATED_POD_COLUMNS: [ObjectColumn; 3] = [
+    ObjectColumn::Namespace,
+    ObjectColumn::Api,
+    ObjectColumn::Age,
+];
 
 /// A `Box`, not a `Grid`: with a `Grid`, leftover row width (none of these
 /// fixed-width cells claims `hexpand`) gets redistributed across columns,
@@ -584,66 +571,331 @@ const RELATED_POD_COLUMNS: [ObjectColumn; 3] =
 /// column to the right. A `Box` just places each child at its own pinned
 /// width with no such redistribution, so header and rows can't diverge.
 pub(super) fn object_header_with_columns(columns: &[ObjectColumn]) -> gtk::Box {
+    let widths = default_column_widths(columns);
+    object_header_with_column_widths(OBJECT_NAME_WIDTH, columns, &widths, None, None)
+}
+
+pub(super) fn object_header_with_column_widths(
+    name_width: i32,
+    columns: &[ObjectColumn],
+    widths: &[i32],
+    sender: Option<ComponentSender<App>>,
+    list: Option<gtk::ListBox>,
+) -> gtk::Box {
     let header = object_row_box();
     header.add_css_class("caption-heading");
 
-    header.append(&grid_label("Name", Some(OBJECT_NAME_WIDTH), false));
-    for column in columns.iter().copied() {
-        header.append(&grid_label(column.label(), Some(column.width()), false));
+    if let Some(sender) = sender.as_ref() {
+        header.append(&resizable_header_cell(
+            ObjectTableColumn::Name,
+            "Name",
+            name_width,
+            0,
+            sender.clone(),
+            list.clone(),
+        ));
+    } else {
+        header.append(&grid_label("Name", Some(name_width), false));
+    }
+    for (index, (column, width)) in columns
+        .iter()
+        .copied()
+        .zip(widths.iter().copied())
+        .enumerate()
+    {
+        if let Some(sender) = sender.as_ref() {
+            header.append(&resizable_header_cell(
+                ObjectTableColumn::Data(column),
+                column.label(),
+                width,
+                index + 1,
+                sender.clone(),
+                list.clone(),
+            ));
+        } else {
+            header.append(&grid_label(column.label(), Some(width), false));
+        }
     }
 
     header
 }
 
-pub(super) fn object_header_row_with_columns(columns: &[ObjectColumn]) -> gtk::ListBoxRow {
+pub(super) fn object_header_row_with_column_widths(
+    name_width: i32,
+    columns: &[ObjectColumn],
+    widths: &[i32],
+    sender: Option<ComponentSender<App>>,
+    list: Option<gtk::ListBox>,
+) -> gtk::ListBoxRow {
     let row = gtk::ListBoxRow::new();
     row.set_activatable(false);
     row.set_selectable(false);
 
-    let header = object_header_with_columns(columns);
+    let header = object_header_with_column_widths(name_width, columns, widths, sender, list);
     header.set_margin_all(8);
     row.set_child(Some(&header));
     row
 }
 
 pub(super) fn object_row(object: &ObjectSummary) -> gtk::ListBoxRow {
-    object_row_with_columns(object, &RELATED_POD_COLUMNS)
+    let widths = default_column_widths(&RELATED_POD_COLUMNS);
+    object_row_with_column_widths(object, OBJECT_NAME_WIDTH, &RELATED_POD_COLUMNS, &widths)
 }
 
-pub(super) fn object_row_with_columns(
+pub(super) fn object_row_with_column_widths(
     object: &ObjectSummary,
+    name_width: i32,
     columns: &[ObjectColumn],
+    widths: &[i32],
 ) -> gtk::ListBoxRow {
     let row = gtk::ListBoxRow::new();
     row.set_activatable(true);
     let container = object_row_box();
     container.set_margin_all(8);
 
-    container.append(&object_name_cell(object));
-    for column in columns.iter().copied() {
+    container.append(&object_name_cell(object, name_width));
+    for (column, width) in columns.iter().copied().zip(widths.iter().copied()) {
         let label = match column {
-            ObjectColumn::Namespace => grid_label(&object.namespace, Some(column.width()), false),
+            ObjectColumn::Namespace => grid_label(&object.namespace, Some(width), false),
             ObjectColumn::Status => match object.status_ratio {
                 Some((ready, desired)) => {
-                    let label =
-                        grid_label(&format!("{ready}/{desired}"), Some(column.width()), false);
+                    let label = grid_label(&format!("{ready}/{desired}"), Some(width), false);
                     label.set_tooltip_text(Some(&object.status));
                     label
                 }
-                None => grid_label("", Some(column.width()), false),
+                None => grid_label("", Some(width), false),
             },
-            ObjectColumn::Cpu => metric_label(object.metrics.as_ref().map(|usage| usage.cpu.as_str())),
-            ObjectColumn::Memory => {
-                metric_label(object.metrics.as_ref().map(|usage| usage.memory.as_str()))
-            }
-            ObjectColumn::Api => grid_label(&object.api_version, Some(column.width()), false),
-            ObjectColumn::Age => grid_label(&object.age, Some(column.width()), false),
+            ObjectColumn::Cpu => metric_label_with_width(
+                object.metrics.as_ref().map(|usage| usage.cpu.as_str()),
+                width,
+            ),
+            ObjectColumn::Memory => metric_label_with_width(
+                object.metrics.as_ref().map(|usage| usage.memory.as_str()),
+                width,
+            ),
+            ObjectColumn::Api => grid_label(&object.api_version, Some(width), false),
+            ObjectColumn::Age => grid_label(&object.age, Some(width), false),
         };
         container.append(&label);
     }
 
     row.set_child(Some(&container));
     row
+}
+
+fn default_column_widths(columns: &[ObjectColumn]) -> Vec<i32> {
+    columns
+        .iter()
+        .copied()
+        .map(ObjectColumn::default_width)
+        .collect()
+}
+
+fn resizable_header_cell(
+    column: ObjectTableColumn,
+    title: &str,
+    width: i32,
+    cell_index: usize,
+    sender: ComponentSender<App>,
+    list: Option<gtk::ListBox>,
+) -> gtk::Box {
+    let cell = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    cell.set_size_request(width, -1);
+    cell.set_hexpand(false);
+
+    let label = grid_label(title, None, false);
+    label.set_hexpand(true);
+    cell.append(&label);
+
+    let handle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    handle.add_css_class("column-resize-handle");
+    handle.set_size_request(10, -1);
+    handle.set_cursor_from_name(Some("col-resize"));
+    handle.set_tooltip_text(Some("Drag to resize column"));
+    let line = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    line.add_css_class("column-resize-line");
+    line.set_margin_start(4);
+    line.set_margin_end(4);
+    line.set_vexpand(true);
+    handle.append(&line);
+    cell.append(&handle);
+
+    let start_width = std::rc::Rc::new(std::cell::Cell::new(width));
+    let next_width = std::rc::Rc::new(std::cell::Cell::new(width));
+    let pending_apply = std::rc::Rc::new(std::cell::Cell::new(false));
+
+    // The gesture lives on `cell`, not `handle`: `handle` slides to the
+    // right as `cell` grows (it's `label`'s hexpand that pushes it), so its
+    // own on-screen origin moves as a *direct result* of the resize it's
+    // driving. GTK translates pointer events into a controller's widget
+    // using that widget's *current* allocation, so a drag attached to a
+    // widget that keeps shifting because of the very drag it's producing
+    // is a coordinate feedback loop — every relayout nudges the reference
+    // frame out from under the still-held pointer, which is what showed up
+    // as the handle visibly shaking while held. `cell`'s own origin is
+    // stable during its own resize (only its far edge extends), so we
+    // attach there and just restrict activation to presses that actually
+    // land on the handle's rendered bounds.
+    let gesture = gtk::GestureDrag::new();
+    gesture.connect_drag_begin({
+        let handle = handle.clone();
+        let cell_for_hit_test = cell.clone();
+        let start_width = start_width.clone();
+        let next_width = next_width.clone();
+        move |gesture, x, y| {
+            let within_handle = handle
+                .compute_bounds(&cell_for_hit_test)
+                .is_some_and(|bounds| {
+                    bounds.contains_point(&gtk::graphene::Point::new(x as f32, y as f32))
+                });
+            if !within_handle {
+                gesture.set_state(gtk::EventSequenceState::Denied);
+                return;
+            }
+            handle.add_css_class("column-resize-handle-active");
+            start_width.set(next_width.get());
+        }
+    });
+    gesture.connect_drag_update({
+        let cell = cell.clone();
+        let list = list.clone();
+        let start_width = start_width.clone();
+        let next_width = next_width.clone();
+        let pending_apply = pending_apply.clone();
+        move |_, offset_x, _| {
+            let width =
+                clamp_table_column_width(column, start_width.get() + offset_x.round() as i32);
+            next_width.set(width);
+            // Coalesce to at most one relayout per frame: a high-poll-rate
+            // mouse fires drag-update far more often than the display
+            // refreshes, and applying every single event synchronously
+            // meant redundant relayouts within the same visual frame.
+            if pending_apply.get() {
+                return;
+            }
+            pending_apply.set(true);
+            let cell = cell.clone();
+            let list = list.clone();
+            let next_width = next_width.clone();
+            let pending_apply = pending_apply.clone();
+            gtk::glib::idle_add_local_once(move || {
+                pending_apply.set(false);
+                let width = next_width.get();
+                cell.set_size_request(width, -1);
+                if let Some(list) = list.as_ref() {
+                    apply_object_table_column_width(list, cell_index, width);
+                }
+            });
+        }
+    });
+    gesture.connect_drag_end({
+        let handle = handle.clone();
+        let sender = sender.clone();
+        let next_width = next_width.clone();
+        move |_, _, _| {
+            handle.remove_css_class("column-resize-handle-active");
+            sender.input(AppMsg::ObjectColumnResized(column, next_width.get()));
+        }
+    });
+    cell.add_controller(gesture);
+
+    cell
+}
+
+fn clamp_table_column_width(column: ObjectTableColumn, width: i32) -> i32 {
+    match column {
+        ObjectTableColumn::Name => width.clamp(OBJECT_NAME_MIN_WIDTH, OBJECT_NAME_MAX_WIDTH),
+        ObjectTableColumn::Data(_) => width.clamp(OBJECT_COLUMN_MIN_WIDTH, OBJECT_COLUMN_MAX_WIDTH),
+    }
+}
+
+fn apply_object_table_column_width(list: &gtk::ListBox, cell_index: usize, width: i32) {
+    // A resource list can hold thousands of rows; touching every one of
+    // them on every live-drag frame is real, visible per-frame cost. Rows
+    // scrolled out of view don't need to track the drag in real time —
+    // they'll pick up the final width from the full rebuild that already
+    // runs once the drag ends — so only the rows actually on screen get
+    // updated live, which keeps each frame's work proportional to the
+    // viewport instead of the whole list.
+    let visible_range = visible_row_range(list);
+
+    let mut row_widget = list.first_child();
+    while let Some(widget) = row_widget {
+        row_widget = widget.next_sibling();
+        let Ok(row) = widget.downcast::<gtk::ListBoxRow>() else {
+            continue;
+        };
+        if let Some((top, bottom)) = visible_range {
+            let Some(bounds) = row.compute_bounds(list) else {
+                continue;
+            };
+            let row_top = f64::from(bounds.y());
+            let row_bottom = row_top + f64::from(bounds.height());
+            if row_bottom < top || row_top > bottom {
+                continue;
+            }
+        }
+        let Some(container) = row
+            .child()
+            .and_then(|child| child.downcast::<gtk::Box>().ok())
+        else {
+            continue;
+        };
+        let Some(cell) = box_child_at(&container, cell_index) else {
+            continue;
+        };
+        cell.set_size_request(width, -1);
+        if cell_index == 0 {
+            resize_live_name_label(&cell, width);
+        }
+    }
+}
+
+/// The visible viewport, in `list`'s own (unscrolled-content) coordinate
+/// space, from the enclosing `GtkScrolledWindow`'s vertical adjustment.
+/// `None` if `list` isn't inside one (or isn't realized yet), in which case
+/// callers should just update every row.
+fn visible_row_range(list: &gtk::ListBox) -> Option<(f64, f64)> {
+    let scrolled = list
+        .ancestor(gtk::ScrolledWindow::static_type())?
+        .downcast::<gtk::ScrolledWindow>()
+        .ok()?;
+    let adjustment = scrolled.vadjustment();
+    let top = adjustment.value();
+    Some((top, top + adjustment.page_size()))
+}
+
+/// The Name cell (index 0) wraps an optional status chip plus the actual
+/// name label; the label — not the wrapping cell — is what carries
+/// ellipsize/max-width-chars, so it needs its own updated budget too, or it
+/// keeps ellipsizing against its stale construction-time width while the
+/// cell around it resizes live.
+fn resize_live_name_label(cell: &gtk::Widget, width: i32) {
+    let Some(name_cell) = cell.downcast_ref::<gtk::Box>() else {
+        return;
+    };
+    let Some(label) = name_cell
+        .last_child()
+        .and_then(|child| child.downcast::<gtk::Label>().ok())
+    else {
+        return;
+    };
+    let has_chip = name_cell.first_child() != name_cell.last_child();
+    let chip_budget = if has_chip { NAME_CELL_CHIP_BUDGET } else { 0 };
+    set_grid_label_pixel_width(&label, (width - chip_budget).max(40));
+}
+
+fn box_child_at(container: &gtk::Box, index: usize) -> Option<gtk::Widget> {
+    let mut position = 0;
+    let mut child = container.first_child();
+    while let Some(widget) = child {
+        child = widget.next_sibling();
+        if position == index {
+            return Some(widget);
+        }
+        position += 1;
+    }
+    None
 }
 
 pub(super) fn object_row_box() -> gtk::Box {
@@ -653,23 +905,36 @@ pub(super) fn object_row_box() -> gtk::Box {
     row_box
 }
 
-pub(super) fn object_name_cell(object: &ObjectSummary) -> gtk::Box {
+/// The status chip's own CSS padding + text + the cell's own spacing,
+/// budgeted out of the Name column's width so the label's pixel budget
+/// (computed both at construction and during a live column-resize drag)
+/// stays in sync in both places.
+const NAME_CELL_CHIP_BUDGET: i32 = 86;
+
+pub(super) fn object_name_cell(object: &ObjectSummary, width: i32) -> gtk::Box {
     let cell = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     cell.set_hexpand(false);
     cell.set_valign(gtk::Align::Center);
-    cell.set_size_request(OBJECT_NAME_WIDTH, -1);
-    if has_meaningful_status(&object.status) {
+    cell.set_size_request(width, -1);
+
+    let has_status = has_meaningful_status(&object.status);
+    if has_status {
         cell.append(&status_prefix_chip(&object.status));
     }
-    let name = grid_label(&object.name, None, false);
-    name.set_width_chars(8);
-    // Kept low enough that chip + name + spacing can never exceed
-    // OBJECT_NAME_WIDTH's natural size, with real margin this time (using
-    // the same conservative px/char estimate as grid_label, plus the
-    // chip's own 16px of CSS padding, which max-width-chars doesn't know
-    // about); with hscrollbar_policy::Never the list can't grow a
-    // scrollbar to absorb an oversized column.
-    name.set_max_width_chars(14);
+
+    // `max-width-chars` alone is only a soft sizing hint to Pango — with
+    // nothing else in this row claiming `hexpand`, a label with no pixel
+    // `size_request` renders at its full natural (untruncated) width
+    // whenever the row has any slack at all, which is why some long names
+    // rendered in full while others ellipsized: it depended on whether that
+    // particular row's total width happened to exceed the window, not on
+    // this column's intended budget. Routing through `grid_label`'s pixel
+    // `size_request` (like every other column already does) is what
+    // actually forces ellipsis to engage reliably, regardless of slack.
+    // Covers the chip's own CSS padding, its text, and the cell's spacing,
+    // so the two together still fit inside `width`.
+    let chip_budget = if has_status { NAME_CELL_CHIP_BUDGET } else { 0 };
+    let name = grid_label(&object.name, Some((width - chip_budget).max(40)), false);
     name.add_css_class("heading");
     name.set_tooltip_text(Some(&object.name));
     cell.append(&name);
@@ -701,23 +966,26 @@ pub(super) fn status_prefix_chip(status: &str) -> gtk::Label {
 /// `value` is `None` when the object has no metrics at all (metrics.k8s.io
 /// unavailable, or this resource kind isn't covered by it) — leave the
 /// cell blank rather than clutter the row with a dash.
-pub(super) fn metric_label(value: Option<&str>) -> gtk::Label {
-    let label = grid_label(value.unwrap_or(""), Some(OBJECT_METRIC_WIDTH), false);
+fn metric_label_with_width(value: Option<&str>, width: i32) -> gtk::Label {
+    let label = grid_label(value.unwrap_or(""), Some(width), false);
     label.add_css_class("caption");
     label
 }
 
-pub(super) fn metric_badge(icon_name: &str, value: &str) -> gtk::Box {
-    let badge = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+pub(super) fn metric_badge(icon_name: &str, label: &str, value: &str, raw_value: &str) -> gtk::Box {
+    let badge = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     badge.set_valign(gtk::Align::Center);
+    badge.set_tooltip_text(Some(&format!("{label}: {raw_value}")));
     let icon = gtk::Image::from_icon_name(available_icon_name(
         icon_name,
-        "utilities-system-monitor-symbolic",
+        "applications-system-symbolic",
     ));
     icon.add_css_class("dim-label");
+    icon.set_tooltip_text(Some(label));
     badge.append(&icon);
     let label = gtk::Label::new(Some(value));
     label.add_css_class("caption");
+    label.set_tooltip_text(Some(raw_value));
     badge.append(&label);
     badge
 }
@@ -740,18 +1008,25 @@ pub(super) fn grid_label(text: &str, width: Option<i32>, hexpand: bool) -> gtk::
     label.set_hexpand(hexpand);
     label.set_ellipsize(gtk::pango::EllipsizeMode::End);
     if let Some(width) = width {
-        // Conservative average px/char so max-width-chars' Pango-side
-        // estimate stays comfortably under the pinned size_request floor
-        // for real content — a tighter ratio let actual text (e.g.
-        // "apps/v1", "200d") occasionally outgrow the floor even though it
-        // was within the char cap, since the column's real width pinning
-        // only holds when content never exceeds it.
-        let chars = (width / 10).max(4);
-        label.set_size_request(width, -1);
-        label.set_width_chars(chars);
-        label.set_max_width_chars(chars);
+        set_grid_label_pixel_width(&label, width);
     }
     label
+}
+
+/// Shared by `grid_label` (at construction) and the live column-resize
+/// drag (updating an existing label in place) so the two never drift out
+/// of sync with each other.
+fn set_grid_label_pixel_width(label: &gtk::Label, width: i32) {
+    // Conservative average px/char so max-width-chars' Pango-side estimate
+    // stays comfortably under the pinned size_request floor for real
+    // content — a tighter ratio let actual text (e.g. "apps/v1", "200d")
+    // occasionally outgrow the floor even though it was within the char
+    // cap, since the column's real width pinning only holds when content
+    // never exceeds it.
+    let chars = (width / 10).max(4);
+    label.set_size_request(width, -1);
+    label.set_width_chars(chars);
+    label.set_max_width_chars(chars);
 }
 
 /// A Ctrl+F search bar for a plain `gtk::TextView` (the log viewer, which
@@ -759,7 +1034,10 @@ pub(super) fn grid_label(text: &str, width: Option<i32>, hexpand: bool) -> gtk::
 /// GTK's own `TextIter::forward_search`/`backward_search` instead. Returns
 /// a `Revealer` to place above the view; wires Ctrl+F on `view` to reveal
 /// it and Escape to hide it again.
-pub(super) fn build_log_search_bar(view: &gtk::TextView, buffer: &gtk::TextBuffer) -> gtk::Revealer {
+pub(super) fn build_log_search_bar(
+    view: &gtk::TextView,
+    buffer: &gtk::TextBuffer,
+) -> gtk::Revealer {
     let entry = gtk::SearchEntry::builder().hexpand(true).build();
     let prev_button = gtk::Button::builder()
         .icon_name("go-up-symbolic")
@@ -880,8 +1158,7 @@ pub(super) fn build_log_search_bar(view: &gtk::TextView, buffer: &gtk::TextBuffe
         let revealer = revealer.clone();
         let entry = entry.clone();
         move |_, key, _, modifiers| {
-            if key == gtk::gdk::Key::f && modifiers.contains(gtk::gdk::ModifierType::CONTROL_MASK)
-            {
+            if key == gtk::gdk::Key::f && modifiers.contains(gtk::gdk::ModifierType::CONTROL_MASK) {
                 revealer.set_reveal_child(true);
                 entry.grab_focus();
                 return gtk::glib::Propagation::Stop;
@@ -908,4 +1185,3 @@ pub(super) fn build_log_search_bar(view: &gtk::TextView, buffer: &gtk::TextBuffe
 
     revealer
 }
-

@@ -23,7 +23,7 @@ impl App {
     /// every path that lands on this page (picking a project, coming back
     /// from Browser, and after adding/editing a cluster).
     pub(super) fn enter_clusters_page(&mut self, sender: ComponentSender<Self>) {
-        self.rebuild_cluster_list(Some(sender.clone()));
+        self.rebuild_cluster_list();
         self.ensure_cluster_summaries_loading(sender);
         self.show_clusters();
     }
@@ -46,6 +46,20 @@ impl App {
         }
     }
 
+    pub(super) fn refresh_cluster_summaries(&mut self, sender: ComponentSender<Self>) {
+        let contexts = self
+            .visible_contexts()
+            .iter()
+            .map(|context| context.name.clone())
+            .collect::<Vec<_>>();
+        for context_name in contexts {
+            self.cluster_summaries
+                .insert(context_name.clone(), ClusterSummaryState::Loading);
+            sender.oneshot_command(async move { load_cluster_summary(context_name).await });
+        }
+        self.rebuild_cluster_list();
+    }
+
     /// Loads the clusters view for whichever project is now selected in
     /// `self.projects`. Shared by switching projects, deleting the current
     /// one (falling back to another), and duplicating one.
@@ -57,7 +71,7 @@ impl App {
         {
             self.selected_context = None;
         }
-        self.sync_dropdowns(Some(sender.clone()));
+        self.sync_dropdowns();
         self.enter_clusters_page(sender);
         self.present_content_panel();
         self.loading = false;
@@ -70,6 +84,7 @@ impl App {
         self.content_header_stack.set_visible_child_name("search");
         self.detail_back_button.set_visible(false);
         self.detail_delete_button.set_visible(false);
+        self.detail_terminal_button.set_visible(false);
     }
 
     pub(super) fn sync_object_columns(&self) {
@@ -89,7 +104,7 @@ impl App {
     }
 
     pub(super) fn sync_status_filter(&self) {
-        rebuild_status_filter_list(&self.status_filter_list, self.selected_status_filter);
+        rebuild_status_filter_list(&self.status_filter_list, &self.selected_status_filters);
     }
 
     pub(super) fn show_detail_page(&self, title: &str) {
@@ -98,6 +113,7 @@ impl App {
         self.content_header_stack.set_visible_child_name("title");
         self.detail_back_button.set_visible(true);
         self.detail_delete_button.set_visible(true);
+        self.sync_terminal_controls();
     }
 
     pub(super) fn present_content_panel(&self) {
@@ -181,8 +197,10 @@ impl App {
         };
 
         self.show_object_list();
+        self.stop_object_watch();
         self.stop_log_stream();
         self.stop_port_forward();
+        self.detail_exec_target = None;
         self.detail_port_forward_target = None;
         self.loading = true;
         self.resources.clear();
@@ -190,7 +208,8 @@ impl App {
         self.selected_resource = None;
         self.status = format!("Discovering resources in {context}...");
         self.rebuild_resource_list(Some(sender.clone()));
-        self.rebuild_object_list();
+        self.rebuild_object_list(Some(sender.clone()));
+        self.sync_terminal_controls();
         self.sync_port_forward_controls();
         self.sync_status();
         sender.oneshot_command(async move { load_cluster(context).await });
@@ -215,6 +234,7 @@ impl App {
         } else {
             None
         };
+        self.stop_object_watch();
         self.loading = true;
         self.status = format!("Loading {}...", resource.label());
         self.sync_status();
@@ -301,12 +321,12 @@ impl App {
         };
     }
 
-    pub(super) fn sync_dropdowns(&self, sender: Option<ComponentSender<Self>>) {
+    pub(super) fn sync_dropdowns(&self) {
         self.project_title_label
             .set_label(self.projects.selected_project_name());
         self.rebuild_project_list();
 
-        self.rebuild_cluster_list(sender.clone());
+        self.rebuild_cluster_list();
         let context_label = self.selected_context.as_deref().unwrap_or("No cluster");
         self.context_selector_label.set_label(context_label);
         self.context_selector_label
@@ -333,11 +353,7 @@ impl App {
         self.namespace_selector_label
             .set_tooltip_text(Some(namespace_label));
 
-        let selected_status = StatusFilter::ALL
-            .iter()
-            .position(|filter| *filter == self.selected_status_filter)
-            .unwrap_or(0);
-        rebuild_status_filter_list(&self.status_filter_list, StatusFilter::ALL[selected_status]);
+        rebuild_status_filter_list(&self.status_filter_list, &self.selected_status_filters);
         self.sync_object_columns();
     }
 
@@ -361,6 +377,8 @@ impl App {
         self.cluster_back_button.set_sensitive(!self.loading);
         self.cluster_menu_button
             .set_sensitive(self.selected_context.is_some() && !self.loading);
+        self.cluster_refresh_button
+            .set_sensitive(!self.loading && !self.visible_contexts().is_empty());
         self.add_cluster_button.set_sensitive(!self.loading);
         self.import_cluster_button.set_sensitive(!self.loading);
         self.add_project_button.set_sensitive(!self.loading);
@@ -381,6 +399,12 @@ impl App {
             .set_sensitive(self.detail_target.is_some() && !self.loading);
         self.detail_delete_button
             .set_sensitive(self.detail_target.is_some() && !self.loading);
+        self.detail_terminal_button.set_sensitive(
+            self.detail_exec_target
+                .as_ref()
+                .is_some_and(|target| !target.containers.is_empty())
+                && !self.loading,
+        );
         self.detail_scale_button.set_sensitive(
             self.detail_target
                 .as_ref()
@@ -422,14 +446,13 @@ impl App {
         rebuild_project_list(&self.project_list, &self.projects);
     }
 
-    pub(super) fn rebuild_cluster_list(&self, sender: Option<ComponentSender<Self>>) {
+    pub(super) fn rebuild_cluster_list(&self) {
         let visible_contexts = self.visible_contexts();
         rebuild_cluster_list(
             &self.cluster_list,
             &visible_contexts,
             &self.cluster_summaries,
             self.selected_context.as_deref(),
-            sender,
         );
     }
 
@@ -475,7 +498,7 @@ impl App {
     /// would block the main loop long enough to feel frozen, so only the
     /// first chunk is built synchronously; the rest is appended a chunk at
     /// a time via idle callbacks so input and redraws keep happening.
-    pub(super) fn rebuild_object_list(&mut self) {
+    pub(super) fn rebuild_object_list(&mut self, sender: Option<ComponentSender<Self>>) {
         const CHUNK_SIZE: usize = 150;
 
         self.object_list_generation
@@ -507,15 +530,24 @@ impl App {
             .copied()
             .filter(|column| offerable.contains(column))
             .collect();
+        let name_width = self.projects.object_name_width();
+        let widths = self.projects.object_column_widths_for(&columns);
 
         self.object_list
-            .append(&object_header_row_with_columns(&columns));
+            .append(&object_header_row_with_column_widths(
+                name_width,
+                &columns,
+                &widths,
+                sender.clone(),
+                Some(self.object_list.clone()),
+            ));
         for _ in 0..CHUNK_SIZE {
             let Some(object) = objects.pop_front() else {
                 return;
             };
-            self.object_list
-                .append(&object_row_with_columns(&object, &columns));
+            self.object_list.append(&object_row_with_column_widths(
+                &object, name_width, &columns, &widths,
+            ));
         }
 
         let list = self.object_list.clone();
@@ -527,17 +559,39 @@ impl App {
                 let Some(object) = objects.pop_front() else {
                     return gtk::glib::ControlFlow::Break;
                 };
-                list.append(&object_row_with_columns(&object, &columns));
+                list.append(&object_row_with_column_widths(
+                    &object, name_width, &columns, &widths,
+                ));
             }
             gtk::glib::ControlFlow::Continue
         });
+    }
+
+    pub(super) fn upsert_object(&mut self, object: ObjectSummary) {
+        if let Some(existing) = self
+            .objects
+            .iter_mut()
+            .find(|existing| same_object(existing, &object))
+        {
+            *existing = object;
+        } else {
+            self.objects.push(object);
+        }
+        sort_objects(&mut self.objects);
+    }
+
+    pub(super) fn remove_object(&mut self, object: &ObjectSummary) {
+        self.objects
+            .retain(|existing| !same_object(existing, object));
     }
 
     pub(super) fn filtered_objects(&self) -> Vec<&ObjectSummary> {
         let query = self.search_query.trim().to_ascii_lowercase();
         self.objects
             .iter()
-            .filter(|object| self.selected_status_filter.matches(&object.status))
+            .filter(|object| {
+                StatusFilter::matches_any(&object.status, &self.selected_status_filters)
+            })
             .filter(|object| query.is_empty() || object_matches(object, &query))
             .collect()
     }
@@ -582,11 +636,14 @@ impl App {
         });
         self.detail_log_target =
             pod_log_target(context.clone(), &resource, namespace.clone(), name.clone());
+        self.detail_exec_target =
+            pod_log_target(context.clone(), &resource, namespace.clone(), name.clone());
         self.detail_port_forward_target =
             pod_log_target(context.clone(), &resource, namespace.clone(), name.clone());
         self.detail_request_token = self.detail_request_token.saturating_add(1);
         let detail_token = self.detail_request_token;
         self.sync_log_controls();
+        self.sync_terminal_controls();
         self.sync_port_forward_controls();
 
         self.loading = true;
@@ -641,6 +698,7 @@ impl App {
         rebuild_related_pods(&self.detail_related_pods_list, detail);
         rebuild_container_metrics(&self.detail_container_metrics_list, detail);
         self.sync_detail_tabs(detail);
+        self.sync_terminal_controls();
         self.sync_port_forward_controls();
     }
 
@@ -688,4 +746,16 @@ impl App {
             self.detail_stack.set_visible_child_name("yaml");
         }
     }
+}
+
+fn same_object(left: &ObjectSummary, right: &ObjectSummary) -> bool {
+    left.name == right.name && left.namespace == right.namespace
+}
+
+fn sort_objects(objects: &mut [ObjectSummary]) {
+    objects.sort_by(|left, right| {
+        left.namespace
+            .cmp(&right.namespace)
+            .then_with(|| left.name.cmp(&right.name))
+    });
 }

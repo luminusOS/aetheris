@@ -150,6 +150,9 @@ mod tests {
     #[test]
     fn parse_ansi_line_maps_bright_colors_to_the_base_tag() {
         let segments = parse_ansi_line("\u{1b}[93mWARN\u{1b}[0m");
-        assert_eq!(segments, vec![(String::from("WARN"), vec!["ansi-fg-yellow"])]);
+        assert_eq!(
+            segments,
+            vec![(String::from("WARN"), vec!["ansi-fg-yellow"])]
+        );
     }
 }

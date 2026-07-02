@@ -51,6 +51,7 @@ pub(super) struct ContentWidgets<'a> {
     pub(super) delete_button: &'a gtk::Button,
     pub(super) create_yaml_button: &'a gtk::Button,
     pub(super) refresh_button: &'a gtk::Button,
+    pub(super) terminal_button: &'a gtk::Button,
     pub(super) search_entry: &'a gtk::SearchEntry,
     pub(super) status_filter_list: &'a gtk::FlowBox,
     pub(super) column_filter_list: &'a gtk::FlowBox,
@@ -93,7 +94,12 @@ pub(super) fn build_content(widgets: ContentWidgets<'_>) -> adw::NavigationPage 
     widgets.header_stack.add_named(widgets.title, Some("title"));
     widgets.header_stack.set_visible_child_name("search");
     header.set_title_widget(Some(widgets.header_stack));
-    header.pack_end(widgets.delete_button);
+    let detail_actions = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    detail_actions.set_valign(gtk::Align::Center);
+    detail_actions.set_halign(gtk::Align::End);
+    detail_actions.append(widgets.terminal_button);
+    detail_actions.append(widgets.delete_button);
+    header.pack_end(&detail_actions);
     toolbar.add_top_bar(&header);
 
     let list_page = gtk::Box::new(gtk::Orientation::Vertical, 12);
@@ -110,7 +116,12 @@ pub(super) fn build_content(widgets: ContentWidgets<'_>) -> adw::NavigationPage 
     let scrolled = gtk::ScrolledWindow::builder()
         .vexpand(true)
         .hexpand(true)
-        .hscrollbar_policy(gtk::PolicyType::Never)
+        // Columns are user-resizable now, so the table can legitimately
+        // grow wider than the window (e.g. after widening Name and a
+        // couple of data columns) — a horizontal scrollbar is how you
+        // reach whatever's pushed past the right edge instead of it just
+        // being clipped and unreachable.
+        .hscrollbar_policy(gtk::PolicyType::Automatic)
         .build();
     let list_container = gtk::Box::new(gtk::Orientation::Vertical, 8);
     list_container.set_hexpand(true);
@@ -269,6 +280,7 @@ pub(super) struct ClustersPageWidgets<'a> {
     pub(super) projects_home_button: &'a gtk::Button,
     pub(super) project_title: &'a gtk::Label,
     pub(super) project_menu_button: &'a gtk::MenuButton,
+    pub(super) refresh_button: &'a gtk::Button,
     pub(super) cluster_list: &'a gtk::ListBox,
     pub(super) add_cluster_button: &'a gtk::Button,
     pub(super) import_cluster_button: &'a gtk::Button,
@@ -278,6 +290,7 @@ pub(super) fn build_clusters_page(widgets: ClustersPageWidgets<'_>) -> adw::Tool
     let toolbar = adw::ToolbarView::new();
     let header = adw::HeaderBar::new();
     header.pack_start(widgets.projects_home_button);
+    header.pack_start(widgets.refresh_button);
     header.set_title_widget(Some(widgets.project_title));
     widgets.add_cluster_button.add_css_class("suggested-action");
     widgets.import_cluster_button.add_css_class("flat");
@@ -316,7 +329,10 @@ pub(super) fn build_clusters_page(widgets: ClustersPageWidgets<'_>) -> adw::Tool
     subtitle.add_css_class("dim-label");
     content.append(&subtitle);
 
-    content.append(cluster_list);
+    let group = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    group.append(&section_title("Clusters"));
+    group.append(cluster_list);
+    content.append(&group);
 
     clamp.set_child(Some(&content));
 

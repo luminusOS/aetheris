@@ -69,7 +69,9 @@ pub(super) fn build_object_detail_page(widgets: ObjectDetailWidgets<'_>) -> gtk:
     actions.append(widgets.drain_button);
     overview.append(&actions);
 
-    widgets.port_forward_group.append(&section_title("Port Forward"));
+    widgets
+        .port_forward_group
+        .append(&section_title("Port Forward"));
     let ports_controls = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     ports_controls.append(&field_box("Local", widgets.port_local_spin));
     ports_controls.append(&field_box("Remote", widgets.port_remote_spin));
@@ -388,13 +390,81 @@ pub(super) fn container_metric_row(name: &str, usage: Option<&ContainerUsage>) -
     let action = adw::ActionRow::builder().title(name).build();
     action.add_prefix(&status_prefix_chip("Running"));
     if let Some(usage) = usage {
-        action.add_suffix(&metric_badge("cpu-symbolic", &usage.cpu));
-        action.add_suffix(&metric_badge("memory-stick-symbolic", &usage.memory));
+        let metrics = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        metrics.set_valign(gtk::Align::Center);
+        metrics.set_margin_start(12);
+        metrics.append(&metric_badge(
+            "applications-engineering-symbolic",
+            "CPU usage",
+            &format_cpu_quantity(&usage.cpu),
+            &usage.cpu,
+        ));
+        metrics.append(&metric_badge(
+            "drive-harddisk-symbolic",
+            "Memory usage",
+            &format_memory_quantity(&usage.memory),
+            &usage.memory,
+        ));
+        action.add_suffix(&metrics);
     } else {
         action.set_subtitle("Metrics unavailable");
     }
     row.set_child(Some(&action));
     row
+}
+
+fn format_cpu_quantity(value: &str) -> String {
+    let Some((amount, suffix)) = split_quantity(value) else {
+        return value.to_owned();
+    };
+    let millicores = match suffix {
+        "n" => amount / 1_000_000.0,
+        "u" => amount / 1_000.0,
+        "m" => amount,
+        "" => amount * 1_000.0,
+        _ => return value.to_owned(),
+    };
+    if millicores >= 1.0 {
+        format!("{}m", millicores.round() as u64)
+    } else {
+        format!("{millicores:.1}m")
+    }
+}
+
+fn format_memory_quantity(value: &str) -> String {
+    let Some((amount, suffix)) = split_quantity(value) else {
+        return value.to_owned();
+    };
+    let bytes = match suffix {
+        "Ki" => amount * 1024.0,
+        "Mi" => amount * 1024.0 * 1024.0,
+        "Gi" => amount * 1024.0 * 1024.0 * 1024.0,
+        "Ti" => amount * 1024.0 * 1024.0 * 1024.0 * 1024.0,
+        "K" => amount * 1_000.0,
+        "M" => amount * 1_000_000.0,
+        "G" => amount * 1_000_000_000.0,
+        "" => amount,
+        _ => return value.to_owned(),
+    };
+    let gib = bytes / 1024.0 / 1024.0 / 1024.0;
+    let mib = bytes / 1024.0 / 1024.0;
+    if gib >= 1.0 {
+        format!("{gib:.1} GiB")
+    } else if mib >= 1.0 {
+        format!("{} MiB", mib.round() as u64)
+    } else {
+        format!("{} KiB", (bytes / 1024.0).round() as u64)
+    }
+}
+
+fn split_quantity(value: &str) -> Option<(f64, &str)> {
+    let split_at = value
+        .char_indices()
+        .find(|(_, character)| !character.is_ascii_digit() && *character != '.')
+        .map(|(index, _)| index)
+        .unwrap_or(value.len());
+    let amount = value.get(..split_at)?.parse::<f64>().ok()?;
+    Some((amount, value.get(split_at..)?))
 }
 
 pub(super) fn condition_row(condition: &ObjectCondition) -> gtk::ListBoxRow {

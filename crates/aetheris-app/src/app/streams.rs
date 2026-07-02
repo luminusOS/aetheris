@@ -4,7 +4,66 @@ use super::utils::*;
 use super::yaml::*;
 use super::*;
 
+type TerminalStart = (
+    String,
+    String,
+    String,
+    String,
+    tokio::sync::mpsc::UnboundedReceiver<Vec<u8>>,
+    futures::future::AbortRegistration,
+);
+
 impl App {
+    pub(super) fn start_object_watch(&mut self, sender: ComponentSender<Self>) {
+        let Some(context) = self.selected_context.clone() else {
+            return;
+        };
+        let Some(resource) = self.selected_resource_kind().cloned() else {
+            return;
+        };
+        let namespace = if resource.is_namespaced() {
+            Some(self.selected_namespace.clone())
+        } else {
+            None
+        };
+
+        self.stop_object_watch();
+        self.object_watch_token = self.object_watch_token.saturating_add(1);
+        let token = self.object_watch_token;
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        self.object_watch_abort_handle = Some(abort_handle);
+
+        sender.command(move |out, shutdown| {
+            shutdown
+                .register(
+                    Abortable::new(
+                        async move {
+                            let result = stream_object_watch(
+                                context,
+                                resource,
+                                namespace,
+                                token,
+                                out.clone(),
+                            )
+                            .await
+                            .map_err(format_error);
+                            let _ = out.send(AppMsg::ObjectWatchFinished(token, result));
+                        },
+                        abort_registration,
+                    )
+                    .map(|_| ()),
+                )
+                .drop_on_shutdown()
+                .boxed()
+        });
+    }
+
+    pub(super) fn stop_object_watch(&mut self) {
+        if let Some(handle) = self.object_watch_abort_handle.take() {
+            handle.abort();
+        }
+    }
+
     pub(super) fn update_log_target_containers(&mut self, detail: &ObjectDetail) {
         let mut selected = None;
         if let Some(target) = &mut self.detail_log_target {
@@ -12,6 +71,13 @@ impl App {
             selected = Some(default_log_container_index(&target.pod, &target.containers));
         }
         self.sync_log_controls_with_selection(selected);
+    }
+
+    pub(super) fn update_exec_target_containers(&mut self, detail: &ObjectDetail) {
+        if let Some(target) = &mut self.detail_exec_target {
+            target.containers.clone_from(&detail.containers);
+        }
+        self.sync_terminal_controls();
     }
 
     pub(super) fn start_pod_logs(&mut self, sender: ComponentSender<Self>) {
@@ -84,6 +150,137 @@ impl App {
             handle.abort();
         }
         self.log_streaming = false;
+    }
+
+    pub(super) fn show_pod_terminal(
+        &mut self,
+        root: &<Self as Component>::Root,
+        sender: ComponentSender<Self>,
+    ) {
+        let Some(target) = self.detail_exec_target.clone() else {
+            self.toaster
+                .add_toast(adw::Toast::new("Terminal is available for Pods."));
+            return;
+        };
+        if default_terminal_container(&target).is_none() {
+            self.toaster
+                .add_toast(adw::Toast::new("This Pod has no containers in its spec."));
+            return;
+        }
+
+        self.exec_token = self.exec_token.saturating_add(1);
+        let token = self.exec_token;
+        let container_dropdown = terminal_container_dropdown(&target);
+        let terminal_view = terminal_view();
+        let terminal_window = terminal_window(root, &target, &container_dropdown, &terminal_view);
+
+        terminal_view.connect_commit({
+            let sender = sender.clone();
+            move |_, text, _| sender.input(AppMsg::PodTerminalInput(token, text.to_string()))
+        });
+        container_dropdown.connect_selected_notify({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::RestartPodTerminal(token))
+        });
+        terminal_window.connect_close_request({
+            let sender = sender.clone();
+            move |_| {
+                sender.input(AppMsg::StopPodTerminal(token));
+                gtk::glib::Propagation::Proceed
+            }
+        });
+
+        self.terminal_sessions.insert(
+            token,
+            TerminalSession {
+                window: terminal_window.clone(),
+                container_dropdown,
+                view: terminal_view.clone(),
+                target,
+                abort_handle: None,
+                input_tx: None,
+            },
+        );
+        terminal_window.present();
+        terminal_view.grab_focus();
+        self.start_terminal_session(token, sender);
+    }
+
+    pub(super) fn start_terminal_session(&mut self, token: u64, sender: ComponentSender<Self>) {
+        let Some((context, namespace, pod, container, input_rx, abort_registration)) =
+            self.prepare_terminal_session(token)
+        else {
+            return;
+        };
+        let request = PodExecRequest {
+            namespace,
+            pod,
+            container: Some(container),
+            command: vec![
+                String::from("sh"),
+                String::from("-lc"),
+                String::from(
+                    "if command -v bash >/dev/null 2>&1; then exec bash -l; else exec sh; fi",
+                ),
+            ],
+        };
+
+        sender.command(move |out, shutdown| {
+            shutdown
+                .register(
+                    Abortable::new(
+                        async move {
+                            let result =
+                                stream_pod_terminal(context, request, input_rx, token, out.clone())
+                                    .await
+                                    .map_err(format_error);
+                            let _ = out.send(AppMsg::PodExecFinished(token, result));
+                        },
+                        abort_registration,
+                    )
+                    .map(|_| ()),
+                )
+                .drop_on_shutdown()
+                .boxed()
+        });
+    }
+
+    fn prepare_terminal_session(&mut self, token: u64) -> Option<TerminalStart> {
+        let session = self.terminal_sessions.get_mut(&token)?;
+        if let Some(handle) = session.abort_handle.take() {
+            handle.abort();
+        }
+        session.input_tx = None;
+        session.view.reset(true, true);
+        session.view.feed(b"Connecting to pod terminal...\r\n");
+
+        let container = selected_log_container(&session.container_dropdown, &session.target)
+            .or_else(|| default_terminal_container(&session.target))?;
+        let (input_tx, input_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        session.abort_handle = Some(abort_handle);
+        session.input_tx = Some(input_tx);
+        Some((
+            session.target.context.clone(),
+            session.target.namespace.clone(),
+            session.target.pod.clone(),
+            container,
+            input_rx,
+            abort_registration,
+        ))
+    }
+
+    pub(super) fn close_terminal_session(&mut self, token: u64, close_window: bool) {
+        let Some(mut session) = self.terminal_sessions.remove(&token) else {
+            return;
+        };
+        if let Some(handle) = session.abort_handle.take() {
+            handle.abort();
+        }
+        session.input_tx = None;
+        if close_window {
+            session.window.close();
+        }
     }
 
     pub(super) fn start_pod_port_forward(&mut self, sender: ComponentSender<Self>) {
@@ -234,6 +431,18 @@ impl App {
             });
     }
 
+    pub(super) fn sync_terminal_controls(&self) {
+        let Some(target) = &self.detail_exec_target else {
+            self.detail_terminal_button.set_visible(false);
+            self.detail_terminal_button.set_sensitive(false);
+            return;
+        };
+
+        let available = !target.containers.is_empty();
+        self.detail_terminal_button.set_visible(true);
+        self.detail_terminal_button.set_sensitive(available);
+    }
+
     pub(super) fn append_log_line(&self, line: &str) {
         insert_ansi_line(&self.detail_log_buffer, line);
         let mut iter = self.detail_log_buffer.end_iter();
@@ -243,6 +452,32 @@ impl App {
                 .create_mark(None, &self.detail_log_buffer.end_iter(), false);
         self.detail_log_view.scroll_mark_onscreen(&mark);
         self.detail_log_buffer.delete_mark(&mark);
+    }
+
+    pub(super) fn feed_terminal_event(&self, token: u64, event: PodExecEvent) {
+        let text = match event {
+            PodExecEvent::Stdout(text) | PodExecEvent::Stderr(text) => text,
+        };
+        if let Some(session) = self.terminal_sessions.get(&token) {
+            session.view.feed(text.as_bytes());
+        }
+    }
+
+    pub(super) fn show_terminal_error(&self, token: u64, error: &str) {
+        if let Some(session) = self.terminal_sessions.get(&token) {
+            let message = terminal_error_message(error);
+            session.view.feed(format!("\r\n{message}\r\n").as_bytes());
+        }
+    }
+
+    pub(super) fn send_terminal_input(&self, token: u64, text: String) {
+        if let Some(input_tx) = self
+            .terminal_sessions
+            .get(&token)
+            .and_then(|session| session.input_tx.as_ref())
+        {
+            let _ = input_tx.send(text.into_bytes());
+        }
     }
 
     pub(super) fn show_yaml_explanation(&self, root: &<Self as Component>::Root) {
@@ -267,4 +502,58 @@ impl App {
         dialog.set_child(Some(&toolbar));
         dialog.present(Some(root));
     }
+}
+
+fn terminal_container_dropdown(target: &PodLogTarget) -> gtk::DropDown {
+    let refs = target
+        .containers
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let dropdown = gtk::DropDown::from_strings(&refs);
+    dropdown.set_selected(default_log_container_index(&target.pod, &target.containers) as u32);
+    dropdown.set_tooltip_text(Some("Container"));
+    dropdown.set_width_request(220);
+    dropdown
+}
+
+fn terminal_view() -> vte4::Terminal {
+    let view = vte4::Terminal::new();
+    view.set_hexpand(true);
+    view.set_vexpand(true);
+    view.set_mouse_autohide(true);
+    view.set_scroll_on_output(true);
+    view.set_scroll_on_keystroke(true);
+    view.set_scrollback_lines(10_000);
+    view.set_font(Some(&gtk::pango::FontDescription::from_string(
+        "Monospace 10",
+    )));
+    view
+}
+
+fn terminal_window(
+    root: &<App as Component>::Root,
+    target: &PodLogTarget,
+    container_dropdown: &gtk::DropDown,
+    terminal_view: &vte4::Terminal,
+) -> adw::Window {
+    let window = adw::Window::builder()
+        .title(target.pod.as_str())
+        .default_width(920)
+        .default_height(620)
+        .build();
+    if let Some(application) = root.application() {
+        window.set_application(Some(&application));
+    }
+    let toolbar = adw::ToolbarView::new();
+    let header = adw::HeaderBar::new();
+    let title = adw::WindowTitle::builder()
+        .title(target.pod.as_str())
+        .build();
+    header.set_title_widget(Some(&title));
+    header.pack_start(container_dropdown);
+    toolbar.add_top_bar(&header);
+    toolbar.set_content(Some(terminal_view));
+    window.set_content(Some(&toolbar));
+    window
 }

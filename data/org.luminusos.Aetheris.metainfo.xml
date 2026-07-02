@@ -5,11 +5,39 @@
   <summary>Native Kubernetes client for GNOME</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
+  <developer id="org.luminusos">
+    <name>LuminusOS</name>
+  </developer>
   <description>
     <p>
-      Aetheris connects to Kubernetes clusters through kubeconfig and provides a
-      native GTK interface for browsing cluster resources.
+      Aetheris connects to Kubernetes and OpenShift clusters through kubeconfig
+      and provides a native GTK interface for browsing and operating cluster
+      resources.
     </p>
+    <ul>
+      <li>Organize clusters by project</li>
+      <li>Browse resources with live watch updates, namespace selection, search, and filters</li>
+      <li>Inspect resources with overview, YAML, conditions, events, related pods, logs, and metrics</li>
+      <li>Apply YAML, create resources, delete resources, scale deployments, cordon and drain nodes</li>
+      <li>Open multiple interactive pod terminals through VTE</li>
+    </ul>
   </description>
   <launchable type="desktop-id">org.luminusos.Aetheris.desktop</launchable>
+  <url type="homepage">https://github.com/luminusOS/aetheris</url>
+  <requires>
+    <internet>always</internet>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>touch</control>
+  </supports>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-07-01">
+      <description>
+        <p>Initial development release with project-based cluster browsing, live resource updates, logs, YAML editing, mutations, metrics, terminal, and port forwarding.</p>
+      </description>
+    </release>
+  </releases>
 </component>

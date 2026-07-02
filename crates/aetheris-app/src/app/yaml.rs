@@ -47,7 +47,10 @@ pub(super) fn build_yaml_view(buffer: &sourceview5::Buffer) -> sourceview5::View
 /// buffer and steps through them. Returns a `Revealer` to place above (or
 /// below) the editor's `ScrolledWindow`; wires Ctrl+F on `view` to reveal
 /// it and Escape to hide it again.
-pub(super) fn build_yaml_search_bar(view: &sourceview5::View, buffer: &sourceview5::Buffer) -> gtk::Revealer {
+pub(super) fn build_yaml_search_bar(
+    view: &sourceview5::View,
+    buffer: &sourceview5::Buffer,
+) -> gtk::Revealer {
     let settings = sourceview5::SearchSettings::new();
     settings.set_wrap_around(true);
     let search_context = sourceview5::SearchContext::new(buffer, Some(&settings));
@@ -150,8 +153,7 @@ pub(super) fn build_yaml_search_bar(view: &sourceview5::View, buffer: &sourcevie
         let revealer = revealer.clone();
         let entry = entry.clone();
         move |_, key, _, modifiers| {
-            if key == gtk::gdk::Key::f && modifiers.contains(gtk::gdk::ModifierType::CONTROL_MASK)
-            {
+            if key == gtk::gdk::Key::f && modifiers.contains(gtk::gdk::ModifierType::CONTROL_MASK) {
                 revealer.set_reveal_child(true);
                 entry.grab_focus();
                 return gtk::glib::Propagation::Stop;

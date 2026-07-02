@@ -26,13 +26,29 @@ pub(super) fn format_error(error: anyhow::Error) -> String {
     format!("{headline} ({cause})")
 }
 
+pub(super) fn terminal_error_message(error: &str) -> String {
+    let lower = error.to_ascii_lowercase();
+    if lower.contains("forbidden")
+        || lower.contains("pods/exec")
+        || (lower.contains("cannot create") && lower.contains("exec"))
+    {
+        return String::from(
+            "You do not have permission to open a terminal for this Pod. Your Kubernetes user needs create access to pods/exec in this namespace.",
+        );
+    }
+
+    format!("Terminal failed to start: {error}")
+}
+
 /// Kubernetes RBAC denials spell out the exact user, resource, API group,
 /// and scope, e.g. `namespaces is forbidden: User "..." cannot list
 /// resource "namespaces" in API group "" at the cluster scope` — all noise
 /// for a toast. Keep just "<resource> is forbidden".
 fn forbidden_summary(message: &str) -> Option<String> {
     let words: Vec<&str> = message.split_whitespace().collect();
-    let position = words.iter().position(|word| word.starts_with("forbidden"))?;
+    let position = words
+        .iter()
+        .position(|word| word.starts_with("forbidden"))?;
     if position < 2 || words[position - 1] != "is" {
         return None;
     }
@@ -132,10 +148,17 @@ pub(super) fn selected_log_container(
     target.containers.get(dropdown.selected() as usize).cloned()
 }
 
+pub(super) fn default_terminal_container(target: &PodLogTarget) -> Option<String> {
+    target
+        .containers
+        .get(default_log_container_index(&target.pod, &target.containers))
+        .cloned()
+}
+
 pub(super) fn default_log_container_index(pod: &str, containers: &[String]) -> usize {
     containers
         .iter()
-        .position(|container| container == pod)
+        .position(|container| container == pod || pod.starts_with(&format!("{container}-")))
         .unwrap_or(0)
 }
 

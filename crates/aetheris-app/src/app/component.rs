@@ -38,6 +38,7 @@ impl Component for App {
         load_app_css();
 
         let project_list = gtk::ListBox::new();
+        project_list.set_hexpand(true);
         project_list.add_css_class("boxed-list");
         project_list.set_selection_mode(gtk::SelectionMode::None);
         let project_title_label = gtk::Label::new(Some(DEFAULT_PROJECT_NAME));
@@ -60,9 +61,20 @@ impl Component for App {
             .icon_name("open-menu-symbolic")
             .tooltip_text("Cluster options")
             .build();
+        let cluster_refresh_button = gtk::Button::builder()
+            .icon_name("view-refresh-symbolic")
+            .tooltip_text("Refresh cluster health")
+            .build();
+        cluster_refresh_button.add_css_class("flat");
         let cluster_edit_button = menu_action_button("document-edit-symbolic", "Edit Cluster…");
-        cluster_menu_button.set_popover(Some(&action_menu_popover(&[&cluster_edit_button])));
+        let cluster_remove_button =
+            menu_action_button("user-trash-symbolic", "Remove from Project");
+        cluster_menu_button.set_popover(Some(&action_menu_popover(&[
+            &cluster_edit_button,
+            &cluster_remove_button,
+        ])));
         let cluster_list = gtk::ListBox::new();
+        cluster_list.set_hexpand(true);
         cluster_list.add_css_class("boxed-list");
         cluster_list.set_selection_mode(gtk::SelectionMode::None);
         let add_cluster_button = gtk::Button::builder().label("Add Cluster").build();
@@ -95,7 +107,8 @@ impl Component for App {
             .tooltip_text("Project options")
             .build();
         let project_rename_button = menu_action_button("document-edit-symbolic", "Rename Project…");
-        let project_duplicate_button = menu_action_button("edit-copy-symbolic", "Duplicate Project");
+        let project_duplicate_button =
+            menu_action_button("edit-copy-symbolic", "Duplicate Project");
         let project_delete_button = menu_action_button("user-trash-symbolic", "Delete Project…");
         project_delete_button.add_css_class("destructive-action");
         project_menu_button.set_popover(Some(&action_menu_popover(&[
@@ -115,7 +128,7 @@ impl Component for App {
         status_filter_list.set_max_children_per_line(3);
         status_filter_list.set_column_spacing(8);
         status_filter_list.set_row_spacing(8);
-        rebuild_status_filter_list(&status_filter_list, StatusFilter::All);
+        rebuild_status_filter_list(&status_filter_list, &StatusFilter::default_filters());
         let default_columns = ProjectStore::default().visible_object_columns;
         let column_filter_list = gtk::FlowBox::new();
         column_filter_list.set_selection_mode(gtk::SelectionMode::None);
@@ -126,7 +139,7 @@ impl Component for App {
         column_filter_list.set_row_spacing(8);
         rebuild_column_filter_list(&column_filter_list, &ObjectColumn::ALL, &default_columns);
         let projects_home_button = gtk::Button::builder()
-            .icon_name("go-home-symbolic")
+            .icon_name("go-previous-symbolic")
             .tooltip_text("Back to projects")
             .build();
         projects_home_button.add_css_class("flat");
@@ -233,6 +246,17 @@ impl Component for App {
             .build();
         detail_delete_button.add_css_class("destructive-action");
         detail_delete_button.add_css_class("flat");
+        detail_delete_button.set_size_request(34, 34);
+        detail_delete_button.set_valign(gtk::Align::Center);
+        let detail_terminal_button = gtk::Button::builder()
+            .icon_name("utilities-terminal-symbolic")
+            .tooltip_text("Open terminal")
+            .sensitive(false)
+            .visible(false)
+            .build();
+        detail_terminal_button.add_css_class("flat");
+        detail_terminal_button.set_size_request(34, 34);
+        detail_terminal_button.set_valign(gtk::Align::Center);
         let detail_port_forward_group = gtk::Box::new(gtk::Orientation::Vertical, 8);
         let detail_overview_section = gtk::Box::new(gtk::Orientation::Vertical, 12);
         let detail_expand_logs_button = gtk::Button::builder()
@@ -461,6 +485,7 @@ impl Component for App {
             delete_button: &detail_delete_button,
             create_yaml_button: &create_yaml_button,
             refresh_button: &refresh_button,
+            terminal_button: &detail_terminal_button,
             search_entry: &search_entry,
             status_filter_list: &status_filter_list,
             column_filter_list: &column_filter_list,
@@ -484,6 +509,7 @@ impl Component for App {
                 projects_home_button: &projects_home_button,
                 project_title: &project_title_label,
                 project_menu_button: &project_menu_button,
+                refresh_button: &cluster_refresh_button,
                 cluster_list: &cluster_list,
                 add_cluster_button: &add_cluster_button,
                 import_cluster_button: &import_cluster_button,
@@ -513,6 +539,14 @@ impl Component for App {
                 sender.input(AppMsg::EditCurrentCluster);
             }
         });
+        cluster_remove_button.connect_clicked({
+            let sender = sender.clone();
+            let menu_button = cluster_menu_button.clone();
+            move |_| {
+                menu_button.popdown();
+                sender.input(AppMsg::RemoveClusterFromProject);
+            }
+        });
         add_cluster_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowAddClusterDialog)
@@ -520,6 +554,10 @@ impl Component for App {
         import_cluster_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowImportFile)
+        });
+        cluster_refresh_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::RefreshClusters)
         });
         namespace_list.connect_row_activated({
             let sender = sender.clone();
@@ -633,6 +671,10 @@ impl Component for App {
             let sender = sender.clone();
             move |_| sender.input(AppMsg::DeleteObject)
         });
+        detail_terminal_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowPodTerminal)
+        });
         detail_scale_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ScaleDeployment)
@@ -698,7 +740,7 @@ impl Component for App {
             selected_resource_section: ResourceSection::Workloads,
             selected_resource: None,
             search_query: String::new(),
-            selected_status_filter: StatusFilter::All,
+            selected_status_filters: StatusFilter::default_filters(),
             loading: true,
             status: String::from("Loading kubeconfig..."),
             toaster,
@@ -709,6 +751,7 @@ impl Component for App {
             add_project_button,
             cluster_back_button,
             cluster_menu_button,
+            cluster_refresh_button,
             context_selector_label,
             cluster_list,
             add_cluster_button,
@@ -748,6 +791,7 @@ impl Component for App {
             detail_apply_button,
             detail_download_yaml_button,
             detail_delete_button,
+            detail_terminal_button,
             detail_yaml_buffer,
             detail_events_list,
             detail_conditions_list,
@@ -770,13 +814,18 @@ impl Component for App {
             detail_expand_logs_button,
             detail_target: None,
             detail_log_target: None,
+            detail_exec_target: None,
             detail_port_forward_target: None,
             detail_related_pods: Vec::new(),
             detail_node_unschedulable: None,
+            object_watch_token: 0,
+            object_watch_abort_handle: None,
             detail_request_token: 0,
             log_streaming: false,
             log_stream_token: 0,
             log_abort_handle: None,
+            exec_token: 0,
+            terminal_sessions: HashMap::new(),
             port_forwarding: false,
             port_forward_token: 0,
             port_forward_abort_handle: None,
