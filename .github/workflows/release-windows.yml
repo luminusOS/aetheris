@@ -148,13 +148,18 @@ jobs:
             target/windows/aetheris.ico
           cp target/windows/aetheris.ico target/windows/aetheris/aetheris.ico
 
-          iscc \
+          source_dir="$(cygpath -w "$(pwd)/target/windows/aetheris")"
+          output_dir="$(cygpath -w "$(pwd)/dist")"
+          setup_icon_file="$(cygpath -w "$(pwd)/target/windows/aetheris.ico")"
+          inno_script="$(cygpath -w "$(pwd)/build-aux/inno/aetheris.iss")"
+
+          MSYS2_ARG_CONV_EXCL='*' iscc \
             "/DAppVersion=${{ steps.names.outputs.version }}" \
-            "/DSourceDir=$(cygpath -w "$(pwd)/target/windows/aetheris")" \
-            "/DOutputDir=$(cygpath -w "$(pwd)/dist")" \
+            "/DSourceDir=${source_dir}" \
+            "/DOutputDir=${output_dir}" \
             "/DTargetArch=x64" \
-            "/DSetupIconFile=$(cygpath -w "$(pwd)/target/windows/aetheris.ico")" \
-            build-aux/inno/aetheris.iss
+            "/DSetupIconFile=${setup_icon_file}" \
+            "${inno_script}"
 
           mv dist/aetheris-setup.exe "dist/${{ steps.names.outputs.setup_name }}"
 
