@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "aetheris-app"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aetheris-kube",
  "anyhow",
@@ -23,7 +23,7 @@ dependencies = [
 
 [[package]]
 name = "aetheris-kube"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "dirs",

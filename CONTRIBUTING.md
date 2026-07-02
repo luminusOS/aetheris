@@ -161,15 +161,15 @@ workspace root.
 Release tags use the workspace version:
 
 ```sh
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
 ```
 
 Release candidates use a suffix:
 
 ```sh
-git tag -a v0.1.0-rc1 -m "Release v0.1.0-rc1"
-git push origin v0.1.0-rc1
+git tag -a v1.0.0-rc1 -m "Release v1.0.0-rc1"
+git push origin v1.0.0-rc1
 ```
 
 The release workflow validates the tag against `[workspace.package].version`
