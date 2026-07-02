@@ -56,6 +56,16 @@ pub(super) async fn list_objects(
     resource: ResourceKind,
     namespace: Option<String>,
 ) -> AppMsg {
+    let result = list_objects_snapshot(context, resource, namespace).await;
+
+    AppMsg::ObjectsLoaded(result)
+}
+
+pub(super) async fn list_objects_snapshot(
+    context: String,
+    resource: ResourceKind,
+    namespace: Option<String>,
+) -> Result<Vec<ObjectSummary>, String> {
     let result = async {
         let manager = KubeManager::load()?;
         let session = manager.connect_context(&context).await?;
@@ -64,7 +74,23 @@ pub(super) async fn list_objects(
     .await
     .map_err(format_error);
 
-    AppMsg::ObjectsLoaded(result)
+    result
+}
+
+pub(super) async fn stream_object_watch(
+    context: String,
+    resource: ResourceKind,
+    namespace: Option<String>,
+    token: u64,
+    out: relm4::Sender<AppMsg>,
+) -> anyhow::Result<()> {
+    let manager = KubeManager::load()?;
+    let session = manager.connect_context(&context).await?;
+    session
+        .watch_objects(resource, namespace, move |event| {
+            let _ = out.send(AppMsg::ObjectWatchEvent(token, event));
+        })
+        .await
 }
 
 pub(super) async fn load_object_detail(
@@ -113,6 +139,22 @@ pub(super) async fn run_pod_port_forward(
     session
         .port_forward_pod(request, move |event| {
             let _ = out.send(AppMsg::PodPortForwardEvent(token, event));
+        })
+        .await
+}
+
+pub(super) async fn stream_pod_terminal(
+    context: String,
+    request: PodExecRequest,
+    input_rx: tokio::sync::mpsc::UnboundedReceiver<Vec<u8>>,
+    token: u64,
+    out: relm4::Sender<AppMsg>,
+) -> anyhow::Result<()> {
+    let manager = KubeManager::load()?;
+    let session = manager.connect_context(&context).await?;
+    session
+        .terminal_pod(request, input_rx, move |event| {
+            let _ = out.send(AppMsg::PodExecEvent(token, event));
         })
         .await
 }
@@ -257,9 +299,26 @@ pub(super) async fn load_state_for_cluster(context: String) -> AppMsg {
     AppMsg::StateLoadedForCluster(context, result)
 }
 
+pub(super) async fn load_state_for_imported_clusters(context_names: Vec<String>) -> AppMsg {
+    let result = async {
+        let manager = KubeManager::load()?;
+        let contexts = manager.load_contexts();
+        let projects = ProjectStore::load(&contexts);
+        Ok::<_, anyhow::Error>(LoadedState {
+            contexts,
+            namespaces: with_all_namespace(manager.namespaces()),
+            projects,
+        })
+    }
+    .await
+    .map_err(format_error);
+
+    AppMsg::StateLoadedForImportedClusters(context_names, result)
+}
+
 pub(super) async fn import_kubeconfig(path: PathBuf) -> AppMsg {
     let result = KubeManager::import_kubeconfig(path)
-        .map(|path| path.display().to_string())
+        .map(|(path, contexts)| (path.display().to_string(), contexts))
         .map_err(format_error);
 
     AppMsg::KubeconfigImported(result)

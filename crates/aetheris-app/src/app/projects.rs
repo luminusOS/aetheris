@@ -6,6 +6,10 @@ pub struct ProjectStore {
     pub(super) selected_project: Option<String>,
     #[serde(default = "default_object_columns")]
     pub(super) visible_object_columns: Vec<ObjectColumn>,
+    #[serde(default)]
+    pub(super) object_name_width: Option<i32>,
+    #[serde(default)]
+    pub(super) object_column_widths: Vec<ObjectColumnWidth>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,9 +47,8 @@ pub(super) enum ResourceSection {
     Custom,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum StatusFilter {
-    All,
     Ready,
     Unavailable,
     Running,
@@ -55,13 +58,25 @@ pub(super) enum StatusFilter {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(super) enum ObjectColumn {
+pub(crate) enum ObjectColumn {
     Namespace,
     Status,
     Cpu,
     Memory,
     Api,
     Age,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ObjectTableColumn {
+    Name,
+    Data(ObjectColumn),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub(super) struct ObjectColumnWidth {
+    column: ObjectColumn,
+    width: i32,
 }
 
 impl ObjectColumn {
@@ -85,7 +100,7 @@ impl ObjectColumn {
         }
     }
 
-    pub(super) fn width(self) -> i32 {
+    pub(super) fn default_width(self) -> i32 {
         match self {
             Self::Namespace => OBJECT_NAMESPACE_WIDTH,
             Self::Status => OBJECT_STATUS_WIDTH,
@@ -101,8 +116,7 @@ pub(super) fn default_object_columns() -> Vec<ObjectColumn> {
 }
 
 impl StatusFilter {
-    pub(super) const ALL: [Self; 6] = [
-        Self::All,
+    pub(super) const ALL: [Self; 5] = [
         Self::Ready,
         Self::Unavailable,
         Self::Running,
@@ -112,7 +126,6 @@ impl StatusFilter {
 
     pub(super) fn label(self) -> &'static str {
         match self {
-            Self::All => "Any status",
             Self::Ready => "Ready",
             Self::Unavailable => "Unavailable",
             Self::Running => "Running",
@@ -122,18 +135,25 @@ impl StatusFilter {
     }
 
     pub(super) fn matches(self, status: &str) -> bool {
-        match self {
-            Self::All => true,
-            filter => status
-                .split_whitespace()
-                .next()
-                .is_some_and(|part| part.eq_ignore_ascii_case(filter.keyword())),
+        status
+            .split_whitespace()
+            .next()
+            .is_some_and(|part| part.eq_ignore_ascii_case(self.keyword()))
+    }
+
+    pub(super) fn matches_any(status: &str, filters: &BTreeSet<Self>) -> bool {
+        if filters.len() == Self::ALL.len() {
+            return true;
         }
+        filters.iter().any(|filter| filter.matches(status))
+    }
+
+    pub(super) fn default_filters() -> BTreeSet<Self> {
+        Self::ALL.into_iter().collect()
     }
 
     pub(super) fn keyword(self) -> &'static str {
         match self {
-            Self::All => "",
             Self::Ready => "Ready",
             Self::Unavailable => "Unavailable",
             Self::Running => "Running",
@@ -225,6 +245,8 @@ impl Default for ProjectStore {
             }],
             selected_project: Some(String::from(DEFAULT_PROJECT_NAME)),
             visible_object_columns: default_object_columns(),
+            object_name_width: None,
+            object_column_widths: Vec::new(),
         }
     }
 }
@@ -233,7 +255,9 @@ impl ProjectStore {
     pub(super) fn load(contexts: &[ContextInfo]) -> Self {
         let mut store = Self::read_from_disk().unwrap_or_default();
         store.normalize_object_columns();
-        store.ensure_contexts(contexts);
+        store.normalize_object_column_widths();
+        store.normalize_object_name_width();
+        store.normalize_contexts(contexts);
         if let Err(error) = store.save() {
             tracing::warn!("Unable to persist projects: {error}");
         }
@@ -269,6 +293,77 @@ impl ProjectStore {
         self.normalize_object_columns();
     }
 
+    pub(super) fn object_column_width(&self, column: ObjectColumn) -> i32 {
+        self.object_column_widths
+            .iter()
+            .find(|entry| entry.column == column)
+            .map(|entry| entry.width)
+            .unwrap_or_else(|| column.default_width())
+            .clamp(OBJECT_COLUMN_MIN_WIDTH, OBJECT_COLUMN_MAX_WIDTH)
+    }
+
+    pub(super) fn object_column_widths_for(&self, columns: &[ObjectColumn]) -> Vec<i32> {
+        columns
+            .iter()
+            .copied()
+            .map(|column| self.object_column_width(column))
+            .collect()
+    }
+
+    pub(super) fn object_name_width(&self) -> i32 {
+        self.object_name_width
+            .unwrap_or(OBJECT_NAME_WIDTH)
+            .clamp(OBJECT_NAME_MIN_WIDTH, OBJECT_NAME_MAX_WIDTH)
+    }
+
+    pub(super) fn set_object_table_column_width(
+        &mut self,
+        column: ObjectTableColumn,
+        width: i32,
+    ) -> bool {
+        match column {
+            ObjectTableColumn::Name => self.set_object_name_width(width),
+            ObjectTableColumn::Data(column) => self.set_object_column_width(column, width),
+        }
+    }
+
+    fn set_object_name_width(&mut self, width: i32) -> bool {
+        let width = width.clamp(OBJECT_NAME_MIN_WIDTH, OBJECT_NAME_MAX_WIDTH);
+        let next = (width != OBJECT_NAME_WIDTH).then_some(width);
+        if self.object_name_width == next {
+            return false;
+        }
+        self.object_name_width = next;
+        true
+    }
+
+    pub(super) fn set_object_column_width(&mut self, column: ObjectColumn, width: i32) -> bool {
+        let width = width.clamp(OBJECT_COLUMN_MIN_WIDTH, OBJECT_COLUMN_MAX_WIDTH);
+        if width == column.default_width() {
+            let previous_len = self.object_column_widths.len();
+            self.object_column_widths
+                .retain(|entry| entry.column != column);
+            return previous_len != self.object_column_widths.len();
+        }
+
+        if let Some(entry) = self
+            .object_column_widths
+            .iter_mut()
+            .find(|entry| entry.column == column)
+        {
+            if entry.width == width {
+                return false;
+            }
+            entry.width = width;
+            return true;
+        }
+
+        self.object_column_widths
+            .push(ObjectColumnWidth { column, width });
+        self.normalize_object_column_widths();
+        true
+    }
+
     fn normalize_object_columns(&mut self) {
         self.visible_object_columns
             .retain(|column| ObjectColumn::ALL.contains(column));
@@ -279,6 +374,32 @@ impl ProjectStore {
                 .unwrap_or(usize::MAX)
         });
         self.visible_object_columns.dedup();
+    }
+
+    fn normalize_object_column_widths(&mut self) {
+        self.object_column_widths
+            .retain(|entry| ObjectColumn::ALL.contains(&entry.column));
+        for entry in &mut self.object_column_widths {
+            entry.width = entry
+                .width
+                .clamp(OBJECT_COLUMN_MIN_WIDTH, OBJECT_COLUMN_MAX_WIDTH);
+        }
+        self.object_column_widths.sort_by_key(|entry| {
+            ObjectColumn::ALL
+                .iter()
+                .position(|candidate| *candidate == entry.column)
+                .unwrap_or(usize::MAX)
+        });
+        self.object_column_widths.dedup_by_key(|entry| entry.column);
+        self.object_column_widths
+            .retain(|entry| entry.width != entry.column.default_width());
+    }
+
+    fn normalize_object_name_width(&mut self) {
+        self.object_name_width = self
+            .object_name_width
+            .map(|width| width.clamp(OBJECT_NAME_MIN_WIDTH, OBJECT_NAME_MAX_WIDTH))
+            .filter(|width| *width != OBJECT_NAME_WIDTH);
     }
 
     pub(super) fn save(&self) -> Result<(), String> {
@@ -305,24 +426,23 @@ impl ProjectStore {
         dirs::config_dir().map(|path| path.join("aetheris").join("projects.json"))
     }
 
-    pub(super) fn ensure_contexts(&mut self, contexts: &[ContextInfo]) {
+    pub(super) fn normalize_contexts(&mut self, contexts: &[ContextInfo]) {
         if self.projects.is_empty() {
             self.projects.push(Project {
                 name: String::from(DEFAULT_PROJECT_NAME),
-                contexts: contexts
-                    .iter()
-                    .map(|context| context.name.clone())
-                    .collect(),
+                contexts: Vec::new(),
                 custom_namespaces: Vec::new(),
             });
             self.selected_project = Some(String::from(DEFAULT_PROJECT_NAME));
-            return;
         }
 
-        // Contexts that were renamed or deleted no longer appear in the
-        // live kubeconfig; drop them so a rename doesn't leave the old name
-        // behind as a phantom cluster in whichever project held it.
-        let live_names: BTreeSet<&str> = contexts.iter().map(|context| context.name.as_str()).collect();
+        // The kubeconfig can be changed by kubectl/oc outside Aetheris. Keep
+        // only clusters explicitly saved in projects.json; use the live
+        // kubeconfig here only to prune deleted/renamed entries.
+        let live_names: BTreeSet<&str> = contexts
+            .iter()
+            .map(|context| context.name.as_str())
+            .collect();
         for project in &mut self.projects {
             project
                 .contexts
@@ -337,31 +457,36 @@ impl ProjectStore {
             self.selected_project = self.projects.first().map(|project| project.name.clone());
         }
 
-        let assigned = self
-            .projects
-            .iter()
-            .flat_map(|project| project.contexts.iter().cloned())
-            .collect::<BTreeSet<_>>();
-        let unassigned = contexts
-            .iter()
-            .filter(|context| !assigned.contains(&context.name))
-            .map(|context| context.name.clone())
-            .collect::<Vec<_>>();
-        let selected = self.selected_project_name().to_owned();
-        if let Some(project) = self
-            .projects
-            .iter_mut()
-            .find(|project| project.name == selected)
-        {
-            project.contexts.extend(unassigned);
-        }
-
         for project in &mut self.projects {
             project.contexts.sort();
             project.contexts.dedup();
             project.custom_namespaces.sort();
             project.custom_namespaces.dedup();
         }
+    }
+
+    pub(super) fn add_contexts_to_selected_project<I>(&mut self, contexts: I)
+    where
+        I: IntoIterator<Item = String>,
+    {
+        let Some(project) = self.selected_project_mut() else {
+            return;
+        };
+        project.contexts.extend(
+            contexts
+                .into_iter()
+                .map(|context| context.trim().to_owned())
+                .filter(|context| !context.is_empty()),
+        );
+        project.contexts.sort();
+        project.contexts.dedup();
+    }
+
+    pub(super) fn remove_context_from_selected_project(&mut self, context: &str) {
+        let Some(project) = self.selected_project_mut() else {
+            return;
+        };
+        project.contexts.retain(|candidate| candidate != context);
     }
 
     pub(super) fn selected_project_mut(&mut self) -> Option<&mut Project> {
@@ -388,22 +513,22 @@ mod tests {
     }
 
     #[test]
-    fn ensure_contexts_drops_renamed_cluster_instead_of_duplicating_it() {
+    fn normalize_contexts_does_not_import_external_contexts() {
         let mut store = ProjectStore {
             projects: vec![Project {
                 name: String::from("Work"),
-                contexts: vec![String::from("old-name")],
+                contexts: vec![String::from("local")],
                 custom_namespaces: Vec::new(),
             }],
             selected_project: Some(String::from("Work")),
             visible_object_columns: default_object_columns(),
+            object_name_width: None,
+            object_column_widths: Vec::new(),
         };
 
-        // The cluster behind "old-name" was renamed to "new-name"; the
-        // kubeconfig now only reports the new name.
-        store.ensure_contexts(&[context("new-name")]);
+        store.normalize_contexts(&[context("local"), context("external")]);
 
         let project = store.selected_project().unwrap();
-        assert_eq!(project.contexts, vec![String::from("new-name")]);
+        assert_eq!(project.contexts, vec![String::from("local")]);
     }
 }

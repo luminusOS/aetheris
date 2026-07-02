@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Symbolic Aetheris icon: the same aether motif as the full-color icon —
+     a core with an orbit of nodes above the curve of the world. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <g fill="none" stroke="#2e3436" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Orbit around the core. -->
+    <circle cx="8" cy="6.5" r="3.75"/>
+    <!-- Horizon of the world below. -->
+    <path d="M2 14 A 9.5 9.5 0 0 1 14 14"/>
+  </g>
+  <g fill="#2e3436">
+    <!-- Core and cluster nodes. -->
+    <circle cx="8" cy="6.5" r="1.75"/>
+    <circle cx="8" cy="2.75" r="1.25"/>
+    <circle cx="4.75" cy="8.4" r="1.25"/>
+    <circle cx="11.25" cy="8.4" r="1.25"/>
+  </g>
+</svg>

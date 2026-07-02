@@ -1,9 +1,13 @@
-use std::{collections::BTreeSet, fs, path::PathBuf};
+use std::{
+    collections::{BTreeSet, HashMap},
+    fs,
+    path::PathBuf,
+};
 
 use aetheris_kube::{
     AddClusterRequest, ClusterSummary, ContainerUsage, ContextInfo, KubeManager, ObjectCondition,
-    ObjectDetail, ObjectEvent, ObjectSummary, PodLogRequest, PodPortForwardEvent,
-    PodPortForwardRequest, ResourceKind,
+    ObjectDetail, ObjectEvent, ObjectSummary, ObjectWatchEvent, PodExecEvent, PodExecRequest,
+    PodLogRequest, PodPortForwardEvent, PodPortForwardRequest, ResourceKind,
 };
 use futures::future::{AbortHandle, Abortable};
 use futures::FutureExt;
@@ -12,6 +16,7 @@ use relm4::prelude::*;
 use relm4::{adw, gtk};
 use serde::{Deserialize, Serialize};
 use sourceview5::prelude::*;
+use vte4::prelude::*;
 
 mod ansi;
 mod commands;
@@ -28,7 +33,8 @@ mod widgets;
 mod yaml;
 
 use projects::{
-    DetailTarget, ObjectColumn, PodLogTarget, Project, ProjectStore, ResourceSection, StatusFilter,
+    DetailTarget, ObjectColumn, ObjectTableColumn, PodLogTarget, Project, ProjectStore,
+    ResourceSection, StatusFilter,
 };
 use widgets::{
     is_access_resource, is_cluster_resource, is_configuration_resource, is_network_resource,
@@ -37,11 +43,15 @@ use widgets::{
 
 const DEFAULT_PROJECT_NAME: &str = "Default";
 const OBJECT_NAME_WIDTH: i32 = 244;
-const OBJECT_NAMESPACE_WIDTH: i32 = 88;
+const OBJECT_NAMESPACE_WIDTH: i32 = 132;
 const OBJECT_STATUS_WIDTH: i32 = 64;
 const OBJECT_METRIC_WIDTH: i32 = 64;
 const OBJECT_API_WIDTH: i32 = 96;
 const OBJECT_AGE_WIDTH: i32 = 56;
+const OBJECT_COLUMN_MIN_WIDTH: i32 = 48;
+const OBJECT_COLUMN_MAX_WIDTH: i32 = 260;
+const OBJECT_NAME_MIN_WIDTH: i32 = 160;
+const OBJECT_NAME_MAX_WIDTH: i32 = 520;
 const APP_CSS: &str = r#"
 .resource-row-selected {
   background-color: alpha(currentColor, 0.08);
@@ -111,6 +121,25 @@ const APP_CSS: &str = r#"
 .content-clamp {
   margin-left: 12px;
   margin-right: 12px;
+}
+
+.column-resize-handle {
+  min-width: 10px;
+  border-radius: 999px;
+}
+
+.column-resize-handle:hover {
+  background-color: alpha(currentColor, 0.12);
+}
+
+.column-resize-handle-active {
+  background-color: alpha(@accent_color, 0.18);
+}
+
+.column-resize-line {
+  background-color: alpha(currentColor, 0.28);
+  min-width: 1px;
+  border-radius: 999px;
 }
 
 .filter-status-dot {
@@ -191,7 +220,7 @@ pub struct App {
     selected_resource_section: ResourceSection,
     selected_resource: Option<usize>,
     search_query: String,
-    selected_status_filter: StatusFilter,
+    selected_status_filters: BTreeSet<StatusFilter>,
     loading: bool,
     status: String,
     toaster: adw::ToastOverlay,
@@ -202,6 +231,7 @@ pub struct App {
     add_project_button: gtk::Button,
     cluster_back_button: gtk::Button,
     cluster_menu_button: gtk::MenuButton,
+    cluster_refresh_button: gtk::Button,
     context_selector_label: gtk::Label,
     cluster_list: gtk::ListBox,
     add_cluster_button: gtk::Button,
@@ -244,6 +274,7 @@ pub struct App {
     detail_apply_button: gtk::Button,
     detail_download_yaml_button: gtk::Button,
     detail_delete_button: gtk::Button,
+    detail_terminal_button: gtk::Button,
     detail_yaml_buffer: sourceview5::Buffer,
     detail_events_list: gtk::ListBox,
     detail_conditions_list: gtk::ListBox,
@@ -266,13 +297,18 @@ pub struct App {
     detail_expand_logs_button: gtk::Button,
     detail_target: Option<DetailTarget>,
     detail_log_target: Option<PodLogTarget>,
+    detail_exec_target: Option<PodLogTarget>,
     detail_port_forward_target: Option<PodLogTarget>,
     detail_related_pods: Vec<ObjectSummary>,
     detail_node_unschedulable: Option<bool>,
+    object_watch_token: u64,
+    object_watch_abort_handle: Option<AbortHandle>,
     detail_request_token: u64,
     log_streaming: bool,
     log_stream_token: u64,
     log_abort_handle: Option<AbortHandle>,
+    exec_token: u64,
+    terminal_sessions: HashMap<u64, TerminalSession>,
     port_forwarding: bool,
     port_forward_token: u64,
     port_forward_abort_handle: Option<AbortHandle>,
@@ -303,6 +339,15 @@ pub struct App {
     editing_context_name: Option<String>,
 }
 
+struct TerminalSession {
+    window: adw::Window,
+    container_dropdown: gtk::DropDown,
+    view: vte4::Terminal,
+    target: PodLogTarget,
+    abort_handle: Option<AbortHandle>,
+    input_tx: Option<tokio::sync::mpsc::UnboundedSender<Vec<u8>>>,
+}
+
 #[derive(Debug)]
 pub enum AppMsg {
     Loaded(Result<LoadedState, String>),
@@ -315,13 +360,14 @@ pub enum AppMsg {
     DeleteProject,
     ConfirmDeleteProject,
     ShowClusters,
+    RefreshClusters,
     ClusterChanged(u32),
     ClusterSummaryLoaded(String, Result<ClusterSummary, String>),
     NamespaceChanged(u32),
     CustomNamespaceEntered,
     StatusFilterChanged(u32),
     ObjectColumnToggled(u32),
-    EditCluster(u32),
+    ObjectColumnResized(ObjectTableColumn, i32),
     EditCurrentCluster,
     ResourceChanged(usize),
     SearchChanged(String),
@@ -334,6 +380,8 @@ pub enum AppMsg {
     ShowCreateYamlDialog,
     CreateYaml,
     ObjectCreated(Result<String, String>),
+    ObjectWatchEvent(u64, ObjectWatchEvent),
+    ObjectWatchFinished(u64, Result<(), String>),
     ScaleDeployment,
     ObjectScaled(u64, Result<ObjectDetail, String>),
     ToggleNodeScheduling,
@@ -357,6 +405,12 @@ pub enum AppMsg {
     ToggleDetailOverview,
     PodLogLine(u64, String),
     PodLogFinished(u64, Result<(), String>),
+    ShowPodTerminal,
+    RestartPodTerminal(u64),
+    StopPodTerminal(u64),
+    PodTerminalInput(u64, String),
+    PodExecEvent(u64, PodExecEvent),
+    PodExecFinished(u64, Result<(), String>),
     StartPodPortForward,
     StopPodPortForward,
     PodPortForwardEvent(u64, PodPortForwardEvent),
@@ -369,8 +423,10 @@ pub enum AppMsg {
     AddCluster,
     ClusterAdded(Result<(String, String), String>),
     StateLoadedForCluster(String, Result<LoadedState, String>),
+    RemoveClusterFromProject,
     ImportKubeconfig(PathBuf),
-    KubeconfigImported(Result<String, String>),
+    KubeconfigImported(Result<(String, Vec<String>), String>),
+    StateLoadedForImportedClusters(Vec<String>, Result<LoadedState, String>),
     Toast(String),
 }
 
