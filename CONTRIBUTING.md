@@ -102,6 +102,7 @@ sudo dnf install flatpak flatpak-builder
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
 mkdir -p target/flatpak
+flatpak_arch="$(uname -m)"
 flatpak-builder \
   --user \
   --force-clean \
@@ -113,7 +114,7 @@ flatpak-builder \
 
 flatpak build-bundle \
   target/flatpak/repo \
-  target/flatpak/aetheris-dev.flatpak \
+  "target/flatpak/aetheris-dev-linux-${flatpak_arch}.flatpak" \
   org.luminusos.Aetheris \
   stable
 ```
@@ -121,7 +122,7 @@ flatpak build-bundle \
 Install and run it with:
 
 ```sh
-flatpak install --user --reinstall target/flatpak/aetheris-dev.flatpak
+flatpak install --user --reinstall "target/flatpak/aetheris-dev-linux-$(uname -m).flatpak"
 flatpak run org.luminusos.Aetheris
 ```
 
@@ -176,11 +177,11 @@ git push origin v1.0.0-rc1
 The release workflow validates the tag against `[workspace.package].version`
 in `Cargo.toml` and `[package].version` in `crates/aetheris-app/Cargo.toml`,
 runs CI, builds Flatpak, AppImage, macOS `.dmg`, Windows portable `.zip`, and
-Windows setup `.exe` bundles, creates a source zip, and publishes the artifacts
-to GitHub Releases. The macOS bundles are generated with `cargo-bundle`,
-Homebrew GTK runtime dylibs, and `create-dmg`. The Windows portable bundle
-contains `bin/aetheris.exe` plus the GTK runtime files it needs, and the setup
-`.exe` is generated with Inno Setup.
+Windows setup `.exe` bundles, and publishes the artifacts to GitHub Releases.
+GitHub provides the release source archives automatically. The macOS bundles are
+generated with `cargo-bundle`, Homebrew GTK runtime dylibs, and `create-dmg`.
+The Windows portable bundle contains `bin/aetheris.exe` plus the GTK runtime
+files it needs, and the setup `.exe` is generated with Inno Setup.
 
 ## Pull Request Checklist
 

@@ -7,8 +7,6 @@ on:
         value: ${{ jobs.flatpak.outputs.artifact-name }}
       bundle-name:
         value: ${{ jobs.flatpak.outputs.bundle-name }}
-      source-name:
-        value: ${{ jobs.flatpak.outputs.source-name }}
 
 jobs:
   flatpak:
@@ -17,7 +15,6 @@ jobs:
     outputs:
       artifact-name: ${{ steps.names.outputs.artifact_name }}
       bundle-name: ${{ steps.names.outputs.bundle_name }}
-      source-name: ${{ steps.names.outputs.source_name }}
     steps:
       - name: Check out sources
         uses: actions/checkout@v4
@@ -40,10 +37,11 @@ jobs:
           fi
 
           mkdir -p dist
+          ARCH="$(uname -m)"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "arch=${ARCH}" >> "$GITHUB_OUTPUT"
           echo "artifact_name=flatpak-bundle" >> "$GITHUB_OUTPUT"
-          echo "bundle_name=aetheris-${VERSION}.flatpak" >> "$GITHUB_OUTPUT"
-          echo "source_name=aetheris-${VERSION}-source.zip" >> "$GITHUB_OUTPUT"
+          echo "bundle_name=aetheris-${VERSION}-linux-${ARCH}.flatpak" >> "$GITHUB_OUTPUT"
 
       - name: Install Flatpak builder
         run: |
@@ -69,19 +67,9 @@ jobs:
             stable
           cp "target/flatpak/${{ steps.names.outputs.bundle_name }}" "dist/${{ steps.names.outputs.bundle_name }}"
 
-      - name: Create source archive
-        run: |
-          git archive \
-            --format=zip \
-            --prefix="aetheris-${{ steps.names.outputs.version }}/" \
-            --output="dist/${{ steps.names.outputs.source_name }}" \
-            HEAD
-
       - name: Upload release assets
         uses: actions/upload-artifact@v4
         with:
           name: flatpak-bundle
-          path: |
-            dist/${{ steps.names.outputs.bundle_name }}
-            dist/${{ steps.names.outputs.source_name }}
+          path: dist/${{ steps.names.outputs.bundle_name }}
           retention-days: 1
