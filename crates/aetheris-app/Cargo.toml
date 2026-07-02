@@ -1,26 +1,67 @@
 [package]
 name = "aetheris-app"
 description = "Aetheris native Kubernetes client for GNOME"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+authors = ["Leandro Rodrigues <leandromqrs@hotmail.com>"]
 
 [[bin]]
 name = "aetheris"
 path = "src/main.rs"
 
+[package.metadata.appimage]
+icon = "../../data/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png"
+desktop_entry = "../../data/org.luminusos.Aetheris.desktop"
+assets = [
+  "../../data/org.luminusos.Aetheris.metainfo.xml",
+  "../../data/icons/hicolor/64x64/apps/org.luminusos.Aetheris.png",
+  "../../data/icons/hicolor/128x128/apps/org.luminusos.Aetheris.png",
+  "../../data/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png",
+  "../../data/icons/hicolor/512x512/apps/org.luminusos.Aetheris.png",
+  "../../data/icons/hicolor/symbolic/apps/org.luminusos.Aetheris-symbolic.svg",
+]
+auto_link = true
+auto_link_exclude_list = [
+  "ld-linux*.so*",
+  "libanl.so*",
+  "libBrokenLocale.so*",
+  "libc.so*",
+  "libdl.so*",
+  "libgcc_s.so*",
+  "libm.so*",
+  "libmvec.so*",
+  "libnsl.so*",
+  "libnss_*.so*",
+  "libpthread.so*",
+  "libresolv.so*",
+  "librt.so*",
+  "libstdc++.so*",
+  "libutil.so*",
+]
+
+[package.metadata.bundle]
+name = "Aetheris"
+identifier = "org.luminusos.Aetheris"
+icon = ["target/macos/aetheris.icns"]
+resources = [
+  "../../data/org.luminusos.Aetheris.metainfo.xml",
+  "../../data/icons/hicolor",
+]
+
 [dependencies]
-anyhow.workspace = true
 aetheris-kube = { path = "../aetheris-kube" }
-dirs.workspace = true
-futures.workspace = true
-relm4.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-serde_yaml.workspace = true
+anyhow = "1"
+dirs = "6"
+futures = "0.3"
+relm4 = { version = "0.11", features = ["libadwaita", "gnome_50"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
 sourceview5 = "0.11"
-tokio.workspace = true
-tracing.workspace = true
-tracing-subscriber.workspace = true
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "time"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
 vte4 = "0.10"

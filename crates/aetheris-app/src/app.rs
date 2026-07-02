@@ -16,6 +16,7 @@ use relm4::prelude::*;
 use relm4::{adw, gtk};
 use serde::{Deserialize, Serialize};
 use sourceview5::prelude::*;
+#[cfg(not(target_os = "windows"))]
 use vte4::prelude::*;
 
 mod ansi;
@@ -339,6 +340,7 @@ pub struct App {
     editing_context_name: Option<String>,
 }
 
+#[cfg(not(target_os = "windows"))]
 struct TerminalSession {
     window: adw::Window,
     container_dropdown: gtk::DropDown,
@@ -347,6 +349,9 @@ struct TerminalSession {
     abort_handle: Option<AbortHandle>,
     input_tx: Option<tokio::sync::mpsc::UnboundedSender<Vec<u8>>>,
 }
+
+#[cfg(target_os = "windows")]
+struct TerminalSession;
 
 #[derive(Debug)]
 pub enum AppMsg {

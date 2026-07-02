@@ -1,0 +1,109 @@
+name: Release AppImage
+
+on:
+  workflow_call:
+    outputs:
+      artifact-name:
+        value: ${{ jobs.appimage.outputs.artifact-name }}
+      appimage-name:
+        value: ${{ jobs.appimage.outputs.appimage-name }}
+
+jobs:
+  appimage:
+    name: Build AppImage
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.names.outputs.artifact_name }}
+      appimage-name: ${{ steps.names.outputs.appimage_name }}
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Read release metadata
+        id: names
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          BASE_VERSION="${VERSION%%-*}"
+          CARGO_VERSION="$(
+            python3 -c 'import pathlib, tomllib; data = tomllib.loads(pathlib.Path("Cargo.toml").read_text()); print(data["workspace"]["package"]["version"])'
+          )"
+          APP_VERSION="$(
+            python3 -c 'import pathlib, tomllib; data = tomllib.loads(pathlib.Path("crates/aetheris-app/Cargo.toml").read_text()); print(data["package"]["version"])'
+          )"
+
+          if [ "$BASE_VERSION" != "$CARGO_VERSION" ]; then
+            echo "Tag ${TAG} does not match workspace version ${CARGO_VERSION}." >&2
+            exit 1
+          fi
+          if [ "$BASE_VERSION" != "$APP_VERSION" ]; then
+            echo "Tag ${TAG} does not match aetheris-app version ${APP_VERSION}." >&2
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=appimage-bundle" >> "$GITHUB_OUTPUT"
+          echo "appimage_name=aetheris-${VERSION}-x86_64.AppImage" >> "$GITHUB_OUTPUT"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            appstream \
+            curl \
+            desktop-file-utils \
+            file \
+            libadwaita-1-dev \
+            libgtk-4-dev \
+            libgtksourceview-5-dev \
+            libssl-dev \
+            libvte-2.91-gtk4-dev \
+            patchelf \
+            pkg-config
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install AppImage tooling
+        run: |
+          set -euo pipefail
+          cargo install cargo-appimage
+          sudo mkdir -p /usr/local/share/appimagetool
+          sudo curl -fL \
+            "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage" \
+            -o /usr/local/bin/appimagetool-bin
+          sudo curl -fL \
+            "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64" \
+            -o /usr/local/share/appimagetool/runtime-x86_64
+          sudo chmod +x /usr/local/bin/appimagetool-bin /usr/local/share/appimagetool/runtime-x86_64
+          sudo tee /usr/local/bin/appimagetool >/dev/null <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec /usr/local/bin/appimagetool-bin --runtime-file /usr/local/share/appimagetool/runtime-x86_64 "$@"
+          EOF
+          sudo chmod +x /usr/local/bin/appimagetool
+
+      - name: Build AppImage
+        run: |
+          set -euo pipefail
+          (
+            cd crates/aetheris-app
+            APPIMAGE_EXTRACT_AND_RUN=1 cargo appimage --locked
+          )
+          mkdir -p dist
+          generated="$(find . -type f -name '*.AppImage' ! -path './dist/*' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
+          if [ -z "${generated}" ]; then
+            echo "cargo-appimage did not produce an AppImage." >&2
+            exit 1
+          fi
+          mv "${generated}" "dist/${{ steps.names.outputs.appimage_name }}"
+          chmod +x "dist/${{ steps.names.outputs.appimage_name }}"
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage-bundle
+          path: dist/${{ steps.names.outputs.appimage_name }}
+          retention-days: 1

@@ -622,6 +622,7 @@ impl App {
         self.stop_log_stream();
         self.stop_port_forward();
         self.detail_log_buffer.set_text("");
+        self.reset_detail_overview_layout();
         // Don't switch tabs yet: the previous object's detail page (and
         // whichever tab the user was on) stays on screen until the new
         // object's data actually arrives, so resetting here would flash
@@ -652,6 +653,14 @@ impl App {
         sender.oneshot_command(async move {
             load_object_detail(detail_token, context, resource, namespace, name).await
         });
+    }
+
+    pub(super) fn reset_detail_overview_layout(&self) {
+        self.detail_overview_section.set_visible(true);
+        self.detail_expand_logs_button
+            .set_icon_name("view-fullscreen-symbolic");
+        self.detail_expand_logs_button
+            .set_tooltip_text(Some("Hide summary to see more of this tab"));
     }
 
     pub(super) fn populate_detail_dialog(&mut self, detail: &ObjectDetail) {

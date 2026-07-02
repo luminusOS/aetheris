@@ -106,9 +106,16 @@ cargo test --workspace
 
 ## Packaging And Release
 
-Primary packaging is Flatpak. The release workflow runs on version tags (`v0.1.0`, `v0.1.0-rc1`) and publishes:
+Primary release packaging is Flatpak, AppImage, macOS DMG, and Windows bundles.
+The release workflow runs on version tags (`v0.1.0`, `v0.1.0-rc1`) and
+publishes:
 
 - `aetheris-<version>.flatpak`
+- `aetheris-<version>-x86_64.AppImage`
+- `aetheris-<version>-macos-aarch64.dmg`
+- `aetheris-<version>-macos-x86_64.dmg`
+- `aetheris-<version>-windows-x86_64.zip`
+- `aetheris-<version>-windows-x86_64-setup.exe`
 - `aetheris-<version>-source.zip`
 
 Tag versions must match `[workspace.package].version` in `Cargo.toml` without the leading `v` and without any `-rc` suffix.
