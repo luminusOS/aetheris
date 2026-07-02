@@ -46,42 +46,12 @@ scale, cordon, drain, and port forwarding.
 | :---: | :---: |
 | <!-- <img src="data/screenshots/yaml.png" alt="YAML editor" /> --> *coming soon* | <!-- <img src="data/screenshots/terminal.png" alt="Logs and pod terminal" /> --> *coming soon* |
 
-## Requirements
+## Documentation
 
-On Fedora or inside the project toolbox:
-
-```sh
-sudo dnf install -y rust cargo pkgconf-pkg-config gtk4-devel libadwaita-devel gtksourceview5-devel vte291-gtk4-devel openssl-devel
-```
-
-## Run
-
-```sh
-RUST_LOG=aetheris=debug,aetheris_kube=debug cargo run --bin aetheris
-```
-
-By default Aetheris reads and writes `~/.kube/config`. You can point it at a
-specific kubeconfig while testing:
-
-```sh
-KUBECONFIG=/path/to/kubeconfig.yaml RUST_LOG=aetheris=debug,aetheris_kube=debug cargo run --bin aetheris
-```
-
-## Verify
-
-```sh
-cargo fmt --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-```
-
-## Flatpak
-
-The Flatpak manifest lives at `build-aux/org.luminusos.Aetheris.json`.
-
-The manifest grants network access and access to `~/.kube` because Aetheris can
-read, import, and create kubeconfig entries. Offline Flatpak builds require a
-generated Cargo source manifest before release packaging.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — development setup, local run commands,
+  verification, Flatpak builds, release tags, and contribution guidelines.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — crate boundaries, application flow,
+  Kubernetes operations, project persistence, and release pipeline diagrams.
 
 ## Built with
 

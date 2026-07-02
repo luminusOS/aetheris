@@ -1,3 +1,5 @@
 /target
 .flatpak-builder/
+.flatpak/
 builddir/
+dist/
