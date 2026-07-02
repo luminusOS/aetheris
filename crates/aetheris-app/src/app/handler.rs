@@ -915,10 +915,7 @@ impl App {
                 self.feed_terminal_event(token, event);
             }
             AppMsg::PodExecFinished(token, result) => {
-                if let Some(session) = self.terminal_sessions.get_mut(&token) {
-                    session.abort_handle = None;
-                    session.input_tx = None;
-                }
+                self.finish_terminal_session(token);
                 if let Err(error) = result {
                     let message = terminal_error_message(&error);
                     self.show_terminal_error(token, &error);
