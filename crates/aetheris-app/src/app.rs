@@ -230,6 +230,7 @@ pub struct App {
     project_list: gtk::ListBox,
     project_title_label: gtk::Label,
     add_project_button: gtk::Button,
+    projects_content_stack: gtk::Stack,
     cluster_back_button: gtk::Button,
     cluster_menu_button: gtk::MenuButton,
     cluster_refresh_button: gtk::Button,
@@ -237,6 +238,7 @@ pub struct App {
     cluster_list: gtk::ListBox,
     add_cluster_button: gtk::Button,
     import_cluster_button: gtk::Button,
+    clusters_content_stack: gtk::Stack,
     /// State/Provider/Version/CPU/Memory/Pods snapshot per context name,
     /// fetched lazily the first time the Clusters page shows a given
     /// context and cached until the app restarts.
@@ -314,11 +316,14 @@ pub struct App {
     port_forward_token: u64,
     port_forward_abort_handle: Option<AbortHandle>,
     custom_namespace_dialog: adw::Dialog,
-    custom_namespace_entry: gtk::Entry,
+    custom_namespace_entry: adw::EntryRow,
     custom_namespace_button: gtk::Button,
+    rename_namespace_dialog: adw::Dialog,
+    rename_namespace_entry: adw::EntryRow,
+    rename_namespace_button: gtk::Button,
     project_dialog: adw::Dialog,
     project_dialog_description: gtk::Label,
-    project_name_entry: gtk::Entry,
+    project_name_entry: adw::EntryRow,
     project_create_button: gtk::Button,
     /// The project's name before this edit, when the project dialog is in
     /// rename mode. `None` means the dialog is creating a new project.
@@ -330,14 +335,17 @@ pub struct App {
     cluster_dialog_stack: gtk::Stack,
     cluster_token_title_label: gtk::Label,
     cluster_token_back_button: gtk::Button,
-    setup_name_entry: gtk::Entry,
-    setup_server_entry: gtk::Entry,
-    setup_token_entry: gtk::PasswordEntry,
-    setup_ca_entry: gtk::Entry,
-    setup_insecure_check: gtk::CheckButton,
+    setup_name_entry: adw::EntryRow,
+    setup_server_entry: adw::EntryRow,
+    setup_token_entry: adw::PasswordEntryRow,
+    setup_ca_entry: adw::EntryRow,
+    setup_insecure_check: adw::SwitchRow,
     setup_button: gtk::Button,
     editing_cluster: bool,
     editing_context_name: Option<String>,
+    /// The namespace being renamed while `rename_namespace_dialog` is open.
+    /// `None` means the dialog is closed.
+    renaming_namespace: Option<String>,
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -370,6 +378,9 @@ pub enum AppMsg {
     ClusterSummaryLoaded(String, Result<ClusterSummary, String>),
     NamespaceChanged(u32),
     CustomNamespaceEntered,
+    RemoveCustomNamespace(String),
+    OpenRenameNamespaceDialog(String),
+    RenameNamespaceConfirmed,
     StatusFilterChanged(u32),
     ObjectColumnToggled(u32),
     ObjectColumnResized(ObjectTableColumn, i32),

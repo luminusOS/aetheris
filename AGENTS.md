@@ -6,6 +6,12 @@ Never create commits, pull requests, tags, or push to any remote unless the user
 
 Do not revert unrelated changes in the working tree. This repository often has active UI, packaging, and documentation work in progress.
 
+## No Real-World Identifiers
+
+Never put real cluster names, namespace names, server hostnames, organization names, or other identifiers from an actual environment into code, comments, tests, or fixtures — including ones seen in bug reports, logs, or a real kubeconfig while debugging. This applies everywhere, not just test data: examples, placeholder text, error messages, sample YAML.
+
+Always use clearly generic/fake values instead — `example.com`, `my-namespace`, `prod`, `console.example.com`, `payroll-hml` are fine; a real customer/org name or an actual internal hostname is not. If a bug reproduction naturally involves a real-looking name, invent a made-up equivalent before it lands in a commit.
+
 ## Validation After Changes
 
 Use the smallest validation that proves the change.

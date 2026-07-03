@@ -8,7 +8,7 @@
 ;   SetupIconFile — optional .ico path
 
 #ifndef AppVersion
-  #define AppVersion "1.0.1"
+  #define AppVersion "1.1.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\..\target\windows\aetheris"

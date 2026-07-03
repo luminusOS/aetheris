@@ -1,9 +1,8 @@
-use super::widgets::*;
 use super::yaml::*;
 use super::*;
 
 pub(super) fn build_custom_namespace_dialog(
-    entry: &gtk::Entry,
+    entry: &adw::EntryRow,
     apply_button: &gtk::Button,
 ) -> adw::Dialog {
     let dialog = adw::Dialog::builder()
@@ -11,9 +10,7 @@ pub(super) fn build_custom_namespace_dialog(
         .content_width(460)
         .build();
     let toolbar = adw::ToolbarView::new();
-    let header = adw::HeaderBar::new();
-    header.pack_end(apply_button);
-    toolbar.add_top_bar(&header);
+    toolbar.add_top_bar(&adw::HeaderBar::new());
 
     let content = gtk::Box::new(gtk::Orientation::Vertical, 14);
     content.set_margin_all(18);
@@ -31,8 +28,51 @@ pub(super) fn build_custom_namespace_dialog(
     subtitle.add_css_class("dim-label");
     content.append(&subtitle);
 
-    entry.set_hexpand(true);
-    content.append(&field("Namespace", entry));
+    content.append(&entry_list(&[entry.upcast_ref()]));
+
+    apply_button.add_css_class("pill");
+    apply_button.set_halign(gtk::Align::Center);
+    apply_button.set_margin_top(6);
+    content.append(apply_button);
+
+    toolbar.set_content(Some(&content));
+    dialog.set_child(Some(&toolbar));
+    dialog
+}
+
+pub(super) fn build_rename_namespace_dialog(
+    entry: &adw::EntryRow,
+    apply_button: &gtk::Button,
+) -> adw::Dialog {
+    let dialog = adw::Dialog::builder()
+        .title("Rename Namespace")
+        .content_width(460)
+        .build();
+    let toolbar = adw::ToolbarView::new();
+    toolbar.add_top_bar(&adw::HeaderBar::new());
+
+    let content = gtk::Box::new(gtk::Orientation::Vertical, 14);
+    content.set_margin_all(18);
+
+    let title = gtk::Label::new(Some("Rename Namespace"));
+    title.set_xalign(0.0);
+    title.add_css_class("title-4");
+    content.append(&title);
+
+    let subtitle = gtk::Label::new(Some(
+        "This only renames the saved shortcut. It does not rename anything in the cluster.",
+    ));
+    subtitle.set_xalign(0.0);
+    subtitle.set_wrap(true);
+    subtitle.add_css_class("dim-label");
+    content.append(&subtitle);
+
+    content.append(&entry_list(&[entry.upcast_ref()]));
+
+    apply_button.add_css_class("pill");
+    apply_button.set_halign(gtk::Align::Center);
+    apply_button.set_margin_top(6);
+    content.append(apply_button);
 
     toolbar.set_content(Some(&content));
     dialog.set_child(Some(&toolbar));
@@ -40,7 +80,7 @@ pub(super) fn build_custom_namespace_dialog(
 }
 
 pub(super) fn build_project_dialog(
-    entry: &gtk::Entry,
+    entry: &adw::EntryRow,
     create_button: &gtk::Button,
     description: &gtk::Label,
 ) -> adw::Dialog {
@@ -49,9 +89,7 @@ pub(super) fn build_project_dialog(
         .content_width(420)
         .build();
     let toolbar = adw::ToolbarView::new();
-    let header = adw::HeaderBar::new();
-    header.pack_end(create_button);
-    toolbar.add_top_bar(&header);
+    toolbar.add_top_bar(&adw::HeaderBar::new());
 
     let content = gtk::Box::new(gtk::Orientation::Vertical, 12);
     content.set_margin_all(18);
@@ -61,7 +99,12 @@ pub(super) fn build_project_dialog(
     description.add_css_class("title-3");
     content.append(description);
 
-    content.append(&field("Project Name", entry));
+    content.append(&entry_list(&[entry.upcast_ref()]));
+
+    create_button.add_css_class("pill");
+    create_button.set_halign(gtk::Align::Center);
+    create_button.set_margin_top(6);
+    content.append(create_button);
 
     toolbar.set_content(Some(&content));
     dialog.set_child(Some(&toolbar));
@@ -79,9 +122,7 @@ pub(super) fn build_create_yaml_dialog(
         .content_height(560)
         .build();
     let toolbar = adw::ToolbarView::new();
-    let header = adw::HeaderBar::new();
-    header.pack_end(create_button);
-    toolbar.add_top_bar(&header);
+    toolbar.add_top_bar(&adw::HeaderBar::new());
 
     let view = build_yaml_view(buffer);
     view.set_editable(true);
@@ -105,6 +146,11 @@ pub(super) fn build_create_yaml_dialog(
     content.append(error_label);
     content.append(&scrolled);
 
+    create_button.add_css_class("pill");
+    create_button.set_halign(gtk::Align::Center);
+    create_button.set_margin_top(6);
+    content.append(create_button);
+
     toolbar.set_content(Some(&content));
     dialog.set_child(Some(&toolbar));
     dialog
@@ -112,11 +158,11 @@ pub(super) fn build_create_yaml_dialog(
 
 pub(super) struct ClusterDialogWidgets<'a> {
     pub(super) stack: &'a gtk::Stack,
-    pub(super) name_entry: &'a gtk::Entry,
-    pub(super) server_entry: &'a gtk::Entry,
-    pub(super) token_entry: &'a gtk::PasswordEntry,
-    pub(super) ca_entry: &'a gtk::Entry,
-    pub(super) insecure_check: &'a gtk::CheckButton,
+    pub(super) name_entry: &'a adw::EntryRow,
+    pub(super) server_entry: &'a adw::EntryRow,
+    pub(super) token_entry: &'a adw::PasswordEntryRow,
+    pub(super) ca_entry: &'a adw::EntryRow,
+    pub(super) insecure_check: &'a adw::SwitchRow,
     pub(super) add_button: &'a gtk::Button,
     pub(super) title_label: &'a gtk::Label,
     pub(super) back_button: &'a gtk::Button,
@@ -199,13 +245,17 @@ pub(super) fn token_cluster_page(
     heading.append(title);
     container.append(&heading);
 
-    container.append(&field("Name", widgets.name_entry));
-    container.append(&field("API Server", widgets.server_entry));
-    container.append(&field("Bearer Token", widgets.token_entry));
-    container.append(&field("CA Data", widgets.ca_entry));
-    container.append(widgets.insecure_check);
+    container.append(&entry_list(&[
+        widgets.name_entry.upcast_ref(),
+        widgets.server_entry.upcast_ref(),
+        widgets.token_entry.upcast_ref(),
+        widgets.ca_entry.upcast_ref(),
+        widgets.insecure_check.upcast_ref(),
+    ]));
 
-    widgets.add_button.set_halign(gtk::Align::End);
+    widgets.add_button.add_css_class("pill");
+    widgets.add_button.set_halign(gtk::Align::Center);
+    widgets.add_button.set_margin_top(6);
     container.append(widgets.add_button);
     container
 }
@@ -223,12 +273,16 @@ pub(super) fn option_row(title: &str, subtitle: &str, icon_name: &str) -> gtk::L
     row
 }
 
-pub(super) fn field<W>(label: &str, widget: &W) -> gtk::Box
-where
-    W: IsA<gtk::Widget>,
-{
-    let container = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    container.append(&section_label(label));
-    container.append(widget);
-    container
+/// Groups `AdwEntryRow`/`AdwPasswordEntryRow`/`AdwSwitchRow` fields into the
+/// standard GNOME HIG "boxed list" form container — each row carries its own
+/// label embedded in the top-left corner, so no separate label widget is
+/// needed above it.
+pub(super) fn entry_list(rows: &[&gtk::Widget]) -> gtk::ListBox {
+    let list = gtk::ListBox::new();
+    list.add_css_class("boxed-list");
+    list.set_selection_mode(gtk::SelectionMode::None);
+    for row in rows {
+        list.append(*row);
+    }
+    list
 }

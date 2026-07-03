@@ -49,6 +49,25 @@ impl Component for App {
             .tooltip_text("Add project")
             .build();
         add_project_button.add_css_class("flat");
+        let projects_empty_add_button = gtk::Button::builder()
+            .child(
+                &adw::ButtonContent::builder()
+                    .icon_name("list-add-symbolic")
+                    .label("Add Project")
+                    .build(),
+            )
+            .halign(gtk::Align::Center)
+            .build();
+        projects_empty_add_button.add_css_class("suggested-action");
+        let projects_empty_page = adw::StatusPage::builder()
+            .icon_name("folder-symbolic")
+            .title("No Projects Yet")
+            .description("Create a project to organize your clusters.")
+            .valign(gtk::Align::Center)
+            .vexpand(true)
+            .build();
+        projects_empty_page.set_child(Some(&projects_empty_add_button));
+        let projects_content_stack = gtk::Stack::new();
         let context_selector_label = gtk::Label::new(Some("No cluster"));
         context_selector_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         context_selector_label.set_max_width_chars(22);
@@ -82,14 +101,33 @@ impl Component for App {
             .tooltip_text("Add cluster")
             .build();
         let import_cluster_button = gtk::Button::builder().label("Import").build();
+        let clusters_empty_add_button = gtk::Button::builder()
+            .child(
+                &adw::ButtonContent::builder()
+                    .icon_name("list-add-symbolic")
+                    .label("Add Cluster")
+                    .build(),
+            )
+            .halign(gtk::Align::Center)
+            .build();
+        clusters_empty_add_button.add_css_class("suggested-action");
+        let clusters_empty_page = adw::StatusPage::builder()
+            .icon_name("network-server-symbolic")
+            .title("No Clusters Yet")
+            .description("Add a cluster to start browsing this project.")
+            .valign(gtk::Align::Center)
+            .vexpand(true)
+            .build();
+        clusters_empty_page.set_child(Some(&clusters_empty_add_button));
+        let clusters_content_stack = gtk::Stack::new();
         let namespace_selector_label = gtk::Label::new(Some("default"));
         let namespace_menu_button = gtk::MenuButton::new();
         namespace_menu_button.set_size_request(170, -1);
         namespace_menu_button.set_child(Some(&selector_button_child(&namespace_selector_label)));
         let namespace_list = gtk::ListBox::new();
         namespace_menu_button.set_popover(Some(&selector_popover(&namespace_list)));
-        let custom_namespace_entry = gtk::Entry::builder()
-            .placeholder_text("my-namespace")
+        let custom_namespace_entry = adw::EntryRow::builder()
+            .title("Namespace")
             .hexpand(true)
             .build();
         let custom_namespace_button = gtk::Button::builder()
@@ -97,8 +135,14 @@ impl Component for App {
             .tooltip_text("Use and save this namespace")
             .build();
         custom_namespace_button.add_css_class("suggested-action");
-        let project_name_entry = gtk::Entry::builder()
-            .placeholder_text("Production")
+        let rename_namespace_entry = adw::EntryRow::builder()
+            .title("Namespace")
+            .hexpand(true)
+            .build();
+        let rename_namespace_button = gtk::Button::builder().label("Rename").build();
+        rename_namespace_button.add_css_class("suggested-action");
+        let project_name_entry = adw::EntryRow::builder()
+            .title("Project Name")
             .hexpand(true)
             .build();
         let project_create_button = gtk::Button::builder().label("Create").build();
@@ -389,25 +433,21 @@ impl Component for App {
             expand_logs_button: &detail_expand_logs_button,
         });
 
-        let setup_name_entry = gtk::Entry::builder()
-            .placeholder_text("production")
+        let setup_name_entry = adw::EntryRow::builder().title("Name").hexpand(true).build();
+        let setup_server_entry = adw::EntryRow::builder()
+            .title("API Server")
             .hexpand(true)
             .build();
-        let setup_server_entry = gtk::Entry::builder()
-            .placeholder_text("https://127.0.0.1:6443")
+        let setup_token_entry = adw::PasswordEntryRow::builder()
+            .title("Bearer Token")
             .hexpand(true)
             .build();
-        let setup_token_entry = gtk::PasswordEntry::builder()
-            .placeholder_text("Bearer token")
-            .hexpand(true)
-            .show_peek_icon(true)
-            .build();
-        let setup_ca_entry = gtk::Entry::builder()
-            .placeholder_text("Optional base64 CA data")
+        let setup_ca_entry = adw::EntryRow::builder()
+            .title("CA Data")
             .hexpand(true)
             .build();
-        let setup_insecure_check = gtk::CheckButton::builder()
-            .label("Skip TLS verification")
+        let setup_insecure_check = adw::SwitchRow::builder()
+            .title("Skip TLS Verification")
             .build();
         let setup_button = gtk::Button::builder()
             .label("Add Cluster")
@@ -422,6 +462,8 @@ impl Component for App {
         open_dialog_button.add_css_class("suggested-action");
         let custom_namespace_dialog =
             build_custom_namespace_dialog(&custom_namespace_entry, &custom_namespace_button);
+        let rename_namespace_dialog =
+            build_rename_namespace_dialog(&rename_namespace_entry, &rename_namespace_button);
         let project_dialog = build_project_dialog(
             &project_name_entry,
             &project_create_button,
@@ -504,7 +546,12 @@ impl Component for App {
         split_view.set_content(Some(&content));
         root_stack.add_named(&build_empty_setup_page(&open_dialog_button), Some("setup"));
         root_stack.add_named(
-            &build_projects_page(&project_list, &add_project_button),
+            &build_projects_page(
+                &project_list,
+                &add_project_button,
+                &projects_content_stack,
+                &projects_empty_page,
+            ),
             Some("projects"),
         );
         root_stack.add_named(
@@ -516,6 +563,8 @@ impl Component for App {
                 cluster_list: &cluster_list,
                 add_cluster_button: &add_cluster_button,
                 import_cluster_button: &import_cluster_button,
+                content_stack: &clusters_content_stack,
+                empty_page: &clusters_empty_page,
             }),
             Some("clusters"),
         );
@@ -554,6 +603,10 @@ impl Component for App {
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowAddClusterDialog)
         });
+        clusters_empty_add_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowAddClusterDialog)
+        });
         import_cluster_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowImportFile)
@@ -570,13 +623,25 @@ impl Component for App {
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowAddProjectDialog)
         });
-        custom_namespace_entry.connect_activate({
+        projects_empty_add_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowAddProjectDialog)
+        });
+        custom_namespace_entry.connect_entry_activated({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::CustomNamespaceEntered)
         });
         custom_namespace_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::CustomNamespaceEntered)
+        });
+        rename_namespace_entry.connect_entry_activated({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::RenameNamespaceConfirmed)
+        });
+        rename_namespace_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::RenameNamespaceConfirmed)
         });
         status_filter_list.connect_child_activated({
             let sender = sender.clone();
@@ -586,7 +651,7 @@ impl Component for App {
             let sender = sender.clone();
             move |_, child| sender.input(AppMsg::ObjectColumnToggled(child.index() as u32))
         });
-        project_name_entry.connect_activate({
+        project_name_entry.connect_entry_activated({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::AddProject)
         });
@@ -752,6 +817,7 @@ impl Component for App {
             project_list,
             project_title_label,
             add_project_button,
+            projects_content_stack,
             cluster_back_button,
             cluster_menu_button,
             cluster_refresh_button,
@@ -759,6 +825,7 @@ impl Component for App {
             cluster_list,
             add_cluster_button,
             import_cluster_button,
+            clusters_content_stack,
             cluster_summaries: std::collections::HashMap::new(),
             namespace_menu_button,
             namespace_selector_label,
@@ -835,6 +902,10 @@ impl Component for App {
             custom_namespace_dialog,
             custom_namespace_entry,
             custom_namespace_button,
+            rename_namespace_dialog,
+            rename_namespace_entry,
+            rename_namespace_button,
+            renaming_namespace: None,
             project_dialog,
             project_dialog_description,
             project_name_entry,

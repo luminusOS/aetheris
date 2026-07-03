@@ -25,7 +25,7 @@ impl App {
                     .first()
                     .cloned()
                     .unwrap_or_else(|| String::from("default"));
-                self.sync_dropdowns();
+                self.sync_dropdowns(Some(sender.clone()));
                 self.loading = false;
                 self.status = String::from("Select a project.");
                 self.show_projects();
@@ -40,7 +40,7 @@ impl App {
                 self.status = String::from("Kubeconfig unavailable.");
                 self.toaster.add_toast(adw::Toast::new(&error));
                 self.show_setup();
-                self.sync_dropdowns();
+                self.sync_dropdowns(Some(sender.clone()));
                 self.rebuild_resource_list(Some(sender.clone()));
                 self.rebuild_object_list(Some(sender.clone()));
                 self.sync_status();
@@ -65,7 +65,7 @@ impl App {
                         .unwrap_or_else(|| String::from("default"));
                 }
                 self.loading = false;
-                self.sync_dropdowns();
+                self.sync_dropdowns(Some(sender.clone()));
                 self.enter_clusters_page(sender);
                 self.status = String::from("Cluster saved.");
                 self.sync_status();
@@ -172,7 +172,7 @@ impl App {
                     self.save_projects_or_toast();
                     self.editing_project_name = None;
                     self.project_dialog.close();
-                    self.sync_dropdowns();
+                    self.sync_dropdowns(Some(sender.clone()));
                     self.sync_status();
                     return;
                 }
@@ -250,8 +250,19 @@ impl App {
                     .projects
                     .first()
                     .map(|project| project.name.clone());
+                self.selected_context = None;
                 self.save_projects_or_toast();
-                self.switch_to_project(sender);
+                self.stop_object_watch();
+                self.stop_log_stream();
+                self.stop_port_forward();
+                self.sync_dropdowns(Some(sender.clone()));
+                self.show_object_list();
+                self.show_projects();
+                self.loading = false;
+                self.status = String::from("Select a project.");
+                self.sync_terminal_controls();
+                self.sync_port_forward_controls();
+                self.sync_status();
             }
             AppMsg::ClusterLoaded(Ok(state)) => {
                 self.loading = false;
@@ -272,7 +283,7 @@ impl App {
                     .selected_resource_kind()
                     .map(ResourceSection::for_resource)
                     .unwrap_or(ResourceSection::Workloads);
-                self.sync_dropdowns();
+                self.sync_dropdowns(Some(sender.clone()));
                 self.rebuild_resource_list(Some(sender.clone()));
 
                 if self.selected_resource.is_some() {
@@ -344,7 +355,7 @@ impl App {
                 if let Some(namespace) = choices.get(index as usize) {
                     if self.selected_namespace != *namespace {
                         self.selected_namespace.clone_from(namespace);
-                        self.sync_dropdowns();
+                        self.sync_dropdowns(Some(sender.clone()));
                         self.show_object_list();
                         self.stop_log_stream();
                         self.stop_port_forward();
@@ -361,16 +372,79 @@ impl App {
                 self.remember_namespace(&namespace);
                 if self.selected_namespace != namespace {
                     self.selected_namespace = namespace;
-                    self.sync_dropdowns();
+                    self.sync_dropdowns(Some(sender.clone()));
                     self.show_object_list();
                     self.stop_log_stream();
                     self.stop_port_forward();
                     self.refresh_objects(sender);
                 } else {
-                    self.sync_dropdowns();
+                    self.sync_dropdowns(Some(sender.clone()));
                 }
 
                 self.custom_namespace_dialog.close();
+            }
+            AppMsg::RemoveCustomNamespace(namespace) => {
+                let Some(context) = self.selected_context.clone() else {
+                    return;
+                };
+                let removed = self
+                    .projects
+                    .selected_project_mut()
+                    .is_some_and(|project| project.remove_custom_namespace(&context, &namespace));
+                if !removed {
+                    return;
+                }
+                self.save_projects_or_toast();
+                if self.selected_namespace == namespace {
+                    self.selected_namespace = String::from("default");
+                    self.sync_dropdowns(Some(sender.clone()));
+                    self.show_object_list();
+                    self.stop_log_stream();
+                    self.stop_port_forward();
+                    self.refresh_objects(sender);
+                } else {
+                    self.sync_dropdowns(Some(sender.clone()));
+                }
+                self.toaster.add_toast(adw::Toast::new("Namespace removed"));
+            }
+            AppMsg::OpenRenameNamespaceDialog(namespace) => {
+                self.open_rename_namespace_dialog(&namespace, root);
+            }
+            AppMsg::RenameNamespaceConfirmed => {
+                let new_name = self.rename_namespace_entry.text().trim().to_owned();
+                let Some(old_name) = self.renaming_namespace.take() else {
+                    return;
+                };
+                if new_name.is_empty() || new_name == old_name {
+                    self.rename_namespace_dialog.close();
+                    return;
+                }
+                let Some(context) = self.selected_context.clone() else {
+                    self.rename_namespace_dialog.close();
+                    return;
+                };
+                let renamed = self.projects.selected_project_mut().is_some_and(|project| {
+                    project.rename_custom_namespace(&context, &old_name, &new_name)
+                });
+                if renamed {
+                    self.save_projects_or_toast();
+                    if self.selected_namespace == old_name {
+                        self.selected_namespace = new_name;
+                        self.sync_dropdowns(Some(sender.clone()));
+                        self.show_object_list();
+                        self.stop_log_stream();
+                        self.stop_port_forward();
+                        self.refresh_objects(sender);
+                    } else {
+                        self.sync_dropdowns(Some(sender.clone()));
+                    }
+                    self.toaster.add_toast(adw::Toast::new("Namespace renamed"));
+                } else {
+                    self.toaster.add_toast(adw::Toast::new(
+                        "A namespace with this name already exists.",
+                    ));
+                }
+                self.rename_namespace_dialog.close();
             }
             AppMsg::StatusFilterChanged(index) => {
                 let Some(filter) = StatusFilter::ALL.get(index as usize).copied() else {
@@ -1115,7 +1189,7 @@ impl App {
                         .unwrap_or_else(|| String::from("default"));
                 }
                 self.loading = false;
-                self.sync_dropdowns();
+                self.sync_dropdowns(Some(sender.clone()));
                 self.enter_clusters_page(sender);
                 self.status = String::from("Kubeconfig imported.");
                 self.sync_status();
