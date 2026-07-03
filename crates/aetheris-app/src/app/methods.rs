@@ -249,7 +249,7 @@ impl App {
     pub(super) fn namespace_choices(&self) -> Vec<String> {
         let mut choices = self.namespaces.clone();
         if let Some(project) = self.projects.selected_project() {
-            choices.extend(project.custom_namespaces.iter().cloned());
+            choices.extend(project.custom_namespaces_for_context(self.selected_context.as_deref()));
         }
 
         if !self.selected_namespace.is_empty()
@@ -272,10 +272,7 @@ impl App {
     pub(super) fn namespace_is_known(&self, namespace: &str) -> bool {
         self.namespaces.iter().any(|known| known == namespace)
             || self.projects.selected_project().is_some_and(|project| {
-                project
-                    .custom_namespaces
-                    .iter()
-                    .any(|known| known == namespace)
+                project.has_custom_namespace(self.selected_context.as_deref(), namespace)
             })
     }
 
@@ -288,16 +285,11 @@ impl App {
             self.namespaces.push(namespace.to_owned());
         }
 
-        if let Some(project) = self.projects.selected_project_mut() {
-            if !project
-                .custom_namespaces
-                .iter()
-                .any(|known| known == namespace)
-            {
-                project.custom_namespaces.push(namespace.to_owned());
-                project.custom_namespaces.sort();
-                project.custom_namespaces.dedup();
-                self.save_projects_or_toast();
+        if let Some(context) = self.selected_context.clone() {
+            if let Some(project) = self.projects.selected_project_mut() {
+                if project.add_custom_namespace(&context, namespace) {
+                    self.save_projects_or_toast();
+                }
             }
         }
     }
