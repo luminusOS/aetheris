@@ -186,7 +186,7 @@ impl App {
                 self.projects.projects.push(Project {
                     name: name.clone(),
                     contexts: Vec::new(),
-                    custom_namespaces: Vec::new(),
+                    custom_namespaces_by_context: Vec::new(),
                 });
                 self.projects.selected_project = Some(name.clone());
                 self.save_projects_or_toast();
@@ -207,7 +207,7 @@ impl App {
                 self.projects.projects.push(Project {
                     name: new_name.clone(),
                     contexts: source.contexts,
-                    custom_namespaces: source.custom_namespaces,
+                    custom_namespaces_by_context: source.custom_namespaces_by_context,
                 });
                 self.projects.selected_project = Some(new_name.clone());
                 self.save_projects_or_toast();

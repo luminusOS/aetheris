@@ -17,7 +17,13 @@ pub(super) struct Project {
     pub(super) name: String,
     pub(super) contexts: Vec<String>,
     #[serde(default)]
-    pub(super) custom_namespaces: Vec<String>,
+    pub(super) custom_namespaces_by_context: Vec<ContextNamespaces>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct ContextNamespaces {
+    pub(super) context: String,
+    pub(super) namespaces: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -241,7 +247,7 @@ impl Default for ProjectStore {
             projects: vec![Project {
                 name: String::from(DEFAULT_PROJECT_NAME),
                 contexts: Vec::new(),
-                custom_namespaces: Vec::new(),
+                custom_namespaces_by_context: Vec::new(),
             }],
             selected_project: Some(String::from(DEFAULT_PROJECT_NAME)),
             visible_object_columns: default_object_columns(),
@@ -431,7 +437,7 @@ impl ProjectStore {
             self.projects.push(Project {
                 name: String::from(DEFAULT_PROJECT_NAME),
                 contexts: Vec::new(),
-                custom_namespaces: Vec::new(),
+                custom_namespaces_by_context: Vec::new(),
             });
             self.selected_project = Some(String::from(DEFAULT_PROJECT_NAME));
         }
@@ -447,6 +453,14 @@ impl ProjectStore {
             project
                 .contexts
                 .retain(|name| live_names.contains(name.as_str()));
+            let project_contexts = project
+                .contexts
+                .iter()
+                .map(String::as_str)
+                .collect::<BTreeSet<_>>();
+            project
+                .custom_namespaces_by_context
+                .retain(|entry| project_contexts.contains(entry.context.as_str()));
         }
 
         let selected_exists = self
@@ -460,8 +474,7 @@ impl ProjectStore {
         for project in &mut self.projects {
             project.contexts.sort();
             project.contexts.dedup();
-            project.custom_namespaces.sort();
-            project.custom_namespaces.dedup();
+            project.normalize_custom_namespaces();
         }
     }
 
@@ -487,6 +500,9 @@ impl ProjectStore {
             return;
         };
         project.contexts.retain(|candidate| candidate != context);
+        project
+            .custom_namespaces_by_context
+            .retain(|entry| entry.context != context);
     }
 
     pub(super) fn selected_project_mut(&mut self) -> Option<&mut Project> {
@@ -494,6 +510,81 @@ impl ProjectStore {
         self.projects
             .iter_mut()
             .find(|project| project.name == selected)
+    }
+}
+
+impl Project {
+    pub(super) fn custom_namespaces_for_context(&self, context: Option<&str>) -> Vec<String> {
+        let Some(context) = context else {
+            return Vec::new();
+        };
+        self.custom_namespaces_by_context
+            .iter()
+            .find(|entry| entry.context == context)
+            .map(|entry| entry.namespaces.clone())
+            .unwrap_or_default()
+    }
+
+    pub(super) fn has_custom_namespace(&self, context: Option<&str>, namespace: &str) -> bool {
+        self.custom_namespaces_for_context(context)
+            .iter()
+            .any(|known| known == namespace)
+    }
+
+    pub(super) fn add_custom_namespace(&mut self, context: &str, namespace: &str) -> bool {
+        if context.is_empty() || namespace.is_empty() {
+            return false;
+        }
+
+        if let Some(entry) = self
+            .custom_namespaces_by_context
+            .iter_mut()
+            .find(|entry| entry.context == context)
+        {
+            if entry.namespaces.iter().any(|known| known == namespace) {
+                return false;
+            }
+            entry.namespaces.push(namespace.to_owned());
+            entry.namespaces.sort();
+            entry.namespaces.dedup();
+            return true;
+        }
+
+        self.custom_namespaces_by_context.push(ContextNamespaces {
+            context: context.to_owned(),
+            namespaces: vec![namespace.to_owned()],
+        });
+        self.normalize_custom_namespaces();
+        true
+    }
+
+    fn normalize_custom_namespaces(&mut self) {
+        for entry in &mut self.custom_namespaces_by_context {
+            entry.context = entry.context.trim().to_owned();
+            entry.namespaces.retain(|namespace| {
+                let namespace = namespace.trim();
+                !namespace.is_empty() && namespace != "all"
+            });
+            for namespace in &mut entry.namespaces {
+                *namespace = namespace.trim().to_owned();
+            }
+            entry.namespaces.sort();
+            entry.namespaces.dedup();
+        }
+        self.custom_namespaces_by_context
+            .retain(|entry| !entry.context.is_empty() && !entry.namespaces.is_empty());
+        self.custom_namespaces_by_context
+            .sort_by(|left, right| left.context.cmp(&right.context));
+        self.custom_namespaces_by_context.dedup_by(|left, right| {
+            if left.context == right.context {
+                left.namespaces.extend(right.namespaces.clone());
+                left.namespaces.sort();
+                left.namespaces.dedup();
+                true
+            } else {
+                false
+            }
+        });
     }
 }
 
@@ -518,7 +609,7 @@ mod tests {
             projects: vec![Project {
                 name: String::from("Work"),
                 contexts: vec![String::from("local")],
-                custom_namespaces: Vec::new(),
+                custom_namespaces_by_context: Vec::new(),
             }],
             selected_project: Some(String::from("Work")),
             visible_object_columns: default_object_columns(),
@@ -530,5 +621,25 @@ mod tests {
 
         let project = store.selected_project().unwrap();
         assert_eq!(project.contexts, vec![String::from("local")]);
+    }
+
+    #[test]
+    fn custom_namespaces_are_scoped_by_context() {
+        let mut project = Project {
+            name: String::from("Work"),
+            contexts: vec![String::from("prod"), String::from("stage")],
+            custom_namespaces_by_context: Vec::new(),
+        };
+
+        assert!(project.add_custom_namespace("prod", "billing"));
+
+        assert_eq!(
+            project.custom_namespaces_for_context(Some("prod")),
+            vec![String::from("billing")]
+        );
+        assert!(project
+            .custom_namespaces_for_context(Some("stage"))
+            .is_empty());
+        assert!(!project.has_custom_namespace(Some("stage"), "billing"));
     }
 }
