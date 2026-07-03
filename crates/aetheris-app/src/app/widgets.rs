@@ -1,12 +1,5 @@
 use super::*;
 
-pub(super) fn section_label(text: &str) -> gtk::Label {
-    let label = gtk::Label::new(Some(text));
-    label.set_xalign(0.0);
-    label.add_css_class("caption-heading");
-    label
-}
-
 pub(super) fn section_title(text: &str) -> gtk::Label {
     let label = gtk::Label::new(Some(text));
     label.set_xalign(0.0);
@@ -88,12 +81,49 @@ pub(super) fn resource_count_label(count: usize) -> String {
 pub(super) fn namespace_selector_row(
     namespace: &str,
     selected: bool,
-    _index: u32,
+    is_custom: bool,
+    sender: Option<ComponentSender<App>>,
 ) -> gtk::ListBoxRow {
-    let row = selector_action_row(namespace, "folder-symbolic");
+    let row = gtk::ListBoxRow::new();
+    row.set_activatable(true);
+
+    let action = adw::ActionRow::builder()
+        .title(namespace)
+        .activatable(true)
+        .build();
+    action.add_prefix(&gtk::Image::from_icon_name("folder-symbolic"));
+
+    if is_custom {
+        if let Some(sender) = sender {
+            let edit_button = gtk::Button::from_icon_name("document-edit-symbolic");
+            edit_button.add_css_class("flat");
+            edit_button.set_valign(gtk::Align::Center);
+            edit_button.set_tooltip_text(Some("Rename"));
+            edit_button.connect_clicked({
+                let sender = sender.clone();
+                let namespace = namespace.to_owned();
+                move |_| sender.input(AppMsg::OpenRenameNamespaceDialog(namespace.clone()))
+            });
+            action.add_suffix(&edit_button);
+
+            let delete_button = gtk::Button::from_icon_name("user-trash-symbolic");
+            delete_button.add_css_class("flat");
+            delete_button.add_css_class("destructive-action");
+            delete_button.set_valign(gtk::Align::Center);
+            delete_button.set_tooltip_text(Some("Remove"));
+            delete_button.connect_clicked({
+                let namespace = namespace.to_owned();
+                move |_| sender.input(AppMsg::RemoveCustomNamespace(namespace.clone()))
+            });
+            action.add_suffix(&delete_button);
+        }
+    }
+
     if selected {
         row.add_css_class("resource-row-selected");
     }
+
+    row.set_child(Some(&action));
     row
 }
 

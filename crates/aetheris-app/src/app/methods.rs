@@ -71,7 +71,7 @@ impl App {
         {
             self.selected_context = None;
         }
-        self.sync_dropdowns();
+        self.sync_dropdowns(Some(sender.clone()));
         self.enter_clusters_page(sender);
         self.present_content_panel();
         self.loading = false;
@@ -152,6 +152,17 @@ impl App {
             .set_text(custom_namespace_initial_text(&self.selected_namespace));
         self.custom_namespace_entry.grab_focus();
         self.custom_namespace_dialog.present(Some(root));
+    }
+
+    pub(super) fn open_rename_namespace_dialog(
+        &mut self,
+        namespace: &str,
+        root: &<Self as Component>::Root,
+    ) {
+        self.renaming_namespace = Some(namespace.to_owned());
+        self.rename_namespace_entry.set_text(namespace);
+        self.rename_namespace_entry.grab_focus();
+        self.rename_namespace_dialog.present(Some(root));
     }
 
     pub(super) fn set_cluster_dialog_editing(&mut self, editing: bool) {
@@ -313,7 +324,7 @@ impl App {
         };
     }
 
-    pub(super) fn sync_dropdowns(&self) {
+    pub(super) fn sync_dropdowns(&self, sender: Option<ComponentSender<Self>>) {
         self.project_title_label
             .set_label(self.projects.selected_project_name());
         self.rebuild_project_list();
@@ -325,14 +336,25 @@ impl App {
             .set_tooltip_text(Some(context_label));
 
         let namespace_choices = self.namespace_choices();
+        let custom_namespaces: std::collections::HashSet<String> = self
+            .projects
+            .selected_project()
+            .map(|project| {
+                project
+                    .custom_namespaces_for_context(self.selected_context.as_deref())
+                    .into_iter()
+                    .collect()
+            })
+            .unwrap_or_default();
         while let Some(child) = self.namespace_list.first_child() {
             self.namespace_list.remove(&child);
         }
-        for (index, namespace) in namespace_choices.iter().enumerate() {
+        for namespace in &namespace_choices {
             self.namespace_list.append(&namespace_selector_row(
                 namespace,
                 namespace == &self.selected_namespace,
-                index as u32,
+                custom_namespaces.contains(namespace),
+                sender.clone(),
             ));
         }
         self.namespace_list.append(&add_namespace_selector_row());
@@ -382,6 +404,7 @@ impl App {
                     .is_none_or(ResourceKind::is_namespaced),
         );
         self.custom_namespace_button.set_sensitive(!self.loading);
+        self.rename_namespace_button.set_sensitive(!self.loading);
         self.project_create_button.set_sensitive(!self.loading);
         self.detail_apply_button
             .set_sensitive(self.detail_target.is_some() && !self.loading);
@@ -436,6 +459,12 @@ impl App {
 
     pub(super) fn rebuild_project_list(&self) {
         rebuild_project_list(&self.project_list, &self.projects);
+        self.projects_content_stack
+            .set_visible_child_name(if self.projects.projects.is_empty() {
+                "empty"
+            } else {
+                "content"
+            });
     }
 
     pub(super) fn rebuild_cluster_list(&self) {
@@ -446,6 +475,12 @@ impl App {
             &self.cluster_summaries,
             self.selected_context.as_deref(),
         );
+        self.clusters_content_stack
+            .set_visible_child_name(if visible_contexts.is_empty() {
+                "empty"
+            } else {
+                "content"
+            });
     }
 
     pub(super) fn rebuild_resource_list(&self, sender: Option<ComponentSender<Self>>) {

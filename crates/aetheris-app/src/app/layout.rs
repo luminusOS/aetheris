@@ -217,6 +217,8 @@ pub(super) fn build_empty_setup_page(add_button: &gtk::Button) -> adw::ToolbarVi
 pub(super) fn build_projects_page(
     project_list: &gtk::ListBox,
     add_button: &gtk::Button,
+    content_stack: &gtk::Stack,
+    empty_page: &adw::StatusPage,
 ) -> adw::ToolbarView {
     let toolbar = adw::ToolbarView::new();
     let header = adw::HeaderBar::new();
@@ -259,10 +261,14 @@ pub(super) fn build_projects_page(
 
     clamp.set_child(Some(&content));
 
+    content_stack.add_named(&clamp, Some("content"));
+    content_stack.add_named(empty_page, Some("empty"));
+    content_stack.set_visible_child_name("content");
+
     let center = gtk::CenterBox::new();
     center.set_hexpand(true);
     center.set_vexpand(true);
-    center.set_center_widget(Some(&clamp));
+    center.set_center_widget(Some(content_stack));
 
     let scrolled = gtk::ScrolledWindow::builder()
         .vexpand(true)
@@ -284,6 +290,8 @@ pub(super) struct ClustersPageWidgets<'a> {
     pub(super) cluster_list: &'a gtk::ListBox,
     pub(super) add_cluster_button: &'a gtk::Button,
     pub(super) import_cluster_button: &'a gtk::Button,
+    pub(super) content_stack: &'a gtk::Stack,
+    pub(super) empty_page: &'a adw::StatusPage,
 }
 
 pub(super) fn build_clusters_page(widgets: ClustersPageWidgets<'_>) -> adw::ToolbarView {
@@ -335,10 +343,16 @@ pub(super) fn build_clusters_page(widgets: ClustersPageWidgets<'_>) -> adw::Tool
 
     clamp.set_child(Some(&content));
 
+    widgets.content_stack.add_named(&clamp, Some("content"));
+    widgets
+        .content_stack
+        .add_named(widgets.empty_page, Some("empty"));
+    widgets.content_stack.set_visible_child_name("content");
+
     let center = gtk::CenterBox::new();
     center.set_hexpand(true);
     center.set_vexpand(true);
-    center.set_center_widget(Some(&clamp));
+    center.set_center_widget(Some(widgets.content_stack));
 
     let scrolled = gtk::ScrolledWindow::builder()
         .vexpand(true)

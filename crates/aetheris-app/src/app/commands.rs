@@ -24,7 +24,10 @@ pub(super) async fn load_cluster(context: String) -> AppMsg {
         let session = manager.connect_context(&context).await?;
         let (namespaces, namespace_warning) = match session.list_namespaces().await {
             Ok(namespaces) => (namespaces, None),
-            Err(error) => (manager.namespaces(), Some(format_error(error))),
+            Err(error) => (
+                manager.namespace_for_context(&context),
+                Some(format_error(error)),
+            ),
         };
         let resources = session.discover_resources().await?;
         Ok::<_, anyhow::Error>(ClusterState {
