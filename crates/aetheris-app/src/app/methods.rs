@@ -17,11 +17,6 @@ impl App {
         self.root_stack.set_visible_child_name("browser");
     }
 
-    /// Shows the Clusters page for the currently selected project: rebuilds
-    /// the list, kicks off a background summary fetch for any context that
-    /// doesn't have one cached yet, and switches `root_stack`. Shared by
-    /// every path that lands on this page (picking a project, coming back
-    /// from Browser, and after adding/editing a cluster).
     pub(super) fn enter_clusters_page(&mut self, sender: ComponentSender<Self>) {
         self.rebuild_cluster_list();
         self.ensure_cluster_summaries_loading(sender);
@@ -60,9 +55,6 @@ impl App {
         self.rebuild_cluster_list();
     }
 
-    /// Loads the clusters view for whichever project is now selected in
-    /// `self.projects`. Shared by switching projects, deleting the current
-    /// one (falling back to another), and duplicating one.
     pub(super) fn switch_to_project(&mut self, sender: ComponentSender<Self>) {
         if !self
             .visible_contexts()
@@ -110,10 +102,6 @@ impl App {
         }
     }
 
-    /// Columns that make sense to offer/render for the currently selected
-    /// resource kind (e.g. "Status" is only meaningful for resources that
-    /// expose a ready/desired ratio, like Deployments; "CPU"/"Memory" only
-    /// for Pods and Nodes, the only kinds metrics.k8s.io covers).
     pub(super) fn offerable_object_columns(&self) -> Vec<ObjectColumn> {
         offerable_columns_for(self.selected_resource_kind())
     }

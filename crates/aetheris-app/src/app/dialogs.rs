@@ -273,10 +273,6 @@ pub(super) fn option_row(title: &str, subtitle: &str, icon_name: &str) -> gtk::L
     row
 }
 
-/// Groups `AdwEntryRow`/`AdwPasswordEntryRow`/`AdwSwitchRow` fields into the
-/// standard GNOME HIG "boxed list" form container — each row carries its own
-/// label embedded in the top-left corner, so no separate label widget is
-/// needed above it.
 pub(super) fn entry_list(rows: &[&gtk::Widget]) -> gtk::ListBox {
     let list = gtk::ListBox::new();
     list.add_css_class("boxed-list");

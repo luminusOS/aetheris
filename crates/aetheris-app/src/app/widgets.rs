@@ -36,7 +36,6 @@ pub(super) fn selector_popover(list: &gtk::ListBox) -> gtk::Popover {
     popover
 }
 
-/// A left-aligned icon + label row styled as a flat popover menu item.
 pub(super) fn menu_action_button(icon_name: &str, label: &str) -> gtk::Button {
     let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     content.set_margin_top(6);
@@ -448,8 +447,6 @@ fn cluster_state_chip(summary: Option<&ClusterSummaryState>) -> gtk::Label {
     chip
 }
 
-/// "{provider} · {version}" when loaded, dropping either half that's
-/// unavailable; a short status line otherwise.
 fn cluster_subtitle_text(summary: Option<&ClusterSummaryState>) -> String {
     match summary {
         None | Some(ClusterSummaryState::Loading) => String::from("Checking cluster…"),
@@ -579,12 +576,6 @@ pub(super) fn is_cluster_resource(resource: &ResourceKind) -> bool {
     )
 }
 
-/// Columns for the Deployment detail page's "Pods" tab, which always lists
-/// Pods as a compact preview. Pods never have a "Status" ready/desired
-/// ratio, and CPU/Memory depend on metrics-server being installed (often
-/// not, and not worth a column that's blank for everyone when it isn't) —
-/// both are dropped here regardless of which resource kind the main object
-/// list has selected.
 const RELATED_POD_COLUMNS: [ObjectColumn; 3] = [
     ObjectColumn::Namespace,
     ObjectColumn::Api,
@@ -741,8 +732,6 @@ fn summary_sorter(
     })
 }
 
-/// Persists user column resizes: clamps the dragged width back into range
-/// and forwards in-range values to the app for (debounced) saving.
 pub(super) fn connect_object_column_persistence(
     view_column: &gtk::ColumnViewColumn,
     table_column: ObjectTableColumn,
@@ -768,8 +757,6 @@ fn clamp_table_column_width(column: ObjectTableColumn, width: i32) -> i32 {
     }
 }
 
-/// The model item type behind the main object table: an `ObjectSummary`
-/// boxed into a `glib::Object` so it can live in a `gio::ListStore`.
 pub(super) fn boxed_object(object: &ObjectSummary) -> gtk::glib::BoxedAnyObject {
     gtk::glib::BoxedAnyObject::new(object.clone())
 }
@@ -782,10 +769,6 @@ fn list_item_object(
     Some((item, boxed))
 }
 
-/// Cell factory for the object table's "Name" column: optional status chip
-/// plus the object name. The chip's tone and presence change per object, so
-/// the cell content is rebuilt on each bind (only the handful of on-screen
-/// rows ever bind, so this stays cheap regardless of list size).
 pub(super) fn object_name_column_factory() -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(|_, item| {
@@ -822,9 +805,6 @@ pub(super) fn object_name_column_factory() -> gtk::SignalListItemFactory {
     factory
 }
 
-/// Cell factory for one data column of the object table. Text columns keep
-/// a single label alive and only swap its text on bind; the CPU/Memory
-/// LevelBar cells are rebuilt per bind like the name cell.
 pub(super) fn object_data_column_factory(column: ObjectColumn) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     match column {
