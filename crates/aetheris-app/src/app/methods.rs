@@ -93,6 +93,21 @@ impl App {
             &self.offerable_object_columns(),
             &self.projects.visible_object_columns,
         );
+        let offerable = self.offerable_object_columns();
+        for (table_column, view_column) in &self.object_columns {
+            match table_column {
+                ObjectTableColumn::Name => {
+                    view_column.set_fixed_width(self.projects.object_name_width());
+                }
+                ObjectTableColumn::Data(column) => {
+                    view_column.set_visible(
+                        offerable.contains(column)
+                            && self.projects.visible_object_columns.contains(column),
+                    );
+                    view_column.set_fixed_width(self.projects.object_column_width(*column));
+                }
+            }
+        }
     }
 
     /// Columns that make sense to offer/render for the currently selected
@@ -219,7 +234,7 @@ impl App {
         self.selected_resource = None;
         self.status = format!("Discovering resources in {context}...");
         self.rebuild_resource_list(Some(sender.clone()));
-        self.rebuild_object_list(Some(sender.clone()));
+        self.rebuild_object_list();
         self.sync_terminal_controls();
         self.sync_port_forward_controls();
         self.sync_status();
@@ -520,80 +535,32 @@ impl App {
         }
     }
 
-    /// Clears and repopulates the object list. With large resources (a
-    /// namespace with thousands of Pods, say) building every row up front
-    /// would block the main loop long enough to feel frozen, so only the
-    /// first chunk is built synchronously; the rest is appended a chunk at
-    /// a time via idle callbacks so input and redraws keep happening.
-    pub(super) fn rebuild_object_list(&mut self, sender: Option<ComponentSender<Self>>) {
-        const CHUNK_SIZE: usize = 150;
+    /// Replaces the object table's backing model with the current filtered
+    /// objects. The `ColumnView` is virtualized, so this is O(model) data
+    /// work with only the on-screen row widgets ever being (re)built —
+    /// tens of thousands of objects stay cheap.
+    pub(super) fn rebuild_object_list(&mut self) {
+        let items: Vec<gtk::glib::BoxedAnyObject> = self
+            .filtered_objects()
+            .into_iter()
+            .map(boxed_object)
+            .collect();
 
-        self.object_list_generation
-            .set(self.object_list_generation.get().wrapping_add(1));
-        let generation = self.object_list_generation.get();
-        let generation_cell = self.object_list_generation.clone();
-
-        while let Some(child) = self.object_list.first_child() {
-            self.object_list.remove(&child);
-        }
-
-        let mut objects: std::collections::VecDeque<ObjectSummary> =
-            self.filtered_objects().into_iter().cloned().collect();
-
-        if objects.is_empty() {
-            let row = adw::ActionRow::builder()
-                .title("No objects")
-                .subtitle("The selected resource has no objects or could not be loaded.")
-                .build();
-            self.object_list.append(&row);
+        if items.is_empty() {
+            self.object_store.remove_all();
+            self.object_list_stack.set_visible_child_name("empty");
             return;
         }
 
-        let offerable = self.offerable_object_columns();
-        let columns: Vec<ObjectColumn> = self
-            .projects
-            .visible_object_columns
-            .iter()
-            .copied()
-            .filter(|column| offerable.contains(column))
-            .collect();
-        let name_width = self.projects.object_name_width();
-        let widths = self.projects.object_column_widths_for(&columns);
-
-        self.object_list
-            .append(&object_header_row_with_column_widths(
-                name_width,
-                &columns,
-                &widths,
-                sender.clone(),
-                Some(self.object_list.clone()),
-            ));
-        for _ in 0..CHUNK_SIZE {
-            let Some(object) = objects.pop_front() else {
-                return;
-            };
-            self.object_list.append(&object_row_with_column_widths(
-                &object, name_width, &columns, &widths,
-            ));
-        }
-
-        let list = self.object_list.clone();
-        gtk::glib::idle_add_local(move || {
-            if generation_cell.get() != generation {
-                return gtk::glib::ControlFlow::Break;
-            }
-            for _ in 0..CHUNK_SIZE {
-                let Some(object) = objects.pop_front() else {
-                    return gtk::glib::ControlFlow::Break;
-                };
-                list.append(&object_row_with_column_widths(
-                    &object, name_width, &columns, &widths,
-                ));
-            }
-            gtk::glib::ControlFlow::Continue
-        });
+        self.object_list_stack.set_visible_child_name("table");
+        // One splice = one items-changed signal, instead of one per row.
+        self.object_store
+            .splice(0, self.object_store.n_items(), &items);
     }
 
+    /// Merges one watch event into `objects` without sorting or repainting;
+    /// both are deferred to `flush_object_list_refresh` so an event burst
+    /// costs one refresh instead of thousands.
     pub(super) fn upsert_object(&mut self, object: ObjectSummary) {
         if let Some(existing) = self
             .objects
@@ -604,7 +571,43 @@ impl App {
         } else {
             self.objects.push(object);
         }
+    }
+
+    /// Schedules a coalesced object-list refresh. Any number of calls while
+    /// one is pending collapse into a single `ObjectListRefreshTick`.
+    pub(super) fn schedule_object_list_refresh(&mut self, sender: &ComponentSender<Self>) {
+        if self.object_list_refresh_scheduled {
+            return;
+        }
+        self.object_list_refresh_scheduled = true;
+        let sender = sender.clone();
+        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(400), move || {
+            sender.input(AppMsg::ObjectListRefreshTick);
+        });
+    }
+
+    pub(super) fn flush_object_list_refresh(&mut self) {
+        self.object_list_refresh_scheduled = false;
+        if self.loading {
+            return;
+        }
         sort_objects(&mut self.objects);
+        self.set_object_status(self.objects.len());
+        self.sync_status();
+        self.rebuild_object_list();
+    }
+
+    /// Persists `projects` after a short delay, collapsing bursts (e.g. the
+    /// per-pixel width updates of a column-resize drag) into one disk write.
+    pub(super) fn schedule_project_save(&mut self, sender: &ComponentSender<Self>) {
+        if self.project_save_scheduled {
+            return;
+        }
+        self.project_save_scheduled = true;
+        let sender = sender.clone();
+        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
+            sender.input(AppMsg::ProjectSaveTick);
+        });
     }
 
     pub(super) fn remove_object(&mut self, object: &ObjectSummary) {
@@ -627,15 +630,16 @@ impl App {
         &self,
         index: i32,
     ) -> Option<(String, ResourceKind, Option<String>, String)> {
-        let (name, namespace) = self
-            .filtered_objects()
-            .get(index as usize)
-            .map(|object| (object.name.clone(), object.namespace.clone()))?;
+        let object = sorted_model_object(&self.object_sorted, index)?;
         let context = self.selected_context.clone()?;
         let resource = self.selected_resource_kind()?.clone();
-        let namespace = resource.is_namespaced().then_some(namespace);
+        let namespace = resource.is_namespaced().then_some(object.namespace);
 
-        Some((context, resource, namespace, name))
+        Some((context, resource, namespace, object.name))
+    }
+
+    pub(super) fn related_pod_at(&self, index: i32) -> Option<ObjectSummary> {
+        sorted_model_object(&self.detail_related_pods_sorted, index)
     }
 
     pub(super) fn open_object_detail(
@@ -712,7 +716,6 @@ impl App {
                 .unwrap_or("-"),
         );
         self.detail_yaml_buffer.set_text(&detail.yaml);
-        self.detail_related_pods.clone_from(&detail.related_pods);
         self.detail_node_unschedulable = detail.node_unschedulable;
         self.detail_scale_spin
             .set_value(detail.replicas.unwrap_or_default().into());
@@ -731,7 +734,12 @@ impl App {
         }
         rebuild_detail_events(&self.detail_events_list, detail);
         rebuild_detail_conditions(&self.detail_conditions_list, detail);
-        rebuild_related_pods(&self.detail_related_pods_list, detail);
+        rebuild_related_pods(
+            &self.detail_related_pods_store,
+            &self.detail_related_pods_stack,
+            &self.detail_related_pods_message,
+            detail,
+        );
         rebuild_container_metrics(&self.detail_container_metrics_list, detail);
         self.sync_detail_tabs(detail);
         self.sync_terminal_controls();
@@ -782,6 +790,17 @@ impl App {
             self.detail_stack.set_visible_child_name("yaml");
         }
     }
+}
+
+/// The object at a view position, resolved against the sorted model the
+/// `ColumnView` actually displays (positions differ from the backing store
+/// whenever a header-click sort is active).
+fn sorted_model_object(model: &gtk::SortListModel, index: i32) -> Option<ObjectSummary> {
+    let item = model
+        .item(u32::try_from(index).ok()?)
+        .and_downcast::<gtk::glib::BoxedAnyObject>()?;
+    let object = item.borrow::<ObjectSummary>().clone();
+    Some(object)
 }
 
 fn same_object(left: &ObjectSummary, right: &ObjectSummary) -> bool {

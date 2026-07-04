@@ -11,7 +11,8 @@ use serde_json::Value;
 use crate::status::{age_label, status_label};
 use crate::{
     api_resource, namespace_scope, resource_scope, KubeSession, ObjectCondition, ObjectDetail,
-    ObjectSummary, ObjectWatchEvent, PodSummary, ResourceKind, ResourceScope, ResourceUsage,
+    ObjectSummary, ObjectWatchEvent, PodSummary, ResourceKind, ResourceRatio, ResourceScope,
+    ResourceUsage,
 };
 
 impl KubeSession {
@@ -103,39 +104,72 @@ impl KubeSession {
             }
             _ => Api::all_with(self.client.clone(), &api_resource),
         };
-        let metrics = self
+        let mut metrics = self
             .resource_metrics(&resource, namespace.as_deref())
             .await
             .unwrap_or_default();
         let mut stream = Box::pin(watcher(objects, kube::runtime::watcher::Config::default()));
         let mut init_buffer = Vec::new();
+        let mut known_objects: BTreeMap<(String, String), DynamicObject> = BTreeMap::new();
+        let mut metrics_refresh = tokio::time::interval(std::time::Duration::from_secs(15));
+        let refresh_metrics = supports_metrics(&resource);
 
-        while let Some(event) = stream.next().await {
-            match event {
-                Ok(WatcherEvent::Init) => {
-                    init_buffer.clear();
+        loop {
+            tokio::select! {
+                event = stream.next() => {
+                    let Some(event) = event else {
+                        break;
+                    };
+                    match event {
+                        Ok(WatcherEvent::Init) => {
+                            init_buffer.clear();
+                        }
+                        Ok(WatcherEvent::InitApply(object)) => {
+                            init_buffer.push(object);
+                        }
+                        Ok(WatcherEvent::InitDone) => {
+                            metrics = self
+                                .resource_metrics(&resource, namespace.as_deref())
+                                .await
+                                .unwrap_or_default();
+                            known_objects = init_buffer
+                                .drain(..)
+                                .map(|object| (object_key(&object), object))
+                                .collect();
+                            on_event(ObjectWatchEvent::Restarted(object_summaries(
+                                known_objects.values().cloned(),
+                                &resource,
+                                &metrics,
+                            )));
+                        }
+                        Ok(WatcherEvent::Apply(object)) => {
+                            let summary = object_summary(object.clone(), &resource, &metrics);
+                            known_objects.insert(object_key(&object), object);
+                            on_event(ObjectWatchEvent::Applied(summary));
+                        }
+                        Ok(WatcherEvent::Delete(object)) => {
+                            let summary = object_summary(object.clone(), &resource, &metrics);
+                            known_objects.remove(&object_key(&object));
+                            on_event(ObjectWatchEvent::Deleted(summary));
+                        }
+                        Err(error) => {
+                            on_event(ObjectWatchEvent::Error(error.to_string()));
+                        }
+                    }
                 }
-                Ok(WatcherEvent::InitApply(object)) => {
-                    init_buffer.push(object_summary(object, &resource, &metrics));
-                }
-                Ok(WatcherEvent::InitDone) => {
-                    sort_object_summaries(&mut init_buffer);
-                    on_event(ObjectWatchEvent::Restarted(std::mem::take(
-                        &mut init_buffer,
+                _ = metrics_refresh.tick(), if refresh_metrics => {
+                    if known_objects.is_empty() {
+                        continue;
+                    }
+                    metrics = self
+                        .resource_metrics(&resource, namespace.as_deref())
+                        .await
+                        .unwrap_or_default();
+                    on_event(ObjectWatchEvent::Restarted(object_summaries(
+                        known_objects.values().cloned(),
+                        &resource,
+                        &metrics,
                     )));
-                }
-                Ok(WatcherEvent::Apply(object)) => {
-                    on_event(ObjectWatchEvent::Applied(object_summary(
-                        object, &resource, &metrics,
-                    )));
-                }
-                Ok(WatcherEvent::Delete(object)) => {
-                    on_event(ObjectWatchEvent::Deleted(object_summary(
-                        object, &resource, &metrics,
-                    )));
-                }
-                Err(error) => {
-                    on_event(ObjectWatchEvent::Error(error.to_string()));
                 }
             }
         }
@@ -309,12 +343,40 @@ fn pod_summary(pod: Pod) -> PodSummary {
     }
 }
 
+fn supports_metrics(resource: &ResourceKind) -> bool {
+    resource.group.is_empty() && matches!(resource.kind.as_str(), "Pod" | "Node")
+}
+
+fn object_key(object: &DynamicObject) -> (String, String) {
+    (
+        object.namespace().unwrap_or_else(|| String::from("-")),
+        object.name_any(),
+    )
+}
+
+fn object_summaries<I>(
+    objects: I,
+    resource: &ResourceKind,
+    metrics: &BTreeMap<(String, String), ResourceUsage>,
+) -> Vec<ObjectSummary>
+where
+    I: IntoIterator<Item = DynamicObject>,
+{
+    let mut summaries = objects
+        .into_iter()
+        .map(|object| object_summary(object, resource, metrics))
+        .collect::<Vec<_>>();
+    sort_object_summaries(&mut summaries);
+    summaries
+}
+
 fn object_summary(
     object: DynamicObject,
     resource: &ResourceKind,
     metrics: &BTreeMap<(String, String), ResourceUsage>,
 ) -> ObjectSummary {
     let namespace = object.namespace().unwrap_or_else(|| String::from("-"));
+    let name = object.name_any();
     let (status, status_ratio) = status_label(&object, resource);
     let age = object
         .metadata
@@ -322,18 +384,116 @@ fn object_summary(
         .as_ref()
         .map(|timestamp| age_label(timestamp.0))
         .unwrap_or_else(|| String::from("-"));
+    let mut usage = metrics.get(&(namespace.clone(), name.clone())).cloned();
+    if let Some(usage) = usage.as_mut() {
+        attach_resource_ratios(usage, &object, resource);
+    }
 
     ObjectSummary {
-        name: object.name_any(),
-        metrics: metrics
-            .get(&(namespace.clone(), object.name_any()))
-            .cloned(),
+        name,
+        metrics: usage,
         namespace,
         status,
         status_ratio,
         api_version: resource.api_version.clone(),
         age,
     }
+}
+
+fn attach_resource_ratios(
+    usage: &mut ResourceUsage,
+    object: &DynamicObject,
+    resource: &ResourceKind,
+) {
+    match (resource.group.as_str(), resource.kind.as_str()) {
+        ("", "Pod") => {
+            usage.cpu_ratio =
+                resource_ratio(&usage.cpu, pod_container_requests_total(object, "cpu"));
+            usage.memory_ratio = resource_ratio(
+                &usage.memory,
+                pod_container_requests_total(object, "memory"),
+            );
+        }
+        ("", "Node") => {
+            usage.cpu_ratio = resource_ratio(&usage.cpu, node_allocatable(object, "cpu"));
+            usage.memory_ratio = resource_ratio(&usage.memory, node_allocatable(object, "memory"));
+        }
+        _ => {}
+    }
+}
+
+fn pod_container_requests_total(object: &DynamicObject, resource_name: &str) -> Option<f64> {
+    object
+        .data
+        .get("spec")?
+        .get("containers")?
+        .as_array()?
+        .iter()
+        .filter_map(|container| {
+            container
+                .get("resources")?
+                .get("requests")?
+                .get(resource_name)?
+                .as_str()
+                .and_then(quantity_as_f64)
+        })
+        .reduce(|total, quantity| total + quantity)
+}
+
+fn node_allocatable(object: &DynamicObject, resource_name: &str) -> Option<f64> {
+    object
+        .data
+        .get("status")?
+        .get("allocatable")?
+        .get(resource_name)?
+        .as_str()
+        .and_then(quantity_as_f64)
+}
+
+fn resource_ratio(used: &str, base: Option<f64>) -> Option<ResourceRatio> {
+    let used = quantity_as_f64(used)?;
+    let base = base?;
+    if !used.is_finite() || !base.is_finite() || base <= 0.0 {
+        return None;
+    }
+
+    Some(ResourceRatio {
+        basis_points: ((used / base) * 10_000.0)
+            .round()
+            .clamp(0.0, u32::MAX as f64) as u32,
+    })
+}
+
+pub(crate) fn quantity_as_f64(value: &str) -> Option<f64> {
+    let value = value.trim();
+    if value.is_empty() || value == "-" {
+        return None;
+    }
+
+    for (suffix, multiplier) in [
+        ("Ki", 1024.0),
+        ("Mi", 1024.0_f64.powi(2)),
+        ("Gi", 1024.0_f64.powi(3)),
+        ("Ti", 1024.0_f64.powi(4)),
+        ("Pi", 1024.0_f64.powi(5)),
+        ("Ei", 1024.0_f64.powi(6)),
+        ("n", 0.000_000_001),
+        ("u", 0.000_001),
+        ("m", 0.001),
+        ("k", 1_000.0),
+        ("K", 1_000.0),
+        ("M", 1_000_000.0),
+        ("G", 1_000_000_000.0),
+        ("T", 1_000_000_000_000.0),
+        ("P", 1_000_000_000_000_000.0),
+        ("E", 1_000_000_000_000_000_000.0),
+    ] {
+        if let Some(number) = value.strip_suffix(suffix) {
+            return number.parse::<f64>().ok().map(|number| number * multiplier);
+        }
+    }
+
+    value.parse::<f64>().ok()
 }
 
 fn object_containers(object: &DynamicObject, resource: &ResourceKind) -> Vec<String> {
@@ -426,4 +586,25 @@ fn deployment_label_selector(object: &DynamicObject) -> Option<String> {
         .collect::<Vec<_>>();
     parts.sort();
     (!parts.is_empty()).then(|| parts.join(","))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{quantity_as_f64, resource_ratio};
+
+    #[test]
+    fn quantity_as_f64_handles_kubernetes_cpu_and_memory_suffixes() {
+        assert_eq!(quantity_as_f64("250m"), Some(0.25));
+        assert_eq!(quantity_as_f64("500000000n"), Some(0.5));
+        assert_eq!(quantity_as_f64("1"), Some(1.0));
+        assert_eq!(quantity_as_f64("1Ki"), Some(1024.0));
+        assert_eq!(quantity_as_f64("2Mi"), Some(2.0 * 1024.0 * 1024.0));
+    }
+
+    #[test]
+    fn resource_ratio_uses_basis_points() {
+        let ratio = resource_ratio("250m", Some(1.0)).expect("ratio should parse");
+
+        assert_eq!(ratio.basis_points, 2500);
+    }
 }

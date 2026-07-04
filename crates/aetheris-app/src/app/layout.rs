@@ -60,7 +60,8 @@ pub(super) struct ContentWidgets<'a> {
     pub(super) content_stack: &'a gtk::Stack,
     pub(super) status_label: &'a gtk::Label,
     pub(super) spinner: &'a gtk::Spinner,
-    pub(super) object_list: &'a gtk::ListBox,
+    pub(super) object_view: &'a gtk::ColumnView,
+    pub(super) object_list_stack: &'a gtk::Stack,
     pub(super) detail_page: &'a gtk::Box,
 }
 
@@ -122,12 +123,30 @@ pub(super) fn build_content(widgets: ContentWidgets<'_>) -> adw::NavigationPage 
         // reach whatever's pushed past the right edge instead of it just
         // being clipped and unreachable.
         .hscrollbar_policy(gtk::PolicyType::Automatic)
+        .css_classes(["aetheris-table-frame"])
         .build();
-    let list_container = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    list_container.set_hexpand(true);
-    list_container.append(widgets.object_list);
-    scrolled.set_child(Some(&list_container));
-    list_page.append(&scrolled);
+    // The ColumnView must be the ScrolledWindow's direct child: it
+    // implements GtkScrollable, and only then does it realize widgets for
+    // just the on-screen rows. Wrapped in a plain Box it would be allocated
+    // its full natural height and materialize every row at once.
+    scrolled.set_child(Some(widgets.object_view));
+
+    let empty_page = adw::StatusPage::builder()
+        .title("No objects")
+        .description("The selected resource has no objects or could not be loaded.")
+        .icon_name("edit-find-symbolic")
+        .build();
+    empty_page.add_css_class("compact");
+
+    widgets
+        .object_list_stack
+        .add_named(&scrolled, Some("table"));
+    widgets
+        .object_list_stack
+        .add_named(&empty_page, Some("empty"));
+    widgets.object_list_stack.set_visible_child_name("empty");
+    widgets.object_list_stack.set_vexpand(true);
+    list_page.append(widgets.object_list_stack);
 
     widgets.content_stack.add_named(&list_page, Some("list"));
     widgets

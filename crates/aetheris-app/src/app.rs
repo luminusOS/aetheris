@@ -7,7 +7,7 @@ use std::{
 use aetheris_kube::{
     AddClusterRequest, ClusterSummary, ContainerUsage, ContextInfo, KubeManager, ObjectCondition,
     ObjectDetail, ObjectEvent, ObjectSummary, ObjectWatchEvent, PodExecEvent, PodExecRequest,
-    PodLogRequest, PodPortForwardEvent, PodPortForwardRequest, ResourceKind,
+    PodLogRequest, PodPortForwardEvent, PodPortForwardRequest, ResourceKind, ResourceUsage,
 };
 use futures::future::{AbortHandle, Abortable};
 use futures::FutureExt;
@@ -197,6 +197,77 @@ flowboxchild.filter-chip-child:selected:hover {
 .filter-chip-active:hover {
   background-color: alpha(@accent_color, 0.24);
 }
+
+/* Object tables: rounded card look, matching the old boxed-list style —
+ * card background for rows, a distinct shaded header, hairline row
+ * separators. The frame class goes on the enclosing ScrolledWindow so the
+ * rounded corners wrap header and rows together. */
+scrolledwindow.aetheris-table-frame {
+  background-color: @card_bg_color;
+  border: 1px solid alpha(currentColor, 0.1);
+  border-radius: 12px;
+}
+
+columnview.aetheris-table,
+columnview.aetheris-table > listview {
+  background: transparent;
+}
+
+/* GNOME-style header: dimmed label at rest (like .dim-label), and on
+ * hover a genuinely darker surface (@shade_color is Adwaita's translucent
+ * black shading color in both light and dark) with the label brightening
+ * to full strength. */
+columnview.aetheris-table > header > button {
+  background-color: alpha(currentColor, 0.05);
+  border-bottom: 1px solid alpha(currentColor, 0.1);
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 1em;
+  color: alpha(@window_fg_color, 0.75);
+}
+
+columnview.aetheris-table > header > button:first-child {
+  border-top-left-radius: 11px;
+}
+
+columnview.aetheris-table > header > button:last-child {
+  border-top-right-radius: 11px;
+}
+
+columnview.aetheris-table > header > button:hover {
+  background-color: @shade_color;
+  color: @window_fg_color;
+}
+
+columnview.aetheris-table > header > button.sorted {
+  background-color: alpha(@accent_color, 0.15);
+  color: @accent_color;
+}
+
+columnview.aetheris-table > listview > row {
+  background: transparent;
+  border-bottom: 1px solid alpha(currentColor, 0.06);
+  padding: 2px 6px;
+}
+
+columnview.aetheris-table > listview > row:hover {
+  background-color: alpha(currentColor, 0.05);
+}
+
+/* CPU/Memory usage bars (same thresholds as Seabird): the LevelBar picks
+ * the class of the smallest offset >= its value — up to 85% "lb-normal",
+ * up to 95% "lb-warning", above that "lb-error". */
+levelbar block.lb-normal {
+  background-color: @view_fg_color;
+}
+
+levelbar block.lb-warning {
+  background-color: @warning_bg_color;
+}
+
+levelbar block.lb-error {
+  background-color: @destructive_bg_color;
+}
 "#;
 
 #[derive(Debug, Clone)]
@@ -212,10 +283,15 @@ pub struct App {
     namespaces: Vec<String>,
     resources: Vec<ResourceKind>,
     objects: Vec<ObjectSummary>,
-    /// Bumped on every `rebuild_object_list` call so a still-running
-    /// chunked render of a stale list can detect it's obsolete and stop
-    /// instead of appending rows after a newer rebuild already started.
-    object_list_generation: std::rc::Rc<std::cell::Cell<u64>>,
+    /// True while a coalesced object-list refresh is pending. Watch events
+    /// can arrive thousands at a time while a namespace spins up; rebuilding
+    /// the list per event would freeze the UI, so events only mark the list
+    /// dirty and a single deferred refresh repaints it.
+    object_list_refresh_scheduled: bool,
+    /// True while a coalesced projects.json save is pending. Dragging a
+    /// column border emits a width change per pixel; saving on each would
+    /// hammer the disk, so width changes only schedule one deferred save.
+    project_save_scheduled: bool,
     selected_context: Option<String>,
     selected_namespace: String,
     selected_resource_section: ResourceSection,
@@ -258,7 +334,16 @@ pub struct App {
     status_label: gtk::Label,
     spinner: gtk::Spinner,
     resource_list: gtk::ListBox,
-    object_list: gtk::ListBox,
+    /// Backing model for `object_view`. The `ColumnView` only realizes
+    /// widgets for on-screen rows, so this can hold tens of thousands of
+    /// objects without the widget tree growing with it.
+    object_store: gtk::gio::ListStore,
+    /// The store as the view displays it (header-click sort applied);
+    /// activation positions index into this model.
+    object_sorted: gtk::SortListModel,
+    object_columns: Vec<(ObjectTableColumn, gtk::ColumnViewColumn)>,
+    /// Switches between the object table and the "No objects" placeholder.
+    object_list_stack: gtk::Stack,
     detail_stack: gtk::Stack,
     detail_name_label: gtk::Label,
     detail_namespace_label: gtk::Label,
@@ -281,7 +366,12 @@ pub struct App {
     detail_yaml_buffer: sourceview5::Buffer,
     detail_events_list: gtk::ListBox,
     detail_conditions_list: gtk::ListBox,
-    detail_related_pods_list: gtk::ListBox,
+    detail_related_pods_store: gtk::gio::ListStore,
+    detail_related_pods_sorted: gtk::SortListModel,
+    /// Switches the detail "Pods" tab between the pods table and an
+    /// informational message (non-Deployment kinds, empty selector match).
+    detail_related_pods_stack: gtk::Stack,
+    detail_related_pods_message: adw::StatusPage,
     detail_log_container_dropdown: gtk::DropDown,
     detail_log_follow_check: gtk::CheckButton,
     detail_log_timestamps_check: gtk::CheckButton,
@@ -302,7 +392,6 @@ pub struct App {
     detail_log_target: Option<PodLogTarget>,
     detail_exec_target: Option<PodLogTarget>,
     detail_port_forward_target: Option<PodLogTarget>,
-    detail_related_pods: Vec<ObjectSummary>,
     detail_node_unschedulable: Option<bool>,
     object_watch_token: u64,
     object_watch_abort_handle: Option<AbortHandle>,
@@ -398,6 +487,8 @@ pub enum AppMsg {
     ObjectCreated(Result<String, String>),
     ObjectWatchEvent(u64, ObjectWatchEvent),
     ObjectWatchFinished(u64, Result<(), String>),
+    ObjectListRefreshTick,
+    ProjectSaveTick,
     ScaleDeployment,
     ObjectScaled(u64, Result<ObjectDetail, String>),
     ToggleNodeScheduling,

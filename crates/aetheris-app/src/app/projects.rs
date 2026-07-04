@@ -308,14 +308,6 @@ impl ProjectStore {
             .clamp(OBJECT_COLUMN_MIN_WIDTH, OBJECT_COLUMN_MAX_WIDTH)
     }
 
-    pub(super) fn object_column_widths_for(&self, columns: &[ObjectColumn]) -> Vec<i32> {
-        columns
-            .iter()
-            .copied()
-            .map(|column| self.object_column_width(column))
-            .collect()
-    }
-
     pub(super) fn object_name_width(&self) -> i32 {
         self.object_name_width
             .unwrap_or(OBJECT_NAME_WIDTH)
