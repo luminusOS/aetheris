@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/aetheris-app", "crates/aetheris-kube"]
 
 [workspace.package]
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
 authors = ["Leandro Rodrigues <leandromqrs@hotmail.com>"]

@@ -47,6 +47,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.2.0" date="2026-07-04">
+      <description>
+        <p>Improves Kubernetes metrics presentation, resource table behavior, screenshots, search keywords, and contribution guidance.</p>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-07-02">
       <description>
         <p>Initial development release with project-based cluster browsing, live resource updates, logs, YAML editing, mutations, metrics, terminal, and port forwarding.</p>
