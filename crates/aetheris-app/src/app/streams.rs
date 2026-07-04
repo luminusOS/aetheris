@@ -269,7 +269,6 @@ impl App {
         }
         session.input_tx = None;
         session.view.reset(true, true);
-        session.view.feed(b"Connecting to pod terminal...\r\n");
 
         let container = selected_log_container(&session.container_dropdown, &session.target)
             .or_else(|| default_terminal_container(&session.target))?;

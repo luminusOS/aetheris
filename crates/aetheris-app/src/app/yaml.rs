@@ -30,9 +30,6 @@ pub(super) fn ensure_text_tag(
     }
 }
 
-/// A `sourceview5::View` configured for editing a Kubernetes manifest: line
-/// numbers, current-line highlight, monospace, no wrapping (long lines
-/// scroll horizontally instead of reflowing).
 pub(super) fn build_yaml_view(buffer: &sourceview5::Buffer) -> sourceview5::View {
     let view = sourceview5::View::with_buffer(buffer);
     view.set_show_line_numbers(true);
@@ -235,9 +232,6 @@ fn update_yaml_error_state(buffer: &sourceview5::Buffer, error_label: &gtk::Labe
     error_label.set_label(&format!("Line {line}: {message}"));
 }
 
-/// Returns the (1-indexed) line and message of the first YAML syntax error
-/// in `text`, or `None` if it parses (or is blank — an empty editor isn't
-/// an error yet).
 pub(super) fn yaml_parse_error(text: &str) -> Option<(usize, String)> {
     if text.trim().is_empty() {
         return None;

@@ -3,11 +3,6 @@ use anyhow::{Context as AnyhowContext, Result};
 use crate::{ClusterSummary, KubeSession};
 
 impl KubeSession {
-    /// A best-effort snapshot for the Clusters list page. Only the initial
-    /// connectivity check (the version endpoint) is fatal; node listing,
-    /// pod counting and metrics-server queries each degrade to `None`
-    /// independently so a cluster without metrics-server (or with a slow
-    /// node list) still reports as reachable.
     /// Only the version endpoint is queried: it's a discovery call granted
     /// to `system:authenticated` in every stock RBAC setup, unlike listing
     /// Nodes or cluster-wide Pods, which regularly aren't (the same reason

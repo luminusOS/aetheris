@@ -198,10 +198,6 @@ flowboxchild.filter-chip-child:selected:hover {
   background-color: alpha(@accent_color, 0.24);
 }
 
-/* Object tables: rounded card look, matching the old boxed-list style —
- * card background for rows, a distinct shaded header, hairline row
- * separators. The frame class goes on the enclosing ScrolledWindow so the
- * rounded corners wrap header and rows together. */
 scrolledwindow.aetheris-table-frame {
   background-color: @card_bg_color;
   border: 1px solid alpha(currentColor, 0.1);
@@ -213,10 +209,6 @@ columnview.aetheris-table > listview {
   background: transparent;
 }
 
-/* GNOME-style header: dimmed label at rest (like .dim-label), and on
- * hover a genuinely darker surface (@shade_color is Adwaita's translucent
- * black shading color in both light and dark) with the label brightening
- * to full strength. */
 columnview.aetheris-table > header > button {
   background-color: alpha(currentColor, 0.05);
   border-bottom: 1px solid alpha(currentColor, 0.1);
@@ -315,9 +307,6 @@ pub struct App {
     add_cluster_button: gtk::Button,
     import_cluster_button: gtk::Button,
     clusters_content_stack: gtk::Stack,
-    /// State/Provider/Version/CPU/Memory/Pods snapshot per context name,
-    /// fetched lazily the first time the Clusters page shows a given
-    /// context and cached until the app restarts.
     cluster_summaries: std::collections::HashMap<String, ClusterSummaryState>,
     namespace_menu_button: gtk::MenuButton,
     namespace_selector_label: gtk::Label,
@@ -342,7 +331,6 @@ pub struct App {
     /// activation positions index into this model.
     object_sorted: gtk::SortListModel,
     object_columns: Vec<(ObjectTableColumn, gtk::ColumnViewColumn)>,
-    /// Switches between the object table and the "No objects" placeholder.
     object_list_stack: gtk::Stack,
     detail_stack: gtk::Stack,
     detail_name_label: gtk::Label,
@@ -368,8 +356,6 @@ pub struct App {
     detail_conditions_list: gtk::ListBox,
     detail_related_pods_store: gtk::gio::ListStore,
     detail_related_pods_sorted: gtk::SortListModel,
-    /// Switches the detail "Pods" tab between the pods table and an
-    /// informational message (non-Deployment kinds, empty selector match).
     detail_related_pods_stack: gtk::Stack,
     detail_related_pods_message: adw::StatusPage,
     detail_log_container_dropdown: gtk::DropDown,
@@ -414,8 +400,6 @@ pub struct App {
     project_dialog_description: gtk::Label,
     project_name_entry: adw::EntryRow,
     project_create_button: gtk::Button,
-    /// The project's name before this edit, when the project dialog is in
-    /// rename mode. `None` means the dialog is creating a new project.
     editing_project_name: Option<String>,
     create_yaml_dialog: adw::Dialog,
     create_yaml_buffer: sourceview5::Buffer,
@@ -432,8 +416,6 @@ pub struct App {
     setup_button: gtk::Button,
     editing_cluster: bool,
     editing_context_name: Option<String>,
-    /// The namespace being renamed while `rename_namespace_dialog` is open.
-    /// `None` means the dialog is closed.
     renaming_namespace: Option<String>,
 }
 

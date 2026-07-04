@@ -121,10 +121,7 @@ pub struct ContainerUsage {
     pub memory: String,
 }
 
-/// A best-effort snapshot of a cluster used by the Clusters list page.
-/// Every field beyond connectivity itself is optional: metrics-server may
-/// not be installed, and provider detection is a heuristic guess, not an
-/// authoritative source.
+/// Version/provider data shown on the Clusters list page.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ClusterSummary {
     pub version: Option<String>,
