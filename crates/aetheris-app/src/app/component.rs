@@ -227,9 +227,46 @@ impl Component for App {
         let resource_list = gtk::ListBox::new();
         resource_list.add_css_class("boxed-list");
         resource_list.set_selection_mode(gtk::SelectionMode::None);
-        let object_list = gtk::ListBox::new();
-        object_list.add_css_class("boxed-list");
-        object_list.set_selection_mode(gtk::SelectionMode::None);
+        let object_store = gtk::gio::ListStore::new::<gtk::glib::BoxedAnyObject>();
+        let object_view = gtk::ColumnView::builder()
+            .single_click_activate(true)
+            .reorderable(false)
+            .build();
+        object_view.add_css_class("aetheris-table");
+        object_view.set_vexpand(true);
+
+        let mut object_columns: Vec<(ObjectTableColumn, gtk::ColumnViewColumn)> = Vec::new();
+        let name_column = gtk::ColumnViewColumn::new(
+            Some("Name"),
+            Some(super::widgets::object_name_column_factory()),
+        );
+        name_column.set_resizable(true);
+        name_column.set_fixed_width(OBJECT_NAME_WIDTH);
+        object_view.append_column(&name_column);
+        object_columns.push((ObjectTableColumn::Name, name_column));
+        for column in ObjectColumn::ALL {
+            let view_column = gtk::ColumnViewColumn::new(
+                Some(column.label()),
+                Some(super::widgets::object_data_column_factory(column)),
+            );
+            view_column.set_resizable(true);
+            view_column.set_fixed_width(column.default_width());
+            view_column.set_sorter(super::widgets::object_column_sorter(column).as_ref());
+            object_view.append_column(&view_column);
+            object_columns.push((ObjectTableColumn::Data(column), view_column));
+        }
+        super::widgets::append_filler_column(&object_view);
+        // Header-click sorting reorders the view, not the store, so
+        // activation positions must be resolved against this sorted model.
+        let object_sorted =
+            gtk::SortListModel::new(Some(object_store.clone()), object_view.sorter());
+        object_view.set_model(Some(&gtk::NoSelection::new(Some(object_sorted.clone()))));
+        super::widgets::connect_sorted_header_highlight(&object_view);
+
+        let object_list_stack = gtk::Stack::builder()
+            .hhomogeneous(false)
+            .vhomogeneous(false)
+            .build();
         let detail_name_label = detail_value_label();
         let detail_namespace_label = detail_value_label();
         let detail_status_label = detail_value_label();
@@ -319,9 +356,18 @@ impl Component for App {
         let detail_conditions_list = gtk::ListBox::new();
         detail_conditions_list.add_css_class("boxed-list");
         detail_conditions_list.set_selection_mode(gtk::SelectionMode::None);
-        let detail_related_pods_list = gtk::ListBox::new();
-        detail_related_pods_list.add_css_class("boxed-list");
-        detail_related_pods_list.set_selection_mode(gtk::SelectionMode::None);
+        let (detail_related_pods_view, detail_related_pods_store, detail_related_pods_sorted) =
+            super::widgets::related_pods_column_view();
+        let detail_related_pods_stack = gtk::Stack::builder()
+            .hhomogeneous(false)
+            .vhomogeneous(false)
+            .build();
+        let detail_related_pods_message = adw::StatusPage::builder()
+            .title("Pods are shown for Deployments")
+            .description("Open a Deployment to inspect its related Pods.")
+            .icon_name("dialog-information-symbolic")
+            .build();
+        detail_related_pods_message.add_css_class("compact");
         let detail_log_container_dropdown = gtk::DropDown::from_strings(&["No containers"]);
         detail_log_container_dropdown.set_sensitive(false);
         let detail_log_follow_check = gtk::CheckButton::builder().label("Follow").build();
@@ -413,7 +459,9 @@ impl Component for App {
             yaml_error_label: &detail_yaml_error_label,
             events_list: &detail_events_list,
             conditions_list: &detail_conditions_list,
-            related_pods_list: &detail_related_pods_list,
+            related_pods_view: &detail_related_pods_view,
+            related_pods_stack: &detail_related_pods_stack,
+            related_pods_message: &detail_related_pods_message,
             log_container_dropdown: &detail_log_container_dropdown,
             log_follow_check: &detail_log_follow_check,
             log_timestamps_check: &detail_log_timestamps_check,
@@ -539,7 +587,8 @@ impl Component for App {
             content_stack: &content_stack,
             status_label: &status_label,
             spinner: &spinner,
-            object_list: &object_list,
+            object_view: &object_view,
+            object_list_stack: &object_list_stack,
             detail_page: &detail_page,
         });
         split_view.set_sidebar(Some(&sidebar));
@@ -687,14 +736,17 @@ impl Component for App {
             let sender = sender.clone();
             move |entry| sender.input(AppMsg::SearchChanged(entry.text().to_string()))
         });
-        object_list.connect_row_activated({
+        object_view.connect_activate({
             let sender = sender.clone();
-            move |_, row| {
-                if row.index() > 0 {
-                    sender.input(AppMsg::ObjectActivated(row.index() - 1));
-                }
-            }
+            move |_, position| sender.input(AppMsg::ObjectActivated(position as i32))
         });
+        for (table_column, view_column) in &object_columns {
+            super::widgets::connect_object_column_persistence(
+                view_column,
+                *table_column,
+                sender.clone(),
+            );
+        }
         create_yaml_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowCreateYamlDialog)
@@ -703,9 +755,9 @@ impl Component for App {
             let sender = sender.clone();
             move |_| sender.input(AppMsg::CreateYaml)
         });
-        detail_related_pods_list.connect_row_activated({
+        detail_related_pods_view.connect_activate({
             let sender = sender.clone();
-            move |_, row| sender.input(AppMsg::RelatedPodActivated(row.index()))
+            move |_, position| sender.input(AppMsg::RelatedPodActivated(position as i32))
         });
         detail_back_button.connect_clicked({
             let sender = sender.clone();
@@ -802,7 +854,8 @@ impl Component for App {
             namespaces: vec![String::from("default")],
             resources: Vec::new(),
             objects: Vec::new(),
-            object_list_generation: std::rc::Rc::new(std::cell::Cell::new(0)),
+            object_list_refresh_scheduled: false,
+            project_save_scheduled: false,
             selected_context: None,
             selected_namespace: String::from("default"),
             selected_resource_section: ResourceSection::Workloads,
@@ -842,7 +895,10 @@ impl Component for App {
             status_label,
             spinner,
             resource_list,
-            object_list,
+            object_store,
+            object_sorted,
+            object_columns,
+            object_list_stack,
             detail_stack,
             detail_name_label,
             detail_namespace_label,
@@ -865,7 +921,10 @@ impl Component for App {
             detail_yaml_buffer,
             detail_events_list,
             detail_conditions_list,
-            detail_related_pods_list,
+            detail_related_pods_store,
+            detail_related_pods_sorted,
+            detail_related_pods_stack,
+            detail_related_pods_message,
             detail_log_container_dropdown,
             detail_log_follow_check,
             detail_log_timestamps_check,
@@ -886,7 +945,6 @@ impl Component for App {
             detail_log_target: None,
             detail_exec_target: None,
             detail_port_forward_target: None,
-            detail_related_pods: Vec::new(),
             detail_node_unschedulable: None,
             object_watch_token: 0,
             object_watch_abort_handle: None,

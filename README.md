@@ -35,16 +35,17 @@ scale, cordon, drain, and port forwarding.
 
 ## Screenshots
 
-> Aetheris is under active development. Screenshots land here as the UI settles —
-> drop them in `data/screenshots/` and swap the placeholders below.
+| Resource browser |
+| :---: |
+| <img src="data/screenshots/resources.png" alt="Aetheris resource browser" /> |
 
-| Cluster overview | Resource browser |
+| Cluster overview | Pod terminal |
 | :---: | :---: |
-| <!-- <img src="data/screenshots/overview.png" alt="Cluster overview" /> --> *coming soon* | <!-- <img src="data/screenshots/resources.png" alt="Resource browser" /> --> *coming soon* |
+| <img src="data/screenshots/overview.png" alt="Aetheris cluster overview" /> | <img src="data/screenshots/terminal.png" alt="Aetheris pod terminal" /> |
 
-| YAML editor | Logs & pod terminal |
+| YAML editor | Live logs |
 | :---: | :---: |
-| <!-- <img src="data/screenshots/yaml.png" alt="YAML editor" /> --> *coming soon* | <!-- <img src="data/screenshots/terminal.png" alt="Logs and pod terminal" /> --> *coming soon* |
+| <img src="data/screenshots/yaml.png" alt="Aetheris YAML editor" /> | <img src="data/screenshots/logs.png" alt="Aetheris live logs" /> |
 
 ## Documentation
 

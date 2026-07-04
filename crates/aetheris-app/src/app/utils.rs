@@ -116,6 +116,7 @@ pub(super) fn offerable_columns_for(resource: Option<&ResourceKind>) -> Vec<Obje
     ObjectColumn::ALL
         .into_iter()
         .filter(|column| match column {
+            ObjectColumn::Namespace => resource.map(ResourceKind::is_namespaced).unwrap_or(true),
             ObjectColumn::Status => has_status_ratio,
             ObjectColumn::Cpu | ObjectColumn::Memory => has_metrics,
             _ => true,
@@ -185,9 +186,46 @@ pub(super) fn select_default_resource(resources: &[ResourceKind]) -> Option<usiz
         .or_else(|| resources.first().map(|_| 0))
 }
 
+/// Parses a Kubernetes quantity string ("125m", "512Mi", "2") into a plain
+/// number for sorting. Decimal (n/u/m/k/M/G/T/P/E) and binary (Ki..Ei)
+/// suffixes are supported; `None` for blanks and anything unparsable, so
+/// objects without a metrics sample sort together at one end.
+pub(super) fn parse_quantity(raw: &str) -> Option<f64> {
+    let raw = raw.trim();
+    if raw.is_empty() || raw == "-" {
+        return None;
+    }
+    let split = raw
+        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .unwrap_or(raw.len());
+    let (number, suffix) = raw.split_at(split);
+    let factor = match suffix {
+        "" => 1.0,
+        "n" => 1e-9,
+        "u" => 1e-6,
+        "m" => 1e-3,
+        "k" | "K" => 1e3,
+        "M" => 1e6,
+        "G" => 1e9,
+        "T" => 1e12,
+        "P" => 1e15,
+        "E" => 1e18,
+        "Ki" => 1024f64,
+        "Mi" => 1024f64.powi(2),
+        "Gi" => 1024f64.powi(3),
+        "Ti" => 1024f64.powi(4),
+        "Pi" => 1024f64.powi(5),
+        "Ei" => 1024f64.powi(6),
+        _ => return None,
+    };
+    number.parse::<f64>().ok().map(|value| value * factor)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::forbidden_summary;
+    use super::{forbidden_summary, offerable_columns_for};
+    use crate::app::projects::ObjectColumn;
+    use aetheris_kube::{ResourceKind, ResourceScope};
 
     #[test]
     fn forbidden_summary_extracts_just_the_resource() {
@@ -203,5 +241,38 @@ mod tests {
     #[test]
     fn forbidden_summary_ignores_unrelated_messages() {
         assert_eq!(forbidden_summary("connection refused"), None);
+    }
+
+    #[test]
+    fn parse_quantity_handles_kubernetes_suffixes() {
+        use super::parse_quantity;
+
+        assert_eq!(parse_quantity("2"), Some(2.0));
+        assert_eq!(parse_quantity("125m"), Some(0.125));
+        assert_eq!(parse_quantity("1500n"), Some(1.5e-6));
+        assert_eq!(parse_quantity("512Mi"), Some(512.0 * 1024.0 * 1024.0));
+        assert_eq!(parse_quantity("1Gi"), Some(1024f64.powi(3)));
+        assert_eq!(parse_quantity("2k"), Some(2000.0));
+        assert_eq!(parse_quantity(""), None);
+        assert_eq!(parse_quantity("-"), None);
+        assert_eq!(parse_quantity("weird"), None);
+    }
+
+    #[test]
+    fn offerable_columns_hide_namespace_for_cluster_scoped_resources() {
+        let node = ResourceKind {
+            group: String::new(),
+            version: String::from("v1"),
+            api_version: String::from("v1"),
+            kind: String::from("Node"),
+            plural: String::from("nodes"),
+            scope: ResourceScope::Cluster,
+        };
+
+        let columns = offerable_columns_for(Some(&node));
+
+        assert!(!columns.contains(&ObjectColumn::Namespace));
+        assert!(columns.contains(&ObjectColumn::Cpu));
+        assert!(columns.contains(&ObjectColumn::Memory));
     }
 }

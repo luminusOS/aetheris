@@ -42,7 +42,7 @@ impl App {
                 self.show_setup();
                 self.sync_dropdowns(Some(sender.clone()));
                 self.rebuild_resource_list(Some(sender.clone()));
-                self.rebuild_object_list(Some(sender.clone()));
+                self.rebuild_object_list();
                 self.sync_status();
             }
             AppMsg::StateLoadedForCluster(context_name, Ok(state)) => {
@@ -291,7 +291,7 @@ impl App {
                 } else {
                     self.status = String::from("No listable Kubernetes resources found.");
                     self.sync_status();
-                    self.rebuild_object_list(Some(sender.clone()));
+                    self.rebuild_object_list();
                 }
             }
             AppMsg::ClusterLoaded(Err(error)) => {
@@ -303,7 +303,7 @@ impl App {
                 self.status = String::from("Unable to discover resources.");
                 self.toaster.add_toast(adw::Toast::new(&error));
                 self.rebuild_resource_list(Some(sender.clone()));
-                self.rebuild_object_list(Some(sender.clone()));
+                self.rebuild_object_list();
                 self.sync_status();
             }
             AppMsg::ClusterChanged(index) => {
@@ -457,7 +457,7 @@ impl App {
                 }
                 self.sync_status();
                 self.sync_status_filter();
-                self.rebuild_object_list(Some(sender.clone()));
+                self.rebuild_object_list();
             }
             AppMsg::ObjectColumnToggled(index) => {
                 let Some(column) = self.offerable_object_columns().get(index as usize).copied()
@@ -468,12 +468,10 @@ impl App {
                 self.projects.set_object_column_visible(column, visible);
                 self.save_projects_or_toast();
                 self.sync_object_columns();
-                self.rebuild_object_list(Some(sender.clone()));
             }
             AppMsg::ObjectColumnResized(column, width) => {
                 if self.projects.set_object_table_column_width(column, width) {
-                    self.save_projects_or_toast();
-                    self.rebuild_object_list(Some(sender.clone()));
+                    self.schedule_project_save(&sender);
                 }
             }
             AppMsg::ResourceChanged(index) => {
@@ -496,7 +494,7 @@ impl App {
             AppMsg::SearchChanged(query) => {
                 self.search_query = query;
                 self.sync_status();
-                self.rebuild_object_list(Some(sender.clone()));
+                self.rebuild_object_list();
             }
             AppMsg::ObjectActivated(index) => {
                 let Some((context, resource, namespace, name)) = self.detail_request(index) else {
@@ -505,7 +503,7 @@ impl App {
                 self.open_object_detail(context, resource, namespace, name, sender);
             }
             AppMsg::RelatedPodActivated(index) => {
-                let Some(pod) = self.detail_related_pods.get(index as usize).cloned() else {
+                let Some(pod) = self.related_pod_at(index) else {
                     return;
                 };
                 let Some(target) = self.detail_target.clone() else {
@@ -1063,7 +1061,7 @@ impl App {
                 self.objects = objects;
                 self.set_object_status(count);
                 self.sync_status();
-                self.rebuild_object_list(Some(sender.clone()));
+                self.rebuild_object_list();
                 self.start_object_watch(sender);
             }
             AppMsg::ObjectsLoaded(Err(error)) => {
@@ -1072,7 +1070,7 @@ impl App {
                 self.objects.clear();
                 self.status = String::from("Unable to list selected resource.");
                 self.sync_status();
-                self.rebuild_object_list(Some(sender.clone()));
+                self.rebuild_object_list();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
             AppMsg::ObjectWatchEvent(token, event) => {
@@ -1081,29 +1079,29 @@ impl App {
                 }
                 match event {
                     ObjectWatchEvent::Restarted(objects) => {
-                        let count = objects.len();
                         self.objects = objects;
-                        self.set_object_status(count);
-                        self.sync_status();
-                        self.rebuild_object_list(Some(sender.clone()));
+                        self.schedule_object_list_refresh(&sender);
                     }
                     ObjectWatchEvent::Applied(object) => {
                         self.upsert_object(object);
-                        self.set_object_status(self.objects.len());
-                        self.sync_status();
-                        self.rebuild_object_list(Some(sender.clone()));
+                        self.schedule_object_list_refresh(&sender);
                     }
                     ObjectWatchEvent::Deleted(object) => {
                         self.remove_object(&object);
-                        self.set_object_status(self.objects.len());
-                        self.sync_status();
-                        self.rebuild_object_list(Some(sender.clone()));
+                        self.schedule_object_list_refresh(&sender);
                     }
                     ObjectWatchEvent::Error(error) => {
                         self.status = format!("Live watch reconnecting: {error}");
                         self.sync_status();
                     }
                 }
+            }
+            AppMsg::ObjectListRefreshTick => {
+                self.flush_object_list_refresh();
+            }
+            AppMsg::ProjectSaveTick => {
+                self.project_save_scheduled = false;
+                self.save_projects_or_toast();
             }
             AppMsg::ObjectWatchFinished(token, result) => {
                 if token != self.object_watch_token {

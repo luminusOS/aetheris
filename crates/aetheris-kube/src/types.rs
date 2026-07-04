@@ -104,6 +104,14 @@ pub struct ObjectEvent {
 pub struct ResourceUsage {
     pub cpu: String,
     pub memory: String,
+    pub cpu_ratio: Option<ResourceRatio>,
+    pub memory_ratio: Option<ResourceRatio>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceRatio {
+    /// Ratio in basis points: 10000 means 100%.
+    pub basis_points: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

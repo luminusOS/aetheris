@@ -24,7 +24,9 @@ pub(super) struct ObjectDetailWidgets<'a> {
     pub(super) yaml_error_label: &'a gtk::Label,
     pub(super) events_list: &'a gtk::ListBox,
     pub(super) conditions_list: &'a gtk::ListBox,
-    pub(super) related_pods_list: &'a gtk::ListBox,
+    pub(super) related_pods_view: &'a gtk::ColumnView,
+    pub(super) related_pods_stack: &'a gtk::Stack,
+    pub(super) related_pods_message: &'a adw::StatusPage,
     pub(super) log_container_dropdown: &'a gtk::DropDown,
     pub(super) log_follow_check: &'a gtk::CheckButton,
     pub(super) log_timestamps_check: &'a gtk::CheckButton,
@@ -165,12 +167,21 @@ pub(super) fn build_object_detail_page(widgets: ObjectDetailWidgets<'_>) -> gtk:
     let pods_scrolled = gtk::ScrolledWindow::builder()
         .vexpand(true)
         .hexpand(true)
+        .hscrollbar_policy(gtk::PolicyType::Automatic)
+        .css_classes(["aetheris-table-frame"])
         .build();
-    let pods_container = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    pods_container.append(&object_header());
-    pods_container.append(widgets.related_pods_list);
-    pods_scrolled.set_child(Some(&pods_container));
-    pods_page.append(&pods_scrolled);
+    // Direct child of the ScrolledWindow so the ColumnView virtualizes
+    // (see the main object table in layout.rs).
+    pods_scrolled.set_child(Some(widgets.related_pods_view));
+    widgets
+        .related_pods_stack
+        .add_named(&pods_scrolled, Some("table"));
+    widgets
+        .related_pods_stack
+        .add_named(widgets.related_pods_message, Some("message"));
+    widgets.related_pods_stack.set_visible_child_name("message");
+    widgets.related_pods_stack.set_vexpand(true);
+    pods_page.append(widgets.related_pods_stack);
     widgets.stack.add_titled(&pods_page, Some("pods"), "Pods");
 
     let logs_page = gtk::Box::new(gtk::Orientation::Vertical, 10);
@@ -327,32 +338,32 @@ pub(super) fn rebuild_detail_conditions(list: &gtk::ListBox, detail: &ObjectDeta
     }
 }
 
-pub(super) fn rebuild_related_pods(list: &gtk::ListBox, detail: &ObjectDetail) {
-    while let Some(child) = list.first_child() {
-        list.remove(&child);
-    }
-
+pub(super) fn rebuild_related_pods(
+    store: &gtk::gio::ListStore,
+    stack: &gtk::Stack,
+    message: &adw::StatusPage,
+    detail: &ObjectDetail,
+) {
     if detail.kind != "Deployment" {
-        list.append(&detail_message_row(
-            "Pods are shown for Deployments",
-            "Open a Deployment to inspect its related Pods.",
-            "dialog-information-symbolic",
-        ));
+        store.remove_all();
+        message.set_title("Pods are shown for Deployments");
+        message.set_description(Some("Open a Deployment to inspect its related Pods."));
+        stack.set_visible_child_name("message");
         return;
     }
 
     if detail.related_pods.is_empty() {
-        list.append(&detail_message_row(
-            "No related Pods",
-            "No Pods matched this Deployment selector.",
-            "dialog-information-symbolic",
-        ));
+        store.remove_all();
+        message.set_title("No related Pods");
+        message.set_description(Some("No Pods matched this Deployment selector."));
+        stack.set_visible_child_name("message");
         return;
     }
 
-    for pod in &detail.related_pods {
-        list.append(&object_row(pod));
-    }
+    let items: Vec<gtk::glib::BoxedAnyObject> =
+        detail.related_pods.iter().map(boxed_object).collect();
+    store.splice(0, store.n_items(), &items);
+    stack.set_visible_child_name("table");
 }
 
 pub(super) fn rebuild_container_metrics(list: &gtk::ListBox, detail: &ObjectDetail) {

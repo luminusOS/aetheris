@@ -39,6 +39,17 @@ Use `cargo check -p aetheris-app` or `cargo check -p aetheris-kube` while iterat
 
 For documentation-only changes, a full Rust test run is usually not necessary. For workflow or Flatpak manifest changes, validate the affected file format and inspect shell scripts carefully.
 
+## AI-Assisted Contributions
+
+Contributions made with AI assistance are welcome, but the contributor remains
+responsible for the change. Do not submit code you do not understand. You must
+be able to explain what the code does, why it is correct, and what tradeoffs or
+risks it introduces.
+
+AI-assisted changes must be tested thoroughly. Maintainers may ask for evidence
+that the functionality works and was tested, such as test output, screenshots,
+screen recordings, logs, or clear reproduction steps.
+
 ## Project Architecture
 
 Aetheris has two Rust crates:

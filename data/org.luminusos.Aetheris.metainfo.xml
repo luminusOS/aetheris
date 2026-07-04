@@ -8,6 +8,19 @@
   <developer id="org.luminusos">
     <name>LuminusOS</name>
   </developer>
+  <keywords>
+    <keyword>Kubernetes</keyword>
+    <keyword>k8s</keyword>
+    <keyword>OpenShift</keyword>
+    <keyword>container</keyword>
+    <keyword>containers</keyword>
+    <keyword>cluster</keyword>
+    <keyword>pods</keyword>
+    <keyword>nodes</keyword>
+    <keyword>kubeconfig</keyword>
+    <keyword>YAML</keyword>
+    <keyword>DevOps</keyword>
+  </keywords>
   <description>
     <p>
       Aetheris connects to Kubernetes and OpenShift clusters through kubeconfig
