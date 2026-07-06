@@ -58,6 +58,7 @@
         "install -Dm644 data/style.css /app/share/aetheris/style.css",
         "install -Dm644 data/org.luminusos.Aetheris.desktop /app/share/applications/org.luminusos.Aetheris.desktop",
         "install -Dm644 data/org.luminusos.Aetheris.metainfo.xml /app/share/metainfo/org.luminusos.Aetheris.metainfo.xml",
+        "install -Dm644 po/pt_BR/LC_MESSAGES/org.luminusos.Aetheris.mo /app/share/locale/pt_BR/LC_MESSAGES/org.luminusos.Aetheris.mo",
         "install -Dm644 data/icons/hicolor/64x64/apps/org.luminusos.Aetheris.png /app/share/icons/hicolor/64x64/apps/org.luminusos.Aetheris.png",
         "install -Dm644 data/icons/hicolor/128x128/apps/org.luminusos.Aetheris.png /app/share/icons/hicolor/128x128/apps/org.luminusos.Aetheris.png",
         "install -Dm644 data/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png /app/share/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png",

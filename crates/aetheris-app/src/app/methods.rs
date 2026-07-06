@@ -63,7 +63,7 @@ impl App {
         self.enter_clusters_page(sender);
         self.present_content_panel();
         self.loading = false;
-        self.status = String::from("Select a cluster.");
+        self.status = tr("Select a cluster.");
         self.sync_status();
     }
 
@@ -179,16 +179,17 @@ impl App {
     pub(super) fn set_cluster_dialog_editing(&mut self, editing: bool) {
         self.editing_cluster = editing;
         if editing {
-            self.cluster_dialog.set_title("Edit Cluster");
-            self.cluster_token_title_label.set_label("Edit cluster");
-            self.cluster_token_back_button.set_visible(false);
-            self.setup_button.set_label("Save");
-        } else {
-            self.cluster_dialog.set_title("Add Cluster");
+            self.cluster_dialog.set_title(&tr("Edit Cluster"));
             self.cluster_token_title_label
-                .set_label("Connect with token");
+                .set_label(&tr("Edit cluster"));
+            self.cluster_token_back_button.set_visible(false);
+            self.setup_button.set_label(&tr("Save"));
+        } else {
+            self.cluster_dialog.set_title(&tr("Add Cluster"));
+            self.cluster_token_title_label
+                .set_label(&tr("Connect with token"));
             self.cluster_token_back_button.set_visible(true);
-            self.setup_button.set_label("Add Cluster");
+            self.setup_button.set_label(&tr("Add Cluster"));
             self.editing_context_name = None;
         }
     }
@@ -215,7 +216,7 @@ impl App {
     pub(super) fn load_cluster(&mut self, sender: ComponentSender<Self>) {
         let Some(context) = self.selected_context.clone() else {
             self.loading = false;
-            self.status = String::from("Select a Kubernetes context.");
+            self.status = tr("Select a Kubernetes context.");
             self.sync_status();
             return;
         };
@@ -232,7 +233,10 @@ impl App {
         self.objects.clear();
         self.selected_namespace = String::from("all");
         self.selected_resource = None;
-        self.status = format!("Discovering resources in {context}...");
+        self.status = tr_format(
+            "Discovering resources in {context}...",
+            &[("{context}", context.clone())],
+        );
         self.sync_dropdowns(Some(sender.clone()));
         self.rebuild_resource_list(Some(sender.clone()));
         self.rebuild_object_list();
@@ -245,13 +249,13 @@ impl App {
     pub(super) fn refresh_objects(&mut self, sender: ComponentSender<Self>) {
         let Some(context) = self.selected_context.clone() else {
             self.loading = false;
-            self.status = String::from("Select a Kubernetes context.");
+            self.status = tr("Select a Kubernetes context.");
             self.sync_status();
             return;
         };
         let Some(resource) = self.selected_resource_kind().cloned() else {
             self.loading = false;
-            self.status = String::from("Select a resource.");
+            self.status = tr("Select a resource.");
             self.sync_status();
             return;
         };
@@ -263,7 +267,7 @@ impl App {
         };
         self.stop_object_watch();
         self.loading = true;
-        self.status = format!("Loading {}...", resource.label());
+        self.status = tr_format("Loading {resource}...", &[("{resource}", resource.label())]);
         self.sync_status();
         sender.oneshot_command(async move { list_objects(context, resource, namespace).await });
     }
@@ -350,7 +354,7 @@ impl App {
         let resource = self
             .selected_resource_kind()
             .map(ResourceKind::label)
-            .unwrap_or_else(|| String::from("objects"));
+            .unwrap_or_else(|| tr("objects"));
         let filtered = self.filtered_objects().len();
 
         self.status = if self.search_query.trim().is_empty() {
@@ -361,7 +365,14 @@ impl App {
                 resource
             )
         } else {
-            format!("{filtered}/{total} objects in {resource}")
+            tr_format(
+                "{filtered}/{total} objects in {resource}",
+                &[
+                    ("{filtered}", filtered.to_string()),
+                    ("{total}", total.to_string()),
+                    ("{resource}", resource.to_string()),
+                ],
+            )
         };
     }
 
@@ -371,10 +382,13 @@ impl App {
         self.rebuild_project_list();
 
         self.rebuild_cluster_list();
-        let context_label = self.selected_context.as_deref().unwrap_or("No cluster");
-        self.context_selector_label.set_label(context_label);
+        let context_label = self
+            .selected_context
+            .clone()
+            .unwrap_or_else(|| tr("No cluster"));
+        self.context_selector_label.set_label(&context_label);
         self.context_selector_label
-            .set_tooltip_text(Some(context_label));
+            .set_tooltip_text(Some(&context_label));
 
         let namespace_choices = self.namespace_choices();
         let custom_namespaces: std::collections::HashSet<String> = self
@@ -541,8 +555,8 @@ impl App {
 
         if resource_groups.is_empty() {
             let row = adw::ActionRow::builder()
-                .title("No resources")
-                .subtitle("Connect to a cluster to load API resources.")
+                .title(tr("No resources"))
+                .subtitle(tr("Connect to a cluster to load API resources."))
                 .build();
             self.resource_list.append(&row);
             return;
@@ -713,7 +727,7 @@ impl App {
         self.sync_port_forward_controls();
 
         self.loading = true;
-        self.status = format!("Loading details for {name}...");
+        self.status = tr_format("Loading details for {name}...", &[("{name}", name.clone())]);
         self.sync_status();
         sender.oneshot_command(async move {
             load_object_detail(detail_token, context, resource, namespace, name).await
@@ -727,7 +741,7 @@ impl App {
             .set_icon_name("view-fullscreen-symbolic");
         self.detail
             .expand_logs_button
-            .set_tooltip_text(Some("Hide summary to see more of this tab"));
+            .set_tooltip_text(Some(&tr("Hide summary to see more of this tab")));
     }
 
     pub(super) fn populate_detail_dialog(&mut self, detail: &ObjectDetail) {
@@ -770,9 +784,12 @@ impl App {
             .set_visible(detail.node_unschedulable.is_some());
         self.detail.explain_yaml_button.set_sensitive(true);
         if let Some(unschedulable) = detail.node_unschedulable {
-            self.detail
-                .cordon_button
-                .set_label(if unschedulable { "Uncordon" } else { "Cordon" });
+            let label = if unschedulable {
+                tr("Uncordon")
+            } else {
+                tr("Cordon")
+            };
+            self.detail.cordon_button.set_label(&label);
         }
         rebuild_detail_events(&self.detail.events_list, detail);
         rebuild_detail_conditions(&self.detail.conditions_list, detail);
@@ -801,28 +818,40 @@ impl App {
             &self.detail.stack,
             "pods",
             show_pods,
-            &format!("Pods ({})", detail.related_pods.len()),
+            &tr_format(
+                "Pods ({count})",
+                &[("{count}", detail.related_pods.len().to_string())],
+            ),
         );
         set_stack_page(
             &self.detail.stack,
             "conditions",
             show_conditions,
-            &format!("Conditions ({})", detail.conditions.len()),
+            &tr_format(
+                "Conditions ({count})",
+                &[("{count}", detail.conditions.len().to_string())],
+            ),
         );
         set_stack_page(
             &self.detail.stack,
             "containers",
             show_containers,
-            &format!("Containers ({})", detail.containers.len()),
+            &tr_format(
+                "Containers ({count})",
+                &[("{count}", detail.containers.len().to_string())],
+            ),
         );
         set_stack_page(
             &self.detail.stack,
             "events",
             true,
-            &format!("Recent Events ({})", detail.events.len()),
+            &tr_format(
+                "Recent Events ({count})",
+                &[("{count}", detail.events.len().to_string())],
+            ),
         );
-        set_stack_page(&self.detail.stack, "logs", show_logs, "Logs");
-        set_stack_page(&self.detail.stack, "yaml", true, "YAML");
+        set_stack_page(&self.detail.stack, "logs", show_logs, &tr("Logs"));
+        set_stack_page(&self.detail.stack, "yaml", true, &tr("YAML"));
 
         let visible_name = self.detail.stack.visible_child_name();
         let visible_child_is_hidden = visible_name

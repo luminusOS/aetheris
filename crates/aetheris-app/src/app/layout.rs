@@ -23,14 +23,14 @@ pub(super) fn build_sidebar(widgets: SidebarWidgets<'_>) -> adw::NavigationPage 
     let container = gtk::Box::new(gtk::Orientation::Vertical, 12);
 
     let namespace_group = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    namespace_group.append(&section_title("Namespace"));
+    namespace_group.append(&section_title(&tr("Namespace")));
     widgets.namespace_menu_button.set_hexpand(true);
     namespace_group.append(widgets.namespace_menu_button);
 
     container.append(&namespace_group);
 
     let resources_group = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    resources_group.append(&section_title("Resources"));
+    resources_group.append(&section_title(&tr("Resources")));
     resources_group.append(widgets.resource_list);
     container.append(&resources_group);
 
@@ -85,7 +85,7 @@ pub(super) fn build_content(widgets: ContentWidgets<'_>) -> adw::NavigationPage 
             "nautilus-search-filters-symbolic",
             "preferences-system-symbolic",
         ))
-        .tooltip_text("Filters")
+        .tooltip_text(tr("Filters"))
         .build();
     filter_button.set_popover(Some(&filter_popover(
         widgets.status_filter_list,
@@ -134,8 +134,10 @@ pub(super) fn build_content(widgets: ContentWidgets<'_>) -> adw::NavigationPage 
     scrolled.set_child(Some(widgets.object_view));
 
     let empty_page = adw::StatusPage::builder()
-        .title("No objects")
-        .description("The selected resource has no objects or could not be loaded.")
+        .title(tr("No objects"))
+        .description(tr(
+            "The selected resource has no objects or could not be loaded.",
+        ))
         .icon_name("edit-find-symbolic")
         .build();
     empty_page.add_css_class("compact");
@@ -173,7 +175,7 @@ pub(super) fn filter_popover(
     content.set_size_request(380, -1);
 
     let title = gtk::Label::builder()
-        .label("Status")
+        .label(tr("Status"))
         .xalign(0.0)
         .css_classes(["caption-heading"])
         .build();
@@ -185,7 +187,7 @@ pub(super) fn filter_popover(
     content.append(&separator);
 
     let columns_title = gtk::Label::builder()
-        .label("Columns")
+        .label(tr("Columns"))
         .xalign(0.0)
         .css_classes(["caption-heading"])
         .build();
@@ -223,21 +225,21 @@ pub(super) fn build_projects_page(
     content.set_margin_top(24);
     content.set_margin_bottom(24);
 
-    let heading = gtk::Label::new(Some("Select a Project"));
+    let heading = gtk::Label::new(Some(&tr("Select a Project")));
     heading.set_xalign(0.0);
     heading.add_css_class("title-1");
     content.append(&heading);
 
-    let subtitle = gtk::Label::new(Some(
+    let subtitle = gtk::Label::new(Some(&tr(
         "Projects keep clusters, namespaces and resources separated by environment, team or company.",
-    ));
+    )));
     subtitle.set_xalign(0.0);
     subtitle.set_wrap(true);
     subtitle.add_css_class("dim-label");
     content.append(&subtitle);
 
     let group = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    group.append(&section_title("Projects"));
+    group.append(&section_title(&tr("Projects")));
     group.append(project_list);
     content.append(&group);
 
@@ -305,21 +307,21 @@ pub(super) fn build_clusters_page(widgets: ClustersPageWidgets<'_>) -> adw::Tool
     content.set_margin_top(24);
     content.set_margin_bottom(24);
 
-    let heading = gtk::Label::new(Some("Clusters"));
+    let heading = gtk::Label::new(Some(&tr("Clusters")));
     heading.set_xalign(0.0);
     heading.add_css_class("title-1");
     content.append(&heading);
 
-    let subtitle = gtk::Label::new(Some(
+    let subtitle = gtk::Label::new(Some(&tr(
         "Pick a cluster to browse, or add a new one to this project.",
-    ));
+    )));
     subtitle.set_xalign(0.0);
     subtitle.set_wrap(true);
     subtitle.add_css_class("dim-label");
     content.append(&subtitle);
 
     let group = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    group.append(&section_title("Clusters"));
+    group.append(&section_title(&tr("Clusters")));
     group.append(cluster_list);
     content.append(&group);
 

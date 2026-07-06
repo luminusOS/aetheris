@@ -56,6 +56,7 @@ jobs:
           update: true
           install: >-
             git
+            gettext
             mingw-w64-clang-x86_64-gtk4
             mingw-w64-clang-x86_64-gtksourceview5
             mingw-w64-clang-x86_64-libadwaita
@@ -109,6 +110,8 @@ jobs:
           cp -r /clang64/share/themes "$bundle/share/" || true
           mkdir -p "$bundle/share/aetheris"
           cp data/style.css "$bundle/share/aetheris/style.css"
+          mkdir -p "$bundle/share/locale/pt_BR/LC_MESSAGES"
+          cp po/pt_BR/LC_MESSAGES/org.luminusos.Aetheris.mo "$bundle/share/locale/pt_BR/LC_MESSAGES/org.luminusos.Aetheris.mo"
           cp -r /clang64/lib/gdk-pixbuf-2.0 "$bundle/lib/" || true
           cp -r /clang64/lib/gio "$bundle/lib/" || true
           cp /clang64/ssl/certs/ca-bundle.crt "$bundle/ssl/certs/" 2>/dev/null || true

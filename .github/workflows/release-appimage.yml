@@ -28,6 +28,7 @@ jobs:
             findutils \
             gcc \
             gcc-c++ \
+            gettext \
             git \
             gtk4-devel \
             gtksourceview5-devel \

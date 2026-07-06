@@ -33,7 +33,7 @@ pub(super) fn selector_popover(list: &gtk::ListBox) -> gtk::Popover {
     list.set_selection_mode(gtk::SelectionMode::None);
 
     let search_entry = gtk::SearchEntry::builder()
-        .placeholder_text("Filter namespaces")
+        .placeholder_text(tr("Filter namespaces"))
         .build();
     content.append(&search_entry);
 
@@ -88,11 +88,7 @@ pub(super) fn resource_count_label(count: usize) -> String {
     format!(
         "{} {}",
         count,
-        if count == 1 {
-            "resource type"
-        } else {
-            "resource types"
-        }
+        trn("resource type", "resource types", count as u32)
     )
 }
 
@@ -116,7 +112,7 @@ pub(super) fn namespace_selector_row(
             let edit_button = gtk::Button::from_icon_name("document-edit-symbolic");
             edit_button.add_css_class("flat");
             edit_button.set_valign(gtk::Align::Center);
-            edit_button.set_tooltip_text(Some("Rename"));
+            edit_button.set_tooltip_text(Some(&tr("Rename")));
             edit_button.connect_clicked({
                 let sender = sender.clone();
                 let namespace = namespace.to_owned();
@@ -128,7 +124,7 @@ pub(super) fn namespace_selector_row(
             delete_button.add_css_class("flat");
             delete_button.add_css_class("destructive-action");
             delete_button.set_valign(gtk::Align::Center);
-            delete_button.set_tooltip_text(Some("Remove"));
+            delete_button.set_tooltip_text(Some(&tr("Remove")));
             delete_button.connect_clicked({
                 let namespace = namespace.to_owned();
                 move |_| sender.input(AppMsg::RemoveCustomNamespace(namespace.clone()))
@@ -146,7 +142,7 @@ pub(super) fn namespace_selector_row(
 }
 
 pub(super) fn add_namespace_selector_row() -> gtk::ListBoxRow {
-    selector_action_row("Add namespace", "list-add-symbolic")
+    selector_action_row(&tr("Add namespace"), "list-add-symbolic")
 }
 
 fn selector_action_row(title: &str, icon_name: &str) -> gtk::ListBoxRow {
@@ -237,13 +233,13 @@ pub(super) fn rebuild_column_filter_list(
 }
 
 fn column_filter_chip(column: ObjectColumn, visible: bool) -> gtk::FlowBoxChild {
-    filter_chip("view-list-symbolic", column.label(), None, visible)
+    filter_chip("view-list-symbolic", &column.label(), None, visible)
 }
 
 fn status_filter_chip(filter: StatusFilter, selected: bool) -> gtk::FlowBoxChild {
     filter_chip(
         "",
-        filter.label(),
+        &filter.label(),
         Some(status_filter_tone(filter)),
         selected,
     )
@@ -454,13 +450,13 @@ pub(super) fn cluster_row(
 
 fn cluster_state_chip(summary: Option<&ClusterSummaryState>) -> gtk::Label {
     let (text, tone, tooltip) = match summary {
-        None | Some(ClusterSummaryState::Loading) => ("Checking…", StatusTone::Neutral, None),
-        Some(ClusterSummaryState::Loaded(_)) => ("Active", StatusTone::Good, None),
+        None | Some(ClusterSummaryState::Loading) => (tr("Checking..."), StatusTone::Neutral, None),
+        Some(ClusterSummaryState::Loaded(_)) => (tr("Active"), StatusTone::Good, None),
         Some(ClusterSummaryState::Error(error)) => {
-            ("Unreachable", StatusTone::Bad, Some(error.as_str()))
+            (tr("Unreachable"), StatusTone::Bad, Some(error.as_str()))
         }
     };
-    let chip = status_chip(text, tone);
+    let chip = status_chip(&text, tone);
     if let Some(tooltip) = tooltip {
         chip.set_tooltip_text(Some(tooltip));
     }
@@ -469,15 +465,15 @@ fn cluster_state_chip(summary: Option<&ClusterSummaryState>) -> gtk::Label {
 
 fn cluster_subtitle_text(summary: Option<&ClusterSummaryState>) -> String {
     match summary {
-        None | Some(ClusterSummaryState::Loading) => String::from("Checking cluster…"),
-        Some(ClusterSummaryState::Error(_)) => String::from("Could not reach this cluster."),
+        None | Some(ClusterSummaryState::Loading) => tr("Checking cluster..."),
+        Some(ClusterSummaryState::Error(_)) => tr("Could not reach this cluster."),
         Some(ClusterSummaryState::Loaded(data)) => {
             let parts: Vec<&str> = [data.provider.as_deref(), data.version.as_deref()]
                 .into_iter()
                 .flatten()
                 .collect();
             if parts.is_empty() {
-                String::from("Kubernetes cluster")
+                tr("Kubernetes cluster")
             } else {
                 parts.join(" · ")
             }
@@ -616,13 +612,14 @@ pub(super) fn related_pods_column_view(
     view.add_css_class("aetheris-table");
     view.set_vexpand(true);
 
-    let name_column = gtk::ColumnViewColumn::new(Some("Name"), Some(object_name_column_factory()));
+    let name_column =
+        gtk::ColumnViewColumn::new(Some(&tr("Name")), Some(object_name_column_factory()));
     name_column.set_resizable(true);
     name_column.set_fixed_width(OBJECT_NAME_WIDTH);
     view.append_column(&name_column);
     for column in RELATED_POD_COLUMNS {
         let view_column = gtk::ColumnViewColumn::new(
-            Some(column.label()),
+            Some(&column.label()),
             Some(object_data_column_factory(column)),
         );
         view_column.set_resizable(true);
@@ -897,11 +894,12 @@ pub(super) fn has_meaningful_status(status: &str) -> bool {
 }
 
 pub(super) fn status_prefix_chip(status: &str) -> gtk::Label {
+    let unknown = tr("Unknown");
     let primary = status
         .split_whitespace()
         .next()
         .filter(|part| !part.is_empty())
-        .unwrap_or("Unknown");
+        .unwrap_or(&unknown);
     let chip = status_chip(primary, status_tone(primary));
     chip.set_tooltip_text(Some(status));
     // Show the full state name (e.g. "CrashLoopBackOff"); the virtualized
@@ -1031,18 +1029,18 @@ pub(super) fn build_log_search_bar(
     let entry = gtk::SearchEntry::builder().hexpand(true).build();
     let prev_button = gtk::Button::builder()
         .icon_name("go-up-symbolic")
-        .tooltip_text("Find previous match (Shift+Enter)")
+        .tooltip_text(tr("Find previous match (Shift+Enter)"))
         .build();
     let next_button = gtk::Button::builder()
         .icon_name("go-down-symbolic")
-        .tooltip_text("Find next match (Enter)")
+        .tooltip_text(tr("Find next match (Enter)"))
         .build();
     let status_label = gtk::Label::new(None);
     status_label.add_css_class("dim-label");
     status_label.add_css_class("caption");
     let close_button = gtk::Button::builder()
         .icon_name("window-close-symbolic")
-        .tooltip_text("Close search (Escape)")
+        .tooltip_text(tr("Close search (Escape)"))
         .build();
 
     let bar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -1070,7 +1068,7 @@ pub(super) fn build_log_search_bar(
                 view.scroll_to_iter(&mut start.clone(), 0.1, false, 0.0, 0.0);
                 status_label.set_label("");
             }
-            None => status_label.set_label("No matches"),
+            None => status_label.set_label(&tr("No matches")),
         }
     };
 

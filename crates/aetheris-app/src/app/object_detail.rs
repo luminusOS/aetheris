@@ -73,10 +73,10 @@ pub(super) fn build_object_detail_page(widgets: ObjectDetailWidgets<'_>) -> gtk:
 
     widgets
         .port_forward_group
-        .append(&section_title("Port Forward"));
+        .append(&section_title(&tr("Port Forward")));
     let ports_controls = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    ports_controls.append(&field_box("Local", widgets.port_local_spin));
-    ports_controls.append(&field_box("Remote", widgets.port_remote_spin));
+    ports_controls.append(&field_box(&tr("Local"), widgets.port_local_spin));
+    ports_controls.append(&field_box(&tr("Remote"), widgets.port_remote_spin));
     // field_box stacks a caption above each spin button, making this row
     // taller than the buttons' own natural height; without an explicit
     // valign, Box stretches them to fill that height instead of sitting at
@@ -124,7 +124,9 @@ pub(super) fn build_object_detail_page(widgets: ObjectDetailWidgets<'_>) -> gtk:
     yaml_page.append(&yaml_controls);
     yaml_page.append(&yaml_search_bar);
     yaml_page.append(&yaml_scrolled);
-    widgets.stack.add_titled(&yaml_page, Some("yaml"), "YAML");
+    widgets
+        .stack
+        .add_titled(&yaml_page, Some("yaml"), &tr("YAML"));
 
     let events_page = gtk::Box::new(gtk::Orientation::Vertical, 0);
     events_page.set_margin_all(12);
@@ -136,7 +138,7 @@ pub(super) fn build_object_detail_page(widgets: ObjectDetailWidgets<'_>) -> gtk:
     events_page.append(&events_scrolled);
     widgets
         .stack
-        .add_titled(&events_page, Some("events"), "Recent Events");
+        .add_titled(&events_page, Some("events"), &tr("Recent Events"));
 
     let conditions_page = gtk::Box::new(gtk::Orientation::Vertical, 0);
     conditions_page.set_margin_all(12);
@@ -148,7 +150,7 @@ pub(super) fn build_object_detail_page(widgets: ObjectDetailWidgets<'_>) -> gtk:
     conditions_page.append(&conditions_scrolled);
     widgets
         .stack
-        .add_titled(&conditions_page, Some("conditions"), "Conditions");
+        .add_titled(&conditions_page, Some("conditions"), &tr("Conditions"));
 
     let containers_page = gtk::Box::new(gtk::Orientation::Vertical, 0);
     containers_page.set_margin_all(12);
@@ -160,7 +162,7 @@ pub(super) fn build_object_detail_page(widgets: ObjectDetailWidgets<'_>) -> gtk:
     containers_page.append(&containers_scrolled);
     widgets
         .stack
-        .add_titled(&containers_page, Some("containers"), "Containers");
+        .add_titled(&containers_page, Some("containers"), &tr("Containers"));
 
     let pods_page = gtk::Box::new(gtk::Orientation::Vertical, 8);
     pods_page.set_margin_all(12);
@@ -182,7 +184,9 @@ pub(super) fn build_object_detail_page(widgets: ObjectDetailWidgets<'_>) -> gtk:
     widgets.related_pods_stack.set_visible_child_name("message");
     widgets.related_pods_stack.set_vexpand(true);
     pods_page.append(widgets.related_pods_stack);
-    widgets.stack.add_titled(&pods_page, Some("pods"), "Pods");
+    widgets
+        .stack
+        .add_titled(&pods_page, Some("pods"), &tr("Pods"));
 
     let logs_page = gtk::Box::new(gtk::Orientation::Vertical, 10);
     logs_page.set_margin_all(12);
@@ -213,7 +217,9 @@ pub(super) fn build_object_detail_page(widgets: ObjectDetailWidgets<'_>) -> gtk:
         .build();
     logs_scrolled.set_child(Some(widgets.log_view));
     logs_page.append(&logs_scrolled);
-    widgets.stack.add_titled(&logs_page, Some("logs"), "Logs");
+    widgets
+        .stack
+        .add_titled(&logs_page, Some("logs"), &tr("Logs"));
 
     widgets.stack.set_visible_child_name("yaml");
     widgets.stack.set_vexpand(true);
@@ -250,20 +256,20 @@ pub(super) fn detail_overview_grid(widgets: &ObjectDetailWidgets<'_>) -> gtk::Gr
     // Paired so related facts sit side by side (Name/Status up top, then
     // Namespace/Age, etc.) instead of one long single-column list.
     let fields = [
-        ("Name", widgets.name),
-        ("Status", widgets.status),
-        ("Namespace", widgets.namespace),
-        ("Age", widgets.age),
-        ("Kind", widgets.kind),
-        ("CPU", widgets.cpu),
-        ("API Version", widgets.api_version),
-        ("Memory", widgets.memory),
+        (tr("Name"), widgets.name),
+        (tr("Status"), widgets.status),
+        (tr("Namespace"), widgets.namespace),
+        (tr("Age"), widgets.age),
+        (tr("Kind"), widgets.kind),
+        (tr("CPU"), widgets.cpu),
+        (tr("API Version"), widgets.api_version),
+        (tr("Memory"), widgets.memory),
     ];
 
     for (index, (label, value)) in fields.into_iter().enumerate() {
         let column = (index % 2) as i32;
         let row = (index / 2) as i32;
-        grid.attach(&field_box(label, value), column, row, 1, 1);
+        grid.attach(&field_box(&label, value), column, row, 1, 1);
     }
 
     grid
@@ -298,7 +304,7 @@ pub(super) fn rebuild_detail_events(list: &gtk::ListBox, detail: &ObjectDetail) 
 
     if let Some(error) = &detail.events_error {
         list.append(&detail_message_row(
-            "Unable to load events",
+            &tr("Unable to load events"),
             error,
             "dialog-warning-symbolic",
         ));
@@ -307,8 +313,8 @@ pub(super) fn rebuild_detail_events(list: &gtk::ListBox, detail: &ObjectDetail) 
 
     if detail.events.is_empty() {
         list.append(&detail_message_row(
-            "No events",
-            "No events were found for this object.",
+            &tr("No events"),
+            &tr("No events were found for this object."),
             "dialog-information-symbolic",
         ));
         return;
@@ -326,8 +332,8 @@ pub(super) fn rebuild_detail_conditions(list: &gtk::ListBox, detail: &ObjectDeta
 
     if detail.conditions.is_empty() {
         list.append(&detail_message_row(
-            "No conditions",
-            "This object does not expose status conditions.",
+            &tr("No conditions"),
+            &tr("This object does not expose status conditions."),
             "dialog-information-symbolic",
         ));
         return;
@@ -346,16 +352,16 @@ pub(super) fn rebuild_related_pods(
 ) {
     if detail.kind != "Deployment" {
         store.remove_all();
-        message.set_title("Pods are shown for Deployments");
-        message.set_description(Some("Open a Deployment to inspect its related Pods."));
+        message.set_title(&tr("Pods are shown for Deployments"));
+        message.set_description(Some(&tr("Open a Deployment to inspect its related Pods.")));
         stack.set_visible_child_name("message");
         return;
     }
 
     if detail.related_pods.is_empty() {
         store.remove_all();
-        message.set_title("No related Pods");
-        message.set_description(Some("No Pods matched this Deployment selector."));
+        message.set_title(&tr("No related Pods"));
+        message.set_description(Some(&tr("No Pods matched this Deployment selector.")));
         stack.set_visible_child_name("message");
         return;
     }
@@ -379,8 +385,8 @@ pub(super) fn rebuild_container_metrics(list: &gtk::ListBox, detail: &ObjectDeta
     list.set_visible(true);
     if detail.containers.is_empty() {
         list.append(&detail_message_row(
-            "No containers",
-            "This Pod does not expose containers in its spec.",
+            &tr("No containers"),
+            &tr("This Pod does not expose containers in its spec."),
             "dialog-information-symbolic",
         ));
         return;
@@ -399,26 +405,26 @@ pub(super) fn container_metric_row(name: &str, usage: Option<&ContainerUsage>) -
     let row = gtk::ListBoxRow::new();
     row.set_selectable(false);
     let action = adw::ActionRow::builder().title(name).build();
-    action.add_prefix(&status_prefix_chip("Running"));
+    action.add_prefix(&status_prefix_chip(&tr("Running")));
     if let Some(usage) = usage {
         let metrics = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         metrics.set_valign(gtk::Align::Center);
         metrics.set_margin_start(12);
         metrics.append(&metric_badge(
             "applications-engineering-symbolic",
-            "CPU usage",
+            &tr("CPU usage"),
             &format_cpu_quantity(&usage.cpu),
             &usage.cpu,
         ));
         metrics.append(&metric_badge(
             "drive-harddisk-symbolic",
-            "Memory usage",
+            &tr("Memory usage"),
             &format_memory_quantity(&usage.memory),
             &usage.memory,
         ));
         action.add_suffix(&metrics);
     } else {
-        action.set_subtitle("Metrics unavailable");
+        action.set_subtitle(&tr("Metrics unavailable"));
     }
     row.set_child(Some(&action));
     row

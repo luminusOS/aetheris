@@ -37,18 +37,18 @@ pub(super) fn build_yaml_search_bar(
     let entry = gtk::SearchEntry::builder().hexpand(true).build();
     let prev_button = gtk::Button::builder()
         .icon_name("go-up-symbolic")
-        .tooltip_text("Find previous match (Shift+Enter)")
+        .tooltip_text(tr("Find previous match (Shift+Enter)"))
         .build();
     let next_button = gtk::Button::builder()
         .icon_name("go-down-symbolic")
-        .tooltip_text("Find next match (Enter)")
+        .tooltip_text(tr("Find next match (Enter)"))
         .build();
     let count_label = gtk::Label::new(None);
     count_label.add_css_class("dim-label");
     count_label.add_css_class("caption");
     let close_button = gtk::Button::builder()
         .icon_name("window-close-symbolic")
-        .tooltip_text("Close search (Escape)")
+        .tooltip_text(tr("Close search (Escape)"))
         .build();
 
     let bar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -72,9 +72,11 @@ pub(super) fn build_yaml_search_bar(
             let count = search_context.occurrences_count();
             count_label.set_label(&match (entry.text().is_empty(), count) {
                 (true, _) => String::new(),
-                (false, 0) => String::from("No matches"),
+                (false, 0) => tr("No matches"),
                 (false, count) if count < 0 => String::new(),
-                (false, count) => format!("{count} matches"),
+                (false, count) => {
+                    format!("{} {}", count, trn("match", "matches", count as u32))
+                }
             });
         }
     });
@@ -210,7 +212,13 @@ fn update_yaml_error_state(buffer: &sourceview5::Buffer, error_label: &gtk::Labe
             text_buffer.apply_tag(&tag, &start, &end);
         }
     }
-    error_label.set_label(&format!("Line {line}: {message}"));
+    error_label.set_label(&tr_format(
+        "Line {line}: {message}",
+        &[
+            ("{line}", line.to_string()),
+            ("{message}", message.to_string()),
+        ],
+    ));
 }
 
 pub(super) fn yaml_parse_error(text: &str) -> Option<(usize, String)> {
@@ -229,13 +237,13 @@ pub(super) fn build_yaml_explanation_content(
     let parsed = match serde_yaml::from_str::<serde_yaml::Value>(yaml) {
         Ok(parsed) => parsed,
         Err(error) => {
-            return yaml_error_page("Unable to parse this YAML", &format!("{error}")).upcast();
+            return yaml_error_page(&tr("Unable to parse this YAML"), &format!("{error}")).upcast();
         }
     };
     let Some(mapping) = parsed.as_mapping() else {
         return yaml_error_page(
-            "This is not a Kubernetes object",
-            "The document is valid YAML, but Kubernetes manifests must be maps with fields such as apiVersion, kind and metadata.",
+            &tr("This is not a Kubernetes object"),
+            &tr("The document is valid YAML, but Kubernetes manifests must be maps with fields such as apiVersion, kind and metadata."),
         )
         .upcast();
     };
@@ -271,59 +279,63 @@ pub(super) fn build_yaml_explanation_content(
 
     content.append(&yaml_explanation_header(kind, name, namespace));
 
-    let summary = adw::PreferencesGroup::builder().title("Summary").build();
+    let summary = adw::PreferencesGroup::builder()
+        .title(tr("Summary"))
+        .build();
     summary.add(&yaml_row(
-        "Resource",
+        &tr("Resource"),
         kind,
-        kind_explanation(kind),
+        &kind_explanation(kind),
         "kubernetes resource type",
         "package-x-generic-symbolic",
     ));
     summary.add(&yaml_row(
-        "API Version",
+        &tr("API Version"),
         api_version,
-        "Identifies the Kubernetes API group and version that owns this object.",
+        &tr("Identifies the Kubernetes API group and version that owns this object."),
         "apiVersion",
         "network-server-symbolic",
     ));
     summary.add(&yaml_row(
-        "Name",
+        &tr("Name"),
         name,
-        "Unique object name inside its scope.",
+        &tr("Unique object name inside its scope."),
         "metadata.name",
         "document-properties-symbolic",
     ));
     summary.add(&yaml_row(
-        "Namespace",
+        &tr("Namespace"),
         namespace,
-        namespace_explanation(namespace),
+        &namespace_explanation(namespace),
         "metadata.namespace",
         "folder-symbolic",
     ));
     content.append(&summary);
 
     let lifecycle = adw::PreferencesGroup::builder()
-        .title("How Kubernetes Uses It")
+        .title(tr("How Kubernetes Uses It"))
         .build();
+    let desired_state = if yaml_has_key(mapping, "spec") {
+        tr("Declared")
+    } else {
+        tr("Not declared")
+    };
     lifecycle.add(&yaml_row(
-        "Desired State",
-        if yaml_has_key(mapping, "spec") {
-            "Declared"
-        } else {
-            "Not declared"
-        },
-        desired_state_explanation(kind, mapping),
+        &tr("Desired State"),
+        &desired_state,
+        &desired_state_explanation(kind, mapping),
         "spec",
         "document-edit-symbolic",
     ));
+    let live_state = if yaml_has_key(mapping, "status") {
+        tr("Present")
+    } else {
+        tr("Managed by cluster")
+    };
     lifecycle.add(&yaml_row(
-        "Live State",
-        if yaml_has_key(mapping, "status") {
-            "Present"
-        } else {
-            "Managed by cluster"
-        },
-        "Status is written by Kubernetes controllers and usually should not be edited manually.",
+        &tr("Live State"),
+        &live_state,
+        &tr("Status is written by Kubernetes controllers and usually should not be edited manually."),
         "status",
         "view-refresh-symbolic",
     ));
@@ -331,17 +343,21 @@ pub(super) fn build_yaml_explanation_content(
 
     if let Some(metadata) = metadata {
         let metadata_group = adw::PreferencesGroup::builder()
-            .title("Metadata")
-            .description(
+            .title(tr("Metadata"))
+            .description(tr(
                 "Labels and annotations are commonly used for selection, automation and ownership.",
-            )
+            ))
             .build();
         let mut has_metadata_rows = false;
         if let Some(labels) = yaml_mapping_field(metadata, "labels") {
             metadata_group.add(&yaml_row(
-                "Labels",
-                &format!("{} labels", labels.len()),
-                "Small key/value pairs used by selectors and grouping.",
+                &tr("Labels"),
+                &format!(
+                    "{} {}",
+                    labels.len(),
+                    trn("label", "labels", labels.len() as u32)
+                ),
+                &tr("Small key/value pairs used by selectors and grouping."),
                 "metadata.labels",
                 "emblem-system-symbolic",
             ));
@@ -349,9 +365,13 @@ pub(super) fn build_yaml_explanation_content(
         }
         if let Some(annotations) = yaml_mapping_field(metadata, "annotations") {
             metadata_group.add(&yaml_row(
-                "Annotations",
-                &format!("{} annotations", annotations.len()),
-                "Free-form metadata used by tools, controllers and integrations.",
+                &tr("Annotations"),
+                &format!(
+                    "{} {}",
+                    annotations.len(),
+                    trn("annotation", "annotations", annotations.len() as u32)
+                ),
+                &tr("Free-form metadata used by tools, controllers and integrations."),
                 "metadata.annotations",
                 "document-properties-symbolic",
             ));
@@ -364,7 +384,7 @@ pub(super) fn build_yaml_explanation_content(
 
     if let Some(spec) = yaml_mapping_field(mapping, "spec") {
         let spec_group = adw::PreferencesGroup::builder()
-            .title("Spec")
+            .title(tr("Spec"))
             .description(spec_explanation(kind))
             .build();
         for (title, value, description, path, icon) in spec_rows(kind, spec) {
@@ -374,15 +394,21 @@ pub(super) fn build_yaml_explanation_content(
     }
 
     let data_group = adw::PreferencesGroup::builder()
-        .title("Data")
-        .description("Payload fields used by configuration-oriented resources.")
+        .title(tr("Data"))
+        .description(tr(
+            "Payload fields used by configuration-oriented resources.",
+        ))
         .build();
     let mut has_data = false;
     if let Some(data) = yaml_mapping_field(mapping, "data") {
         data_group.add(&yaml_row(
             "data",
-            &format!("{} entries", data.len()),
-            "Key/value payload. In Secrets these values are base64 encoded.",
+            &format!(
+                "{} {}",
+                data.len(),
+                trn("entry", "entries", data.len() as u32)
+            ),
+            &tr("Key/value payload. In Secrets these values are base64 encoded."),
             "data",
             "document-open-symbolic",
         ));
@@ -391,8 +417,12 @@ pub(super) fn build_yaml_explanation_content(
     if let Some(string_data) = yaml_mapping_field(mapping, "stringData") {
         data_group.add(&yaml_row(
             "stringData",
-            &format!("{} entries", string_data.len()),
-            "Plain string Secret input converted by Kubernetes into data.",
+            &format!(
+                "{} {}",
+                string_data.len(),
+                trn("entry", "entries", string_data.len() as u32)
+            ),
+            &tr("Plain string Secret input converted by Kubernetes into data."),
             "stringData",
             "document-edit-symbolic",
         ));
@@ -413,14 +443,16 @@ pub(super) fn build_yaml_explanation_content(
         .collect::<Vec<_>>();
     if !other_fields.is_empty() {
         let other_group = adw::PreferencesGroup::builder()
-            .title("Other Fields")
-            .description("These fields are interpreted according to the resource schema.")
+            .title(tr("Other Fields"))
+            .description(tr(
+                "These fields are interpreted according to the resource schema.",
+            ))
             .build();
         for field in other_fields {
             other_group.add(&yaml_row(
                 field,
-                "Present",
-                "Additional top-level field in this manifest.",
+                &tr("Present"),
+                &tr("Additional top-level field in this manifest."),
                 field,
                 "dialog-information-symbolic",
             ));
@@ -454,16 +486,28 @@ pub(super) fn yaml_explanation_header(kind: &str, name: &str, namespace: &str) -
 
     let text = gtk::Box::new(gtk::Orientation::Vertical, 4);
     let title = gtk::Label::builder()
-        .label(format!("{kind} Manifest"))
+        .label(tr_format(
+            "{kind} Manifest",
+            &[("{kind}", kind.to_string())],
+        ))
         .xalign(0.0)
         .ellipsize(gtk::pango::EllipsizeMode::End)
         .css_classes(["title-2"])
         .build();
     let subtitle = gtk::Label::builder()
         .label(if namespace == "-" {
-            format!("{} at cluster scope", display_yaml_value(name))
+            tr_format(
+                "{name} at cluster scope",
+                &[("{name}", display_yaml_value(name).to_string())],
+            )
         } else {
-            format!("{} in namespace {namespace}", display_yaml_value(name))
+            tr_format(
+                "{name} in namespace {namespace}",
+                &[
+                    ("{name}", display_yaml_value(name).to_string()),
+                    ("{namespace}", namespace.to_string()),
+                ],
+            )
         })
         .xalign(0.0)
         .wrap(true)
@@ -521,20 +565,22 @@ pub(super) fn display_yaml_value(value: &str) -> &str {
     }
 }
 
-pub(super) fn namespace_explanation(namespace: &str) -> &'static str {
+pub(super) fn namespace_explanation(namespace: &str) -> String {
     if namespace == "-" {
-        "This resource is cluster-scoped and does not belong to a namespace."
+        tr("This resource is cluster-scoped and does not belong to a namespace.")
     } else {
-        "Namespace that scopes this resource and separates it from other environments."
+        tr("Namespace that scopes this resource and separates it from other environments.")
     }
 }
 
-pub(super) fn desired_state_explanation(kind: &str, mapping: &serde_yaml::Mapping) -> &'static str {
+pub(super) fn desired_state_explanation(kind: &str, mapping: &serde_yaml::Mapping) -> String {
     if !yaml_has_key(mapping, "spec") {
         return match kind {
-            "ConfigMap" => "ConfigMaps usually express desired configuration through data instead of spec.",
-            "Secret" => "Secrets usually express desired sensitive data through data or stringData instead of spec.",
-            _ => "This manifest does not include a spec section.",
+            "ConfigMap" => {
+                tr("ConfigMaps usually express desired configuration through data instead of spec.")
+            }
+            "Secret" => tr("Secrets usually express desired sensitive data through data or stringData instead of spec."),
+            _ => tr("This manifest does not include a spec section."),
         };
     }
 
@@ -552,25 +598,25 @@ pub(super) fn spec_rows(
                 &mut rows,
                 spec,
                 "replicas",
-                "Replicas",
-                "Number of Pod copies the Deployment should keep running.",
+                &tr("Replicas"),
+                &tr("Number of Pod copies the Deployment should keep running."),
                 "spec.replicas",
                 "view-grid-symbolic",
             );
             if yaml_mapping_field(spec, "selector").is_some() {
                 rows.push((
-                    String::from("Selector"),
-                    String::from("Present"),
-                    String::from("Matches the Pods managed by this Deployment."),
+                    tr("Selector"),
+                    tr("Present"),
+                    tr("Matches the Pods managed by this Deployment."),
                     String::from("spec.selector"),
                     "edit-find-symbolic",
                 ));
             }
             if yaml_mapping_field(spec, "template").is_some() {
                 rows.push((
-                    String::from("Pod Template"),
-                    String::from("Present"),
-                    String::from("Template used to create new Pods."),
+                    tr("Pod Template"),
+                    tr("Present"),
+                    tr("Template used to create new Pods."),
                     String::from("spec.template"),
                     "document-new-symbolic",
                 ));
@@ -579,9 +625,13 @@ pub(super) fn spec_rows(
         "Pod" => {
             if let Some(containers) = yaml_sequence_field(spec, "containers") {
                 rows.push((
-                    String::from("Containers"),
-                    format!("{} containers", containers.len()),
-                    String::from("Application containers started together in this Pod."),
+                    tr("Containers"),
+                    format!(
+                        "{} {}",
+                        containers.len(),
+                        trn("container", "containers", containers.len() as u32)
+                    ),
+                    tr("Application containers started together in this Pod."),
                     String::from("spec.containers"),
                     "utilities-terminal-symbolic",
                 ));
@@ -590,8 +640,8 @@ pub(super) fn spec_rows(
                 &mut rows,
                 spec,
                 "restartPolicy",
-                "Restart Policy",
-                "Controls how Kubernetes restarts containers after exit.",
+                &tr("Restart Policy"),
+                &tr("Controls how Kubernetes restarts containers after exit."),
                 "spec.restartPolicy",
                 "view-refresh-symbolic",
             );
@@ -599,8 +649,8 @@ pub(super) fn spec_rows(
                 &mut rows,
                 spec,
                 "nodeName",
-                "Node",
-                "Node currently targeted by this Pod.",
+                &tr("Node"),
+                &tr("Node currently targeted by this Pod."),
                 "spec.nodeName",
                 "computer-symbolic",
             );
@@ -610,25 +660,29 @@ pub(super) fn spec_rows(
                 &mut rows,
                 spec,
                 "type",
-                "Type",
-                "Controls how the Service is exposed.",
+                &tr("Type"),
+                &tr("Controls how the Service is exposed."),
                 "spec.type",
                 "network-wired-symbolic",
             );
             if yaml_mapping_field(spec, "selector").is_some() {
                 rows.push((
-                    String::from("Selector"),
-                    String::from("Present"),
-                    String::from("Selects Pods that receive traffic from this Service."),
+                    tr("Selector"),
+                    tr("Present"),
+                    tr("Selects Pods that receive traffic from this Service."),
                     String::from("spec.selector"),
                     "edit-find-symbolic",
                 ));
             }
             if let Some(ports) = yaml_sequence_field(spec, "ports") {
                 rows.push((
-                    String::from("Ports"),
-                    format!("{} ports", ports.len()),
-                    String::from("Network ports exposed by this Service."),
+                    tr("Ports"),
+                    format!(
+                        "{} {}",
+                        ports.len(),
+                        trn("port", "ports", ports.len() as u32)
+                    ),
+                    tr("Network ports exposed by this Service."),
                     String::from("spec.ports"),
                     "network-transmit-receive-symbolic",
                 ));
@@ -637,18 +691,26 @@ pub(super) fn spec_rows(
         "Ingress" => {
             if let Some(rules) = yaml_sequence_field(spec, "rules") {
                 rows.push((
-                    String::from("Rules"),
-                    format!("{} rules", rules.len()),
-                    String::from("HTTP routing rules handled by this Ingress."),
+                    tr("Rules"),
+                    format!(
+                        "{} {}",
+                        rules.len(),
+                        trn("rule", "rules", rules.len() as u32)
+                    ),
+                    tr("HTTP routing rules handled by this Ingress."),
                     String::from("spec.rules"),
                     "network-server-symbolic",
                 ));
             }
             if let Some(tls) = yaml_sequence_field(spec, "tls") {
                 rows.push((
-                    String::from("TLS"),
-                    format!("{} entries", tls.len()),
-                    String::from("TLS certificate routing configuration."),
+                    tr("TLS"),
+                    format!(
+                        "{} {}",
+                        tls.len(),
+                        trn("entry", "entries", tls.len() as u32)
+                    ),
+                    tr("TLS certificate routing configuration."),
                     String::from("spec.tls"),
                     "changes-allow-symbolic",
                 ));
@@ -657,9 +719,9 @@ pub(super) fn spec_rows(
         "Job" | "CronJob" => {
             if yaml_mapping_field(spec, "jobTemplate").is_some() {
                 rows.push((
-                    String::from("Job Template"),
-                    String::from("Present"),
-                    String::from("Template used to create scheduled Jobs."),
+                    tr("Job Template"),
+                    tr("Present"),
+                    tr("Template used to create scheduled Jobs."),
                     String::from("spec.jobTemplate"),
                     "document-new-symbolic",
                 ));
@@ -668,8 +730,8 @@ pub(super) fn spec_rows(
                 &mut rows,
                 spec,
                 "schedule",
-                "Schedule",
-                "Cron schedule used to create Jobs.",
+                &tr("Schedule"),
+                &tr("Cron schedule used to create Jobs."),
                 "spec.schedule",
                 "appointment-new-symbolic",
             );
@@ -687,7 +749,7 @@ pub(super) fn spec_rows(
         rows.push((
             key.to_owned(),
             yaml_value_summary(spec.get(serde_yaml::Value::String(key.to_owned()))),
-            String::from("Field declared in the desired state for this resource."),
+            tr("Field declared in the desired state for this resource."),
             format!("spec.{key}"),
             "dialog-information-symbolic",
         ));
@@ -695,9 +757,9 @@ pub(super) fn spec_rows(
 
     if rows.is_empty() {
         rows.push((
-            String::from("Spec"),
-            String::from("Empty"),
-            String::from("No desired-state fields are declared in this spec."),
+            tr("Spec"),
+            tr("Empty"),
+            tr("No desired-state fields are declared in this spec."),
             String::from("spec"),
             "dialog-information-symbolic",
         ));
@@ -728,13 +790,25 @@ pub(super) fn push_yaml_field(
 
 pub(super) fn yaml_value_summary(value: Option<&serde_yaml::Value>) -> String {
     match value {
-        Some(serde_yaml::Value::Null) | None => String::from("Not set"),
+        Some(serde_yaml::Value::Null) | None => tr("Not set"),
         Some(serde_yaml::Value::Bool(value)) => value.to_string(),
         Some(serde_yaml::Value::Number(value)) => value.to_string(),
         Some(serde_yaml::Value::String(value)) => value.clone(),
-        Some(serde_yaml::Value::Sequence(values)) => format!("{} items", values.len()),
-        Some(serde_yaml::Value::Mapping(values)) => format!("{} fields", values.len()),
-        Some(serde_yaml::Value::Tagged(_)) => String::from("Tagged value"),
+        Some(serde_yaml::Value::Sequence(values)) => {
+            format!(
+                "{} {}",
+                values.len(),
+                trn("item", "items", values.len() as u32)
+            )
+        }
+        Some(serde_yaml::Value::Mapping(values)) => {
+            format!(
+                "{} {}",
+                values.len(),
+                trn("field", "fields", values.len() as u32)
+            )
+        }
+        Some(serde_yaml::Value::Tagged(_)) => tr("Tagged value"),
     }
 }
 
@@ -771,32 +845,32 @@ pub(super) fn yaml_string_field<'a>(
         .and_then(serde_yaml::Value::as_str)
 }
 
-pub(super) fn kind_explanation(kind: &str) -> &'static str {
+pub(super) fn kind_explanation(kind: &str) -> String {
     match kind {
-        "Pod" => "Runs one or more containers together on a node.",
-        "Deployment" => "Manages ReplicaSets and keeps the desired number of Pods running.",
-        "Service" => "Gives a stable virtual address and discovery name to a set of Pods.",
-        "Ingress" => "Routes external HTTP or HTTPS traffic to Services.",
-        "ConfigMap" => "Stores non-secret configuration consumed by Pods.",
-        "Secret" => "Stores sensitive configuration. Values under data are base64 encoded.",
-        "Job" => "Runs Pods until a task completes successfully.",
-        "CronJob" => "Creates Jobs on a schedule.",
-        "Namespace" => "Partitions namespaced resources inside a cluster.",
-        "Node" => "Represents a worker machine registered in the cluster.",
-        _ => "Declares the Kubernetes resource type for this manifest.",
+        "Pod" => tr("Runs one or more containers together on a node."),
+        "Deployment" => tr("Manages ReplicaSets and keeps the desired number of Pods running."),
+        "Service" => tr("Gives a stable virtual address and discovery name to a set of Pods."),
+        "Ingress" => tr("Routes external HTTP or HTTPS traffic to Services."),
+        "ConfigMap" => tr("Stores non-secret configuration consumed by Pods."),
+        "Secret" => tr("Stores sensitive configuration. Values under data are base64 encoded."),
+        "Job" => tr("Runs Pods until a task completes successfully."),
+        "CronJob" => tr("Creates Jobs on a schedule."),
+        "Namespace" => tr("Partitions namespaced resources inside a cluster."),
+        "Node" => tr("Represents a worker machine registered in the cluster."),
+        _ => tr("Declares the Kubernetes resource type for this manifest."),
     }
 }
 
-pub(super) fn spec_explanation(kind: &str) -> &'static str {
+pub(super) fn spec_explanation(kind: &str) -> String {
     match kind {
-        "Pod" => "Desired Pod configuration, including containers, volumes, restart policy and scheduling hints.",
-        "Deployment" => "Desired Deployment state, usually replicas, selector and the Pod template.",
-        "Service" => "Desired Service routing, including selector, type and exposed ports.",
-        "Ingress" => "Desired routing rules, TLS configuration and backend Services.",
-        "Job" => "Desired one-shot workload, including completion policy and Pod template.",
-        "CronJob" => "Desired schedule and Job template.",
-        "Node" => "Node spec is mostly managed by Kubernetes and should be edited carefully.",
-        _ => "Desired state for this resource. Controllers reconcile the live object toward this section.",
+        "Pod" => tr("Desired Pod configuration, including containers, volumes, restart policy and scheduling hints."),
+        "Deployment" => tr("Desired Deployment state, usually replicas, selector and the Pod template."),
+        "Service" => tr("Desired Service routing, including selector, type and exposed ports."),
+        "Ingress" => tr("Desired routing rules, TLS configuration and backend Services."),
+        "Job" => tr("Desired one-shot workload, including completion policy and Pod template."),
+        "CronJob" => tr("Desired schedule and Job template."),
+        "Node" => tr("Node spec is mostly managed by Kubernetes and should be edited carefully."),
+        _ => tr("Desired state for this resource. Controllers reconcile the live object toward this section."),
     }
 }
 

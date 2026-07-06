@@ -6,7 +6,7 @@ pub(super) fn build_custom_namespace_dialog(
     apply_button: &gtk::Button,
 ) -> adw::Dialog {
     let dialog = adw::Dialog::builder()
-        .title("Namespace")
+        .title(tr("Namespace"))
         .content_width(460)
         .build();
     let toolbar = adw::ToolbarView::new();
@@ -15,14 +15,14 @@ pub(super) fn build_custom_namespace_dialog(
     let content = gtk::Box::new(gtk::Orientation::Vertical, 14);
     content.set_margin_all(18);
 
-    let title = gtk::Label::new(Some("Use a Custom Namespace"));
+    let title = gtk::Label::new(Some(&tr("Use a Custom Namespace")));
     title.set_xalign(0.0);
     title.add_css_class("title-4");
     content.append(&title);
 
-    let subtitle = gtk::Label::new(Some(
+    let subtitle = gtk::Label::new(Some(&tr(
         "Enter a namespace that was not returned by the cluster. It will be saved for this project.",
-    ));
+    )));
     subtitle.set_xalign(0.0);
     subtitle.set_wrap(true);
     subtitle.add_css_class("dim-label");
@@ -45,7 +45,7 @@ pub(super) fn build_rename_namespace_dialog(
     apply_button: &gtk::Button,
 ) -> adw::Dialog {
     let dialog = adw::Dialog::builder()
-        .title("Rename Namespace")
+        .title(tr("Rename Namespace"))
         .content_width(460)
         .build();
     let toolbar = adw::ToolbarView::new();
@@ -54,14 +54,14 @@ pub(super) fn build_rename_namespace_dialog(
     let content = gtk::Box::new(gtk::Orientation::Vertical, 14);
     content.set_margin_all(18);
 
-    let title = gtk::Label::new(Some("Rename Namespace"));
+    let title = gtk::Label::new(Some(&tr("Rename Namespace")));
     title.set_xalign(0.0);
     title.add_css_class("title-4");
     content.append(&title);
 
-    let subtitle = gtk::Label::new(Some(
+    let subtitle = gtk::Label::new(Some(&tr(
         "This only renames the saved shortcut. It does not rename anything in the cluster.",
-    ));
+    )));
     subtitle.set_xalign(0.0);
     subtitle.set_wrap(true);
     subtitle.add_css_class("dim-label");
@@ -85,7 +85,7 @@ pub(super) fn build_project_dialog(
     description: &gtk::Label,
 ) -> adw::Dialog {
     let dialog = adw::Dialog::builder()
-        .title("New Project")
+        .title(tr("New Project"))
         .content_width(420)
         .build();
     let toolbar = adw::ToolbarView::new();
@@ -117,7 +117,7 @@ pub(super) fn build_create_yaml_dialog(
     error_label: &gtk::Label,
 ) -> adw::Dialog {
     let dialog = adw::Dialog::builder()
-        .title("Create from YAML")
+        .title(tr("Create from YAML"))
         .content_width(760)
         .content_height(560)
         .build();
@@ -173,7 +173,7 @@ pub(super) fn build_cluster_dialog(
     sender: ComponentSender<App>,
 ) -> adw::Dialog {
     let dialog = adw::Dialog::builder()
-        .title("Add Cluster")
+        .title(tr("Add Cluster"))
         .content_width(520)
         .build();
     let toolbar = adw::ToolbarView::new();
@@ -196,7 +196,7 @@ pub(super) fn cluster_options_page(sender: ComponentSender<App>) -> gtk::Box {
     let container = gtk::Box::new(gtk::Orientation::Vertical, 14);
     container.set_margin_all(18);
 
-    let title = gtk::Label::new(Some("Choose how to connect"));
+    let title = gtk::Label::new(Some(&tr("Choose how to connect")));
     title.set_xalign(0.0);
     title.add_css_class("title-3");
     container.append(&title);
@@ -205,13 +205,13 @@ pub(super) fn cluster_options_page(sender: ComponentSender<App>) -> gtk::Box {
     list.add_css_class("boxed-list");
     list.set_selection_mode(gtk::SelectionMode::None);
     list.append(&option_row(
-        "Connect with token",
-        "Use an API server URL and bearer token.",
+        &tr("Connect with token"),
+        &tr("Use an API server URL and bearer token."),
         "dialog-password-symbolic",
     ));
     list.append(&option_row(
-        "Import kubeconfig",
-        "Merge contexts from an existing kubeconfig file.",
+        &tr("Import kubeconfig"),
+        &tr("Merge contexts from an existing kubeconfig file."),
         "document-open-symbolic",
     ));
     list.connect_row_activated(move |_, row| match row.index() {
@@ -233,7 +233,7 @@ pub(super) fn token_cluster_page(
 
     let back = widgets.back_button;
     back.add_css_class("flat");
-    back.set_tooltip_text(Some("Back to connection options"));
+    back.set_tooltip_text(Some(&tr("Back to connection options")));
     back.connect_clicked(move |_| sender.input(AppMsg::ShowAddClusterDialog));
 
     let heading = gtk::Box::new(gtk::Orientation::Horizontal, 6);

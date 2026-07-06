@@ -24,6 +24,7 @@ mod commands;
 mod component;
 mod dialogs;
 mod handler;
+pub(crate) mod i18n;
 mod layout;
 mod methods;
 mod object_detail;
@@ -34,6 +35,7 @@ mod utils;
 mod widgets;
 mod yaml;
 
+use i18n::{tr, tr_format, trn};
 use projects::{
     DetailTarget, ObjectColumn, ObjectTableColumn, PodLogTarget, Project, ProjectStore,
     ResourceSection, StatusFilter,

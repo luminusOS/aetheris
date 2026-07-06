@@ -1,7 +1,9 @@
 [Desktop Entry]
 Name=Aetheris
 Comment=Operate Kubernetes clusters from a native GNOME interface
+Comment[pt_BR]=Opere clusters Kubernetes em uma interface GNOME nativa
 Keywords=Kubernetes;k8s;OpenShift;container;containers;cluster;clusters;pod;pods;node;nodes;kubeconfig;YAML;DevOps;
+Keywords[pt_BR]=Kubernetes;k8s;OpenShift;contêiner;contêineres;cluster;clusters;pod;pods;nó;nós;kubeconfig;YAML;DevOps;
 Exec=aetheris
 Icon=org.luminusos.Aetheris
 Terminal=false

@@ -83,13 +83,14 @@ impl App {
     pub(super) fn start_pod_logs(&mut self, sender: ComponentSender<Self>) {
         let Some(target) = self.detail.log_target.clone() else {
             self.toaster
-                .add_toast(adw::Toast::new("Logs are available for Pods."));
+                .add_toast(adw::Toast::new(&tr("Logs are available for Pods.")));
             return;
         };
         let Some(container) = selected_log_container(&self.detail.log_container_dropdown, &target)
         else {
-            self.toaster
-                .add_toast(adw::Toast::new("Select a container before starting logs."));
+            self.toaster.add_toast(adw::Toast::new(&tr(
+                "Select a container before starting logs.",
+            )));
             return;
         };
 
@@ -161,12 +162,13 @@ impl App {
     ) {
         let Some(target) = self.detail.exec_target.clone() else {
             self.toaster
-                .add_toast(adw::Toast::new("Terminal is available for Pods."));
+                .add_toast(adw::Toast::new(&tr("Terminal is available for Pods.")));
             return;
         };
         if default_terminal_container(&target).is_none() {
-            self.toaster
-                .add_toast(adw::Toast::new("This Pod has no containers in its spec."));
+            self.toaster.add_toast(adw::Toast::new(&tr(
+                "This Pod has no containers in its spec.",
+            )));
             return;
         }
 
@@ -214,9 +216,9 @@ impl App {
         _root: &<Self as Component>::Root,
         _sender: ComponentSender<Self>,
     ) {
-        self.toaster.add_toast(adw::Toast::new(
+        self.toaster.add_toast(adw::Toast::new(&tr(
             "Terminal windows are not available in the Windows build yet.",
-        ));
+        )));
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -306,8 +308,9 @@ impl App {
 
     pub(super) fn start_pod_port_forward(&mut self, sender: ComponentSender<Self>) {
         let Some(target) = self.detail.port_forward_target.clone() else {
-            self.toaster
-                .add_toast(adw::Toast::new("Port forwarding is available for Pods."));
+            self.toaster.add_toast(adw::Toast::new(&tr(
+                "Port forwarding is available for Pods.",
+            )));
             return;
         };
 
@@ -372,34 +375,35 @@ impl App {
         if !available {
             self.detail
                 .port_status_label
-                .set_label("Port forwarding is available for Pods.");
+                .set_label(&tr("Port forwarding is available for Pods."));
         } else if self.port_forwarding {
             self.detail
                 .port_status_label
-                .set_label("Starting port-forward...");
+                .set_label(&tr("Starting port-forward..."));
         } else {
             self.detail
                 .port_status_label
-                .set_label("Choose local and remote ports to forward this Pod.");
+                .set_label(&tr("Choose local and remote ports to forward this Pod."));
         }
     }
 
     pub(super) fn handle_port_forward_event(&self, event: PodPortForwardEvent) {
         match event {
             PodPortForwardEvent::Ready { local_port } => {
-                self.detail.port_status_label.set_label(&format!(
-                    "Forwarding 127.0.0.1:{local_port} to the selected Pod."
+                self.detail.port_status_label.set_label(&tr_format(
+                    "Forwarding 127.0.0.1:{local_port} to the selected Pod.",
+                    &[("{local_port}", local_port.to_string())],
                 ));
             }
             PodPortForwardEvent::ConnectionOpened => {
                 self.detail
                     .port_status_label
-                    .set_label("Port-forward connection active.");
+                    .set_label(&tr("Port-forward connection active."));
             }
             PodPortForwardEvent::ConnectionClosed => {
                 self.detail
                     .port_status_label
-                    .set_label("Waiting for the next local connection...");
+                    .set_label(&tr("Waiting for the next local connection..."));
             }
         }
     }
@@ -412,7 +416,7 @@ impl App {
         let Some(target) = &self.detail.log_target else {
             self.detail
                 .log_container_dropdown
-                .set_model(Some(&gtk::StringList::new(&["No containers"])));
+                .set_model(Some(&gtk::StringList::new(&[&tr("No containers")])));
             self.detail.log_container_dropdown.set_selected(0);
             self.detail.log_container_dropdown.set_sensitive(false);
             self.detail.log_follow_check.set_sensitive(false);
@@ -421,12 +425,12 @@ impl App {
             self.detail.log_stop_button.set_sensitive(false);
             self.detail
                 .log_status_label
-                .set_label("Logs are available for Pods.");
+                .set_label(&tr("Logs are available for Pods."));
             return;
         };
 
         let labels = if target.containers.is_empty() {
-            vec![String::from("No containers")]
+            vec![tr("No containers")]
         } else {
             target.containers.clone()
         };
@@ -460,15 +464,14 @@ impl App {
         self.detail
             .log_stop_button
             .set_sensitive(self.log_streaming);
-        self.detail
-            .log_status_label
-            .set_label(if self.log_streaming {
-                "Streaming pod logs..."
-            } else if target.containers.is_empty() {
-                "This Pod has no containers in its spec."
-            } else {
-                "Select a container and start logs."
-            });
+        let status = if self.log_streaming {
+            tr("Streaming pod logs...")
+        } else if target.containers.is_empty() {
+            tr("This Pod has no containers in its spec.")
+        } else {
+            tr("Select a container and start logs.")
+        };
+        self.detail.log_status_label.set_label(&status);
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -560,7 +563,7 @@ impl App {
             self.detail.target.as_ref(),
         );
         let dialog = adw::Dialog::builder()
-            .title("YAML Explanation")
+            .title(tr("YAML Explanation"))
             .content_width(640)
             .content_height(620)
             .build();
@@ -587,7 +590,7 @@ fn terminal_container_dropdown(target: &PodLogTarget) -> gtk::DropDown {
         .collect::<Vec<_>>();
     let dropdown = gtk::DropDown::from_strings(&refs);
     dropdown.set_selected(default_log_container_index(&target.pod, &target.containers) as u32);
-    dropdown.set_tooltip_text(Some("Container"));
+    dropdown.set_tooltip_text(Some(&tr("Container")));
     dropdown.set_width_request(220);
     dropdown
 }

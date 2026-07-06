@@ -1,0 +1,12 @@
+crates/aetheris-app/src/app/component.rs
+crates/aetheris-app/src/app/dialogs.rs
+crates/aetheris-app/src/app/handler.rs
+crates/aetheris-app/src/app/i18n.rs
+crates/aetheris-app/src/app/layout.rs
+crates/aetheris-app/src/app/methods.rs
+crates/aetheris-app/src/app/object_detail.rs
+crates/aetheris-app/src/app/projects.rs
+crates/aetheris-app/src/app/streams.rs
+crates/aetheris-app/src/app/utils.rs
+crates/aetheris-app/src/app/widgets.rs
+crates/aetheris-app/src/app/yaml.rs

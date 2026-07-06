@@ -45,14 +45,14 @@ impl Component for App {
         project_title_label.set_max_width_chars(22);
         let add_project_button = gtk::Button::builder()
             .icon_name("list-add-symbolic")
-            .tooltip_text("Add project")
+            .tooltip_text(tr("Add project"))
             .build();
         add_project_button.add_css_class("flat");
         let projects_empty_add_button = gtk::Button::builder()
             .child(
                 &adw::ButtonContent::builder()
                     .icon_name("list-add-symbolic")
-                    .label("Add Project")
+                    .label(tr("Add Project"))
                     .build(),
             )
             .halign(gtk::Align::Center)
@@ -60,32 +60,32 @@ impl Component for App {
         projects_empty_add_button.add_css_class("suggested-action");
         let projects_empty_page = adw::StatusPage::builder()
             .icon_name("folder-symbolic")
-            .title("No Projects Yet")
-            .description("Create a project to organize your clusters.")
+            .title(tr("No Projects Yet"))
+            .description(tr("Create a project to organize your clusters."))
             .valign(gtk::Align::Center)
             .vexpand(true)
             .build();
         projects_empty_page.set_child(Some(&projects_empty_add_button));
         let projects_content_stack = gtk::Stack::new();
-        let context_selector_label = gtk::Label::new(Some("No cluster"));
+        let context_selector_label = gtk::Label::new(Some(&tr("No cluster")));
         context_selector_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         context_selector_label.set_max_width_chars(22);
         let cluster_back_button = gtk::Button::builder()
             .icon_name("go-previous-symbolic")
-            .tooltip_text("Back to clusters")
+            .tooltip_text(tr("Back to clusters"))
             .build();
         cluster_back_button.add_css_class("flat");
         let cluster_menu = gtk::gio::Menu::new();
-        cluster_menu.append(Some("Edit Cluster…"), Some("win.cluster-edit"));
-        cluster_menu.append(Some("Remove from Project"), Some("win.cluster-remove"));
+        cluster_menu.append(Some(&tr("Edit Cluster...")), Some("win.cluster-edit"));
+        cluster_menu.append(Some(&tr("Remove from Project")), Some("win.cluster-remove"));
         let cluster_menu_button = gtk::MenuButton::builder()
             .icon_name("open-menu-symbolic")
-            .tooltip_text("Cluster options")
+            .tooltip_text(tr("Cluster options"))
             .menu_model(&cluster_menu)
             .build();
         let cluster_refresh_button = gtk::Button::builder()
             .icon_name("view-refresh-symbolic")
-            .tooltip_text("Refresh cluster health")
+            .tooltip_text(tr("Refresh cluster health"))
             .build();
         cluster_refresh_button.add_css_class("flat");
         let cluster_list = gtk::ListBox::new();
@@ -94,14 +94,14 @@ impl Component for App {
         cluster_list.set_selection_mode(gtk::SelectionMode::None);
         let add_cluster_button = gtk::Button::builder()
             .icon_name("list-add-symbolic")
-            .tooltip_text("Add cluster")
+            .tooltip_text(tr("Add cluster"))
             .build();
-        let import_cluster_button = gtk::Button::builder().label("Import").build();
+        let import_cluster_button = gtk::Button::builder().label(tr("Import")).build();
         let clusters_empty_add_button = gtk::Button::builder()
             .child(
                 &adw::ButtonContent::builder()
                     .icon_name("list-add-symbolic")
-                    .label("Add Cluster")
+                    .label(tr("Add Cluster"))
                     .build(),
             )
             .halign(gtk::Align::Center)
@@ -109,8 +109,8 @@ impl Component for App {
         clusters_empty_add_button.add_css_class("suggested-action");
         let clusters_empty_page = adw::StatusPage::builder()
             .icon_name("network-server-symbolic")
-            .title("No Clusters Yet")
-            .description("Add a cluster to start browsing this project.")
+            .title(tr("No Clusters Yet"))
+            .description(tr("Add a cluster to start browsing this project."))
             .valign(gtk::Align::Center)
             .vexpand(true)
             .build();
@@ -123,35 +123,38 @@ impl Component for App {
         let namespace_list = gtk::ListBox::new();
         namespace_menu_button.set_popover(Some(&selector_popover(&namespace_list)));
         let custom_namespace_entry = adw::EntryRow::builder()
-            .title("Namespace")
+            .title(tr("Namespace"))
             .hexpand(true)
             .build();
         let custom_namespace_button = gtk::Button::builder()
-            .label("Use")
-            .tooltip_text("Use and save this namespace")
+            .label(tr("Use"))
+            .tooltip_text(tr("Use and save this namespace"))
             .build();
         custom_namespace_button.add_css_class("suggested-action");
         let rename_namespace_entry = adw::EntryRow::builder()
-            .title("Namespace")
+            .title(tr("Namespace"))
             .hexpand(true)
             .build();
-        let rename_namespace_button = gtk::Button::builder().label("Rename").build();
+        let rename_namespace_button = gtk::Button::builder().label(tr("Rename")).build();
         rename_namespace_button.add_css_class("suggested-action");
         let project_name_entry = adw::EntryRow::builder()
-            .title("Project Name")
+            .title(tr("Project Name"))
             .hexpand(true)
             .build();
-        let project_create_button = gtk::Button::builder().label("Create").build();
+        let project_create_button = gtk::Button::builder().label(tr("Create")).build();
         project_create_button.add_css_class("suggested-action");
         let project_dialog_description =
-            gtk::Label::new(Some("Separate clusters by environment or company"));
+            gtk::Label::new(Some(&tr("Separate clusters by environment or company")));
         let project_menu = gtk::gio::Menu::new();
-        project_menu.append(Some("Rename Project…"), Some("win.project-rename"));
-        project_menu.append(Some("Duplicate Project"), Some("win.project-duplicate"));
-        project_menu.append(Some("Delete Project…"), Some("win.project-delete"));
+        project_menu.append(Some(&tr("Rename Project...")), Some("win.project-rename"));
+        project_menu.append(
+            Some(&tr("Duplicate Project")),
+            Some("win.project-duplicate"),
+        );
+        project_menu.append(Some(&tr("Delete Project...")), Some("win.project-delete"));
         let project_menu_button = gtk::MenuButton::builder()
             .icon_name("open-menu-symbolic")
-            .tooltip_text("Project options")
+            .tooltip_text(tr("Project options"))
             .menu_model(&project_menu)
             .build();
         // width-chars is the entry's *minimum* width and the header bar
@@ -161,7 +164,7 @@ impl Component for App {
         // Keep the minimum tiny and let hexpand grow it into whatever the
         // header actually has.
         let search_entry = gtk::SearchEntry::builder()
-            .placeholder_text("Search")
+            .placeholder_text(tr("Search"))
             .width_chars(8)
             .max_width_chars(75)
             .build();
@@ -184,27 +187,27 @@ impl Component for App {
         rebuild_column_filter_list(&column_filter_list, &ObjectColumn::ALL, &default_columns);
         let projects_home_button = gtk::Button::builder()
             .icon_name("go-previous-symbolic")
-            .tooltip_text("Back to projects")
+            .tooltip_text(tr("Back to projects"))
             .build();
         projects_home_button.add_css_class("flat");
         let create_yaml_button = gtk::Button::builder()
-            .label("Create")
+            .label(tr("Create"))
             .icon_name("document-new-symbolic")
-            .tooltip_text("Create object from YAML")
+            .tooltip_text(tr("Create object from YAML"))
             .sensitive(false)
             .build();
         let refresh_button = gtk::Button::builder()
             .icon_name("view-refresh-symbolic")
-            .tooltip_text("Refresh resources")
+            .tooltip_text(tr("Refresh resources"))
             .sensitive(false)
             .build();
         let detail_back_button = gtk::Button::builder()
             .icon_name("go-previous-symbolic")
-            .tooltip_text("Back to objects")
+            .tooltip_text(tr("Back to objects"))
             .visible(false)
             .build();
         detail_back_button.add_css_class("flat");
-        let content_title_label = gtk::Label::new(Some("Objects"));
+        let content_title_label = gtk::Label::new(Some(&tr("Objects")));
         content_title_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         content_title_label.set_max_width_chars(24);
         let content_header_stack = gtk::Stack::new();
@@ -216,7 +219,7 @@ impl Component for App {
             .transition_type(gtk::StackTransitionType::Crossfade)
             .build();
         let status_label = gtk::Label::builder()
-            .label("Loading kubeconfig...")
+            .label(tr("Loading kubeconfig..."))
             .xalign(0.0)
             .hexpand(true)
             .ellipsize(gtk::pango::EllipsizeMode::End)
@@ -235,7 +238,7 @@ impl Component for App {
 
         let mut object_columns: Vec<(ObjectTableColumn, gtk::ColumnViewColumn)> = Vec::new();
         let name_column = gtk::ColumnViewColumn::new(
-            Some("Name"),
+            Some(&tr("Name")),
             Some(super::widgets::object_name_column_factory()),
         );
         name_column.set_resizable(true);
@@ -244,7 +247,7 @@ impl Component for App {
         object_columns.push((ObjectTableColumn::Name, name_column));
         for column in ObjectColumn::ALL {
             let view_column = gtk::ColumnViewColumn::new(
-                Some(column.label()),
+                Some(&column.label()),
                 Some(super::widgets::object_data_column_factory(column)),
             );
             view_column.set_resizable(true);
@@ -280,49 +283,49 @@ impl Component for App {
         detail_scale_spin.set_numeric(true);
         detail_scale_spin.set_visible(false);
         let detail_scale_button = gtk::Button::builder()
-            .label("Scale")
+            .label(tr("Scale"))
             .icon_name("view-grid-symbolic")
-            .tooltip_text("Scale deployment replicas")
+            .tooltip_text(tr("Scale deployment replicas"))
             .sensitive(false)
             .visible(false)
             .build();
         let detail_cordon_button = gtk::Button::builder()
-            .label("Cordon")
+            .label(tr("Cordon"))
             .icon_name("changes-prevent-symbolic")
-            .tooltip_text("Toggle node scheduling")
+            .tooltip_text(tr("Toggle node scheduling"))
             .sensitive(false)
             .visible(false)
             .build();
         let detail_drain_button = gtk::Button::builder()
-            .label("Drain")
+            .label(tr("Drain"))
             .icon_name("edit-delete-symbolic")
-            .tooltip_text("Drain eligible pods from this node")
+            .tooltip_text(tr("Drain eligible pods from this node"))
             .sensitive(false)
             .visible(false)
             .build();
         detail_drain_button.add_css_class("destructive-action");
         let detail_explain_yaml_button = gtk::Button::builder()
-            .label("Explain")
+            .label(tr("Explain"))
             .icon_name("dialog-information-symbolic")
-            .tooltip_text("Explain this YAML manifest")
+            .tooltip_text(tr("Explain this YAML manifest"))
             .sensitive(false)
             .build();
         let detail_apply_button = gtk::Button::builder()
-            .label("Apply YAML")
+            .label(tr("Apply YAML"))
             .icon_name("document-send-symbolic")
-            .tooltip_text("Apply edited YAML to the cluster")
+            .tooltip_text(tr("Apply edited YAML to the cluster"))
             .sensitive(false)
             .build();
         detail_apply_button.add_css_class("suggested-action");
         let detail_download_yaml_button = gtk::Button::builder()
-            .label("Save YAML")
+            .label(tr("Save YAML"))
             .icon_name("document-save-as-symbolic")
-            .tooltip_text("Save YAML to a local file")
+            .tooltip_text(tr("Save YAML to a local file"))
             .sensitive(false)
             .build();
         let detail_delete_button = gtk::Button::builder()
             .icon_name("user-trash-symbolic")
-            .tooltip_text("Delete this object")
+            .tooltip_text(tr("Delete this object"))
             .sensitive(false)
             .visible(false)
             .build();
@@ -332,7 +335,7 @@ impl Component for App {
         detail_delete_button.set_valign(gtk::Align::Center);
         let detail_terminal_button = gtk::Button::builder()
             .icon_name("utilities-terminal-symbolic")
-            .tooltip_text("Open terminal")
+            .tooltip_text(tr("Open terminal"))
             .sensitive(false)
             .visible(false)
             .build();
@@ -343,7 +346,7 @@ impl Component for App {
         let detail_overview_section = gtk::Box::new(gtk::Orientation::Vertical, 12);
         let detail_expand_logs_button = gtk::Button::builder()
             .icon_name("view-fullscreen-symbolic")
-            .tooltip_text("Hide summary to see more of this tab")
+            .tooltip_text(tr("Hide summary to see more of this tab"))
             .build();
         let detail_yaml_buffer = sourceview5::Buffer::new(None);
         let detail_yaml_error_label = gtk::Label::new(None);
@@ -361,42 +364,44 @@ impl Component for App {
             .vhomogeneous(false)
             .build();
         let detail_related_pods_message = adw::StatusPage::builder()
-            .title("Pods are shown for Deployments")
-            .description("Open a Deployment to inspect its related Pods.")
+            .title(tr("Pods are shown for Deployments"))
+            .description(tr("Open a Deployment to inspect its related Pods."))
             .icon_name("dialog-information-symbolic")
             .build();
         detail_related_pods_message.add_css_class("compact");
-        let detail_log_container_dropdown = gtk::DropDown::from_strings(&["No containers"]);
+        let no_containers = tr("No containers");
+        let detail_log_container_dropdown = gtk::DropDown::from_strings(&[no_containers.as_str()]);
         detail_log_container_dropdown.set_sensitive(false);
-        let detail_log_follow_check = gtk::CheckButton::builder().label("Follow").build();
+        let detail_log_follow_check = gtk::CheckButton::builder().label(tr("Follow")).build();
         detail_log_follow_check.set_active(true);
         detail_log_follow_check.set_sensitive(false);
-        let detail_log_timestamps_check = gtk::CheckButton::builder().label("Timestamps").build();
+        let detail_log_timestamps_check =
+            gtk::CheckButton::builder().label(tr("Timestamps")).build();
         detail_log_timestamps_check.set_active(false);
         detail_log_timestamps_check.set_sensitive(false);
         let detail_log_start_button = gtk::Button::builder()
-            .label("Start")
+            .label(tr("Start"))
             .icon_name("media-playback-start-symbolic")
-            .tooltip_text("Start log streaming")
+            .tooltip_text(tr("Start log streaming"))
             .sensitive(false)
             .build();
         let detail_log_stop_button = gtk::Button::builder()
-            .label("Stop")
+            .label(tr("Stop"))
             .icon_name("media-playback-stop-symbolic")
-            .tooltip_text("Stop log streaming")
+            .tooltip_text(tr("Stop log streaming"))
             .sensitive(false)
             .build();
         let detail_log_clear_button = gtk::Button::builder()
-            .label("Clear")
+            .label(tr("Clear"))
             .icon_name("edit-clear-symbolic")
-            .tooltip_text("Clear visible logs")
+            .tooltip_text(tr("Clear visible logs"))
             .build();
         let detail_log_download_button = gtk::Button::builder()
             .icon_name("document-save-as-symbolic")
-            .tooltip_text("Save logs to a local file")
+            .tooltip_text(tr("Save logs to a local file"))
             .build();
         let detail_log_status_label = gtk::Label::builder()
-            .label("Logs are available for Pods.")
+            .label(tr("Logs are available for Pods."))
             .xalign(0.0)
             .hexpand(true)
             .build();
@@ -406,25 +411,26 @@ impl Component for App {
         let detail_port_local_spin = gtk::SpinButton::with_range(0.0, 65535.0, 1.0);
         detail_port_local_spin.set_numeric(true);
         detail_port_local_spin.set_value(0.0);
-        detail_port_local_spin.set_tooltip_text(Some("Local port, or 0 for an automatic port"));
+        detail_port_local_spin
+            .set_tooltip_text(Some(&tr("Local port, or 0 for an automatic port")));
         let detail_port_remote_spin = gtk::SpinButton::with_range(1.0, 65535.0, 1.0);
         detail_port_remote_spin.set_numeric(true);
         detail_port_remote_spin.set_value(8080.0);
-        detail_port_remote_spin.set_tooltip_text(Some("Pod port to forward"));
+        detail_port_remote_spin.set_tooltip_text(Some(&tr("Pod port to forward")));
         let detail_port_start_button = gtk::Button::builder()
-            .label("Start")
+            .label(tr("Start"))
             .icon_name("media-playback-start-symbolic")
-            .tooltip_text("Start port forwarding")
+            .tooltip_text(tr("Start port forwarding"))
             .sensitive(false)
             .build();
         let detail_port_stop_button = gtk::Button::builder()
-            .label("Stop")
+            .label(tr("Stop"))
             .icon_name("media-playback-stop-symbolic")
-            .tooltip_text("Stop port forwarding")
+            .tooltip_text(tr("Stop port forwarding"))
             .sensitive(false)
             .build();
         let detail_port_status_label = gtk::Label::builder()
-            .label("Port forwarding is available for Pods.")
+            .label(tr("Port forwarding is available for Pods."))
             .xalign(0.0)
             .hexpand(true)
             .wrap(true)
@@ -479,28 +485,31 @@ impl Component for App {
             expand_logs_button: &detail_expand_logs_button,
         });
 
-        let setup_name_entry = adw::EntryRow::builder().title("Name").hexpand(true).build();
+        let setup_name_entry = adw::EntryRow::builder()
+            .title(tr("Name"))
+            .hexpand(true)
+            .build();
         let setup_server_entry = adw::EntryRow::builder()
-            .title("API Server")
+            .title(tr("API Server"))
             .hexpand(true)
             .build();
         let setup_token_entry = adw::PasswordEntryRow::builder()
-            .title("Bearer Token")
+            .title(tr("Bearer Token"))
             .hexpand(true)
             .build();
         let setup_ca_entry = adw::EntryRow::builder()
-            .title("CA Data")
+            .title(tr("CA Data"))
             .hexpand(true)
             .build();
         let setup_insecure_check = adw::SwitchRow::builder()
-            .title("Skip TLS Verification")
+            .title(tr("Skip TLS Verification"))
             .build();
         let setup_button = gtk::Button::builder()
-            .label("Add Cluster")
+            .label(tr("Add Cluster"))
             .sensitive(true)
             .build();
         setup_button.add_css_class("suggested-action");
-        let cluster_token_title_label = gtk::Label::new(Some("Connect with token"));
+        let cluster_token_title_label = gtk::Label::new(Some(&tr("Connect with token")));
         let cluster_token_back_button = gtk::Button::builder()
             .icon_name("go-previous-symbolic")
             .build();
@@ -516,7 +525,7 @@ impl Component for App {
         let create_yaml_buffer = sourceview5::Buffer::new(None);
         let create_yaml_error_label = gtk::Label::new(None);
         setup_yaml_buffer(&create_yaml_buffer, &create_yaml_error_label);
-        let create_yaml_apply_button = gtk::Button::builder().label("Create").build();
+        let create_yaml_apply_button = gtk::Button::builder().label(tr("Create")).build();
         create_yaml_apply_button.add_css_class("suggested-action");
         let create_yaml_dialog = build_create_yaml_dialog(
             &create_yaml_buffer,
@@ -560,7 +569,7 @@ impl Component for App {
             .build();
         let sidebar_toggle_button = gtk::ToggleButton::builder()
             .icon_name("sidebar-show-symbolic")
-            .tooltip_text("Show Sidebar")
+            .tooltip_text(tr("Show Sidebar"))
             .visible(false)
             .build();
         sidebar_toggle_button.add_css_class("flat");
@@ -868,7 +877,7 @@ impl Component for App {
             search_query: String::new(),
             selected_status_filters: StatusFilter::default_filters(),
             loading: true,
-            status: String::from("Loading kubeconfig..."),
+            status: tr("Loading kubeconfig..."),
             toaster,
             root_stack,
             split_view,

@@ -3,8 +3,11 @@ mod app;
 use relm4::RelmApp;
 
 pub const APP_ID: &str = "org.luminusos.Aetheris";
+pub const GETTEXT_PACKAGE: &str = APP_ID;
 
 fn main() {
+    app::i18n::init();
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()

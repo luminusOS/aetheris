@@ -23,7 +23,7 @@ impl App {
                 self.selected_namespace = self.preferred_namespace_for_selected_context("default");
                 self.sync_dropdowns(Some(sender.clone()));
                 self.loading = false;
-                self.status = String::from("Select a project.");
+                self.status = tr("Select a project.");
                 self.show_projects();
                 self.sync_status();
             }
@@ -37,7 +37,7 @@ impl App {
                 self.objects.clear();
                 self.selected_context = None;
                 self.projects = ProjectStore::load(&[]);
-                self.status = String::from("Kubeconfig unavailable.");
+                self.status = tr("Kubeconfig unavailable.");
                 self.toaster.add_toast(adw::Toast::new(&error));
                 self.show_projects();
                 self.sync_dropdowns(Some(sender.clone()));
@@ -61,12 +61,12 @@ impl App {
                 self.loading = false;
                 self.sync_dropdowns(Some(sender.clone()));
                 self.enter_clusters_page(sender);
-                self.status = String::from("Cluster saved.");
+                self.status = tr("Cluster saved.");
                 self.sync_status();
             }
             AppMsg::StateLoadedForCluster(_context_name, Err(error)) => {
                 self.loading = false;
-                self.status = String::from("Unable to reload kubeconfig.");
+                self.status = tr("Unable to reload kubeconfig.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
@@ -81,7 +81,7 @@ impl App {
                 self.rebuild_project_list();
                 self.show_projects();
                 self.loading = false;
-                self.status = String::from("Select a project.");
+                self.status = tr("Select a project.");
                 self.sync_terminal_controls();
                 self.sync_port_forward_controls();
                 self.sync_status();
@@ -92,14 +92,14 @@ impl App {
                 self.show_object_list();
                 self.enter_clusters_page(sender);
                 self.loading = false;
-                self.status = String::from("Select a cluster.");
+                self.status = tr("Select a cluster.");
                 self.sync_terminal_controls();
                 self.sync_port_forward_controls();
                 self.sync_status();
             }
             AppMsg::RefreshClusters => {
                 self.refresh_cluster_summaries(sender);
-                self.status = String::from("Refreshing clusters.");
+                self.status = tr("Refreshing clusters.");
                 self.sync_status();
             }
             AppMsg::ClusterSummaryLoaded(context_name, result) => {
@@ -127,20 +127,20 @@ impl App {
             }
             AppMsg::ShowAddProjectDialog => {
                 self.editing_project_name = None;
-                self.project_dialog.set_title("New Project");
+                self.project_dialog.set_title(&tr("New Project"));
                 self.project_dialog_description
-                    .set_label("Separate clusters by environment or company");
-                self.project_create_button.set_label("Create");
+                    .set_label(&tr("Separate clusters by environment or company"));
+                self.project_create_button.set_label(&tr("Create"));
                 self.project_name_entry.set_text("");
                 self.project_dialog.present(Some(root));
             }
             AppMsg::ShowRenameProjectDialog => {
                 let current = self.projects.selected_project_name().to_owned();
                 self.editing_project_name = Some(current.clone());
-                self.project_dialog.set_title("Rename Project");
+                self.project_dialog.set_title(&tr("Rename Project"));
                 self.project_dialog_description
-                    .set_label("Choose a new name for this project");
-                self.project_create_button.set_label("Rename");
+                    .set_label(&tr("Choose a new name for this project"));
+                self.project_create_button.set_label(&tr("Rename"));
                 self.project_name_entry.set_text(&current);
                 self.project_dialog.present(Some(root));
             }
@@ -152,8 +152,9 @@ impl App {
 
                 if let Some(original) = self.editing_project_name.clone() {
                     if name != original && self.projects.has_project(&name) {
-                        self.toaster
-                            .add_toast(adw::Toast::new("A project with this name already exists."));
+                        self.toaster.add_toast(adw::Toast::new(&tr(
+                            "A project with this name already exists.",
+                        )));
                         return;
                     }
                     if let Some(project) = self
@@ -176,8 +177,9 @@ impl App {
                 }
 
                 if self.projects.has_project(&name) {
-                    self.toaster
-                        .add_toast(adw::Toast::new("A project with this name already exists."));
+                    self.toaster.add_toast(adw::Toast::new(&tr(
+                        "A project with this name already exists.",
+                    )));
                     return;
                 }
 
@@ -196,10 +198,16 @@ impl App {
                 let Some(source) = self.projects.selected_project().cloned() else {
                     return;
                 };
-                let mut new_name = format!("{} copy", source.name);
+                let mut new_name = tr_format("{name} copy", &[("{name}", source.name.clone())]);
                 let mut suffix = 2;
                 while self.projects.has_project(&new_name) {
-                    new_name = format!("{} copy {suffix}", source.name);
+                    new_name = tr_format(
+                        "{name} copy {suffix}",
+                        &[
+                            ("{name}", source.name.clone()),
+                            ("{suffix}", suffix.to_string()),
+                        ],
+                    );
                     suffix += 1;
                 }
                 self.projects.projects.push(Project {
@@ -209,25 +217,27 @@ impl App {
                 });
                 self.projects.selected_project = Some(new_name.clone());
                 self.save_projects_or_toast();
-                self.toaster
-                    .add_toast(adw::Toast::new(&format!("Duplicated as {new_name}")));
+                self.toaster.add_toast(adw::Toast::new(&tr_format(
+                    "Duplicated as {name}",
+                    &[("{name}", new_name.clone())],
+                )));
                 self.switch_to_project(sender);
             }
             AppMsg::DeleteProject => {
                 if self.projects.projects.len() <= 1 {
                     self.toaster
-                        .add_toast(adw::Toast::new("At least one project must remain."));
+                        .add_toast(adw::Toast::new(&tr("At least one project must remain.")));
                     return;
                 }
                 let name = self.projects.selected_project_name().to_owned();
                 let dialog = adw::AlertDialog::new(
-                    Some("Delete project?"),
-                    Some(&format!(
-                        "This removes \"{name}\" from Aetheris, including its saved clusters \
-                         and namespaces. The clusters themselves are not affected."
+                    Some(&tr("Delete project?")),
+                    Some(&tr_format(
+                        "This removes \"{name}\" from Aetheris, including its saved clusters and namespaces. The clusters themselves are not affected.",
+                        &[("{name}", name.clone())],
                     )),
                 );
-                dialog.add_responses(&[("cancel", "Cancel"), ("delete", "Delete")]);
+                dialog.add_responses(&[("cancel", &tr("Cancel")), ("delete", &tr("Delete"))]);
                 dialog.set_close_response("cancel");
                 dialog.set_default_response(Some("cancel"));
                 dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
@@ -257,7 +267,7 @@ impl App {
                 self.show_object_list();
                 self.show_projects();
                 self.loading = false;
-                self.status = String::from("Select a project.");
+                self.status = tr("Select a project.");
                 self.sync_terminal_controls();
                 self.sync_port_forward_controls();
                 self.sync_status();
@@ -281,7 +291,7 @@ impl App {
                 if self.selected_resource.is_some() {
                     self.refresh_objects(sender);
                 } else {
-                    self.status = String::from("No listable Kubernetes resources found.");
+                    self.status = tr("No listable Kubernetes resources found.");
                     self.sync_status();
                     self.rebuild_object_list();
                 }
@@ -292,7 +302,7 @@ impl App {
                 self.resources.clear();
                 self.objects.clear();
                 self.selected_resource = None;
-                self.status = String::from("Unable to discover resources.");
+                self.status = tr("Unable to discover resources.");
                 self.toaster.add_toast(adw::Toast::new(&error));
                 self.rebuild_resource_list(Some(sender.clone()));
                 self.rebuild_object_list();
@@ -339,7 +349,10 @@ impl App {
                 self.selected_resource = None;
                 self.show_object_list();
                 self.enter_clusters_page(sender);
-                self.status = format!("Removed {context} from this project.");
+                self.status = tr_format(
+                    "Removed {context} from this project.",
+                    &[("{context}", context)],
+                );
                 self.sync_terminal_controls();
                 self.sync_port_forward_controls();
                 self.sync_status();
@@ -406,7 +419,8 @@ impl App {
                 } else {
                     self.sync_dropdowns(Some(sender.clone()));
                 }
-                self.toaster.add_toast(adw::Toast::new("Namespace removed"));
+                self.toaster
+                    .add_toast(adw::Toast::new(&tr("Namespace removed")));
             }
             AppMsg::OpenRenameNamespaceDialog(namespace) => {
                 self.open_rename_namespace_dialog(&namespace, root);
@@ -440,11 +454,12 @@ impl App {
                     } else {
                         self.sync_dropdowns(Some(sender.clone()));
                     }
-                    self.toaster.add_toast(adw::Toast::new("Namespace renamed"));
+                    self.toaster
+                        .add_toast(adw::Toast::new(&tr("Namespace renamed")));
                 } else {
-                    self.toaster.add_toast(adw::Toast::new(
+                    self.toaster.add_toast(adw::Toast::new(&tr(
                         "A namespace with this name already exists.",
-                    ));
+                    )));
                 }
                 self.rename_namespace_dialog.close();
             }
@@ -525,7 +540,10 @@ impl App {
                     return;
                 }
                 self.loading = false;
-                self.status = format!("Showing details for {}", detail.name);
+                self.status = tr_format(
+                    "Showing details for {name}",
+                    &[("{name}", detail.name.clone())],
+                );
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
                 self.update_exec_target_containers(&detail);
@@ -545,7 +563,7 @@ impl App {
                 self.sync_log_controls();
                 self.sync_terminal_controls();
                 self.sync_port_forward_controls();
-                self.status = String::from("Unable to load object detail.");
+                self.status = tr("Unable to load object detail.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
@@ -586,13 +604,14 @@ impl App {
                 } else {
                     "view-fullscreen-symbolic"
                 });
+                let tooltip = if collapsed {
+                    tr("Show summary")
+                } else {
+                    tr("Hide summary to see more of this tab")
+                };
                 self.detail
                     .expand_logs_button
-                    .set_tooltip_text(Some(if collapsed {
-                        "Show summary"
-                    } else {
-                        "Hide summary to see more of this tab"
-                    }));
+                    .set_tooltip_text(Some(&tooltip));
             }
             AppMsg::BackToObjects => {
                 self.show_object_list();
@@ -609,8 +628,9 @@ impl App {
             }
             AppMsg::ShowCreateYamlDialog => {
                 if self.selected_resource_kind().is_none() {
-                    self.toaster
-                        .add_toast(adw::Toast::new("Select a resource before creating YAML."));
+                    self.toaster.add_toast(adw::Toast::new(&tr(
+                        "Select a resource before creating YAML.",
+                    )));
                     return;
                 }
                 self.create_yaml_dialog.present(Some(root));
@@ -627,7 +647,10 @@ impl App {
                     .then(|| self.selected_namespace.clone());
                 let yaml = text_buffer_text(&self.create_yaml_buffer);
                 self.loading = true;
-                self.status = format!("Creating {}...", resource.label());
+                self.status = tr_format(
+                    "Creating {resource}...",
+                    &[("{resource}", resource.label())],
+                );
                 self.sync_status();
                 sender.oneshot_command(async move {
                     create_object_yaml(context, resource, namespace, yaml).await
@@ -637,13 +660,15 @@ impl App {
                 self.loading = false;
                 self.create_yaml_dialog.close();
                 self.create_yaml_buffer.set_text("");
-                self.toaster
-                    .add_toast(adw::Toast::new(&format!("Created {name}.")));
+                self.toaster.add_toast(adw::Toast::new(&tr_format(
+                    "Created {name}.",
+                    &[("{name}", name)],
+                )));
                 self.refresh_objects(sender);
             }
             AppMsg::ObjectCreated(Err(error)) => {
                 self.loading = false;
-                self.status = String::from("Unable to create object.");
+                self.status = tr("Unable to create object.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
@@ -658,7 +683,7 @@ impl App {
                 self.detail.request_token = self.detail.request_token.saturating_add(1);
                 let token = self.detail.request_token;
                 self.loading = true;
-                self.status = format!("Scaling {}...", target.name);
+                self.status = tr_format("Scaling {name}...", &[("{name}", target.name.clone())]);
                 self.sync_status();
                 sender.oneshot_command(
                     async move { scale_deployment(token, target, replicas).await },
@@ -669,20 +694,20 @@ impl App {
                     return;
                 }
                 self.loading = false;
-                self.status = format!("Scaled {}", detail.name);
+                self.status = tr_format("Scaled {name}", &[("{name}", detail.name.clone())]);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
                 self.update_exec_target_containers(&detail);
                 self.sync_status();
                 self.toaster
-                    .add_toast(adw::Toast::new("Deployment scaled."));
+                    .add_toast(adw::Toast::new(&tr("Deployment scaled.")));
             }
             AppMsg::ObjectScaled(token, Err(error)) => {
                 if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
-                self.status = String::from("Unable to scale deployment.");
+                self.status = tr("Unable to scale deployment.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
@@ -697,7 +722,7 @@ impl App {
                 self.detail.request_token = self.detail.request_token.saturating_add(1);
                 let token = self.detail.request_token;
                 self.loading = true;
-                self.status = format!("Updating {}...", target.name);
+                self.status = tr_format("Updating {name}...", &[("{name}", target.name.clone())]);
                 self.sync_status();
                 sender.oneshot_command(async move {
                     set_node_unschedulable(token, target, unschedulable).await
@@ -708,20 +733,20 @@ impl App {
                     return;
                 }
                 self.loading = false;
-                self.status = format!("Updated {}", detail.name);
+                self.status = tr_format("Updated {name}", &[("{name}", detail.name.clone())]);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
                 self.update_exec_target_containers(&detail);
                 self.sync_status();
                 self.toaster
-                    .add_toast(adw::Toast::new("Node scheduling updated."));
+                    .add_toast(adw::Toast::new(&tr("Node scheduling updated.")));
             }
             AppMsg::NodeSchedulingUpdated(token, Err(error)) => {
                 if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
-                self.status = String::from("Unable to update node scheduling.");
+                self.status = tr("Unable to update node scheduling.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
@@ -733,13 +758,13 @@ impl App {
                     return;
                 }
                 let dialog = adw::AlertDialog::new(
-                    Some("Drain node?"),
-                    Some(&format!(
-                        "This will remove eligible Pods from node {}. DaemonSet, mirror and completed Pods are skipped.",
-                        target.name
+                    Some(&tr("Drain node?")),
+                    Some(&tr_format(
+                        "This will remove eligible Pods from node {name}. DaemonSet, mirror and completed Pods are skipped.",
+                        &[("{name}", target.name)],
                     )),
                 );
-                dialog.add_responses(&[("cancel", "Cancel"), ("drain", "Drain")]);
+                dialog.add_responses(&[("cancel", &tr("Cancel")), ("drain", &tr("Drain"))]);
                 dialog.set_close_response("cancel");
                 dialog.set_default_response(Some("cancel"));
                 dialog.set_response_appearance("drain", adw::ResponseAppearance::Destructive);
@@ -760,7 +785,7 @@ impl App {
                 self.detail.request_token = self.detail.request_token.saturating_add(1);
                 let token = self.detail.request_token;
                 self.loading = true;
-                self.status = format!("Draining {}...", target.name);
+                self.status = tr_format("Draining {name}...", &[("{name}", target.name.clone())]);
                 self.sync_status();
                 sender.oneshot_command(async move { drain_node(token, target).await });
             }
@@ -769,20 +794,22 @@ impl App {
                     return;
                 }
                 self.loading = false;
-                self.status = format!("Drained {}", detail.name);
+                self.status = tr_format("Drained {name}", &[("{name}", detail.name.clone())]);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
                 self.update_exec_target_containers(&detail);
                 self.sync_status();
-                self.toaster
-                    .add_toast(adw::Toast::new(&format!("Drain started for {count} Pods.")));
+                self.toaster.add_toast(adw::Toast::new(&tr_format(
+                    "Drain started for {count} Pods.",
+                    &[("{count}", count.to_string())],
+                )));
             }
             AppMsg::NodeDrained(token, Err(error)) => {
                 if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
-                self.status = String::from("Unable to drain node.");
+                self.status = tr("Unable to drain node.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
@@ -797,7 +824,7 @@ impl App {
                 self.detail.request_token = self.detail.request_token.saturating_add(1);
                 let token = self.detail.request_token;
                 self.loading = true;
-                self.status = format!("Applying {}...", target.name);
+                self.status = tr_format("Applying {name}...", &[("{name}", target.name.clone())]);
                 self.sync_status();
                 sender.oneshot_command(async move { apply_object_yaml(token, target, yaml).await });
             }
@@ -806,19 +833,20 @@ impl App {
                     return;
                 }
                 self.loading = false;
-                self.status = format!("Applied {}", detail.name);
+                self.status = tr_format("Applied {name}", &[("{name}", detail.name.clone())]);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
                 self.update_exec_target_containers(&detail);
                 self.sync_status();
-                self.toaster.add_toast(adw::Toast::new("YAML applied."));
+                self.toaster
+                    .add_toast(adw::Toast::new(&tr("YAML applied.")));
             }
             AppMsg::ObjectApplied(token, Err(error)) => {
                 if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
-                self.status = String::from("Unable to apply YAML.");
+                self.status = tr("Unable to apply YAML.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
@@ -831,8 +859,8 @@ impl App {
                     .map(|target| format!("{}.yaml", target.name))
                     .unwrap_or_else(|| String::from("object.yaml"));
                 let dialog = gtk::FileDialog::builder()
-                    .title("Save YAML")
-                    .accept_label("Save")
+                    .title(tr("Save YAML"))
+                    .accept_label(tr("Save"))
                     .initial_name(name)
                     .modal(true)
                     .build();
@@ -845,7 +873,7 @@ impl App {
                             if let Some(path) = file.path() {
                                 sender.input(AppMsg::SaveYamlTo(path, yaml.clone()));
                             } else {
-                                sender.input(AppMsg::Toast(String::from(
+                                sender.input(AppMsg::Toast(tr(
                                     "Selected destination is not available on the local filesystem.",
                                 )));
                             }
@@ -859,12 +887,16 @@ impl App {
                 );
             }
             AppMsg::SaveYamlTo(path, yaml) => match fs::write(&path, yaml) {
-                Ok(()) => self
-                    .toaster
-                    .add_toast(adw::Toast::new(&format!("Saved {}.", path.display()))),
-                Err(error) => self.toaster.add_toast(adw::Toast::new(&format!(
-                    "Unable to save {}: {error}",
-                    path.display()
+                Ok(()) => self.toaster.add_toast(adw::Toast::new(&tr_format(
+                    "Saved {path}.",
+                    &[("{path}", path.display().to_string())],
+                ))),
+                Err(error) => self.toaster.add_toast(adw::Toast::new(&tr_format(
+                    "Unable to save {path}: {error}",
+                    &[
+                        ("{path}", path.display().to_string()),
+                        ("{error}", error.to_string()),
+                    ],
                 ))),
             },
             AppMsg::DownloadLogs => {
@@ -876,8 +908,8 @@ impl App {
                     .map(|target| format!("{}.log", target.name))
                     .unwrap_or_else(|| String::from("pod.log"));
                 let dialog = gtk::FileDialog::builder()
-                    .title("Save Logs")
-                    .accept_label("Save")
+                    .title(tr("Save Logs"))
+                    .accept_label(tr("Save"))
                     .initial_name(name)
                     .modal(true)
                     .build();
@@ -890,7 +922,7 @@ impl App {
                             if let Some(path) = file.path() {
                                 sender.input(AppMsg::SaveLogsTo(path, logs.clone()));
                             } else {
-                                sender.input(AppMsg::Toast(String::from(
+                                sender.input(AppMsg::Toast(tr(
                                     "Selected destination is not available on the local filesystem.",
                                 )));
                             }
@@ -904,12 +936,16 @@ impl App {
                 );
             }
             AppMsg::SaveLogsTo(path, logs) => match fs::write(&path, logs) {
-                Ok(()) => self
-                    .toaster
-                    .add_toast(adw::Toast::new(&format!("Saved {}.", path.display()))),
-                Err(error) => self.toaster.add_toast(adw::Toast::new(&format!(
-                    "Unable to save {}: {error}",
-                    path.display()
+                Ok(()) => self.toaster.add_toast(adw::Toast::new(&tr_format(
+                    "Saved {path}.",
+                    &[("{path}", path.display().to_string())],
+                ))),
+                Err(error) => self.toaster.add_toast(adw::Toast::new(&tr_format(
+                    "Unable to save {path}: {error}",
+                    &[
+                        ("{path}", path.display().to_string()),
+                        ("{error}", error.to_string()),
+                    ],
                 ))),
             },
             AppMsg::DeleteObject => {
@@ -917,13 +953,13 @@ impl App {
                     return;
                 };
                 let dialog = adw::AlertDialog::new(
-                    Some("Delete object?"),
-                    Some(&format!(
-                        "This will delete {} {}.",
-                        target.resource.kind, target.name
+                    Some(&tr("Delete object?")),
+                    Some(&tr_format(
+                        "This will delete {kind} {name}.",
+                        &[("{kind}", target.resource.kind), ("{name}", target.name)],
                     )),
                 );
-                dialog.add_responses(&[("cancel", "Cancel"), ("delete", "Delete")]);
+                dialog.add_responses(&[("cancel", &tr("Cancel")), ("delete", &tr("Delete"))]);
                 dialog.set_close_response("cancel");
                 dialog.set_default_response(Some("cancel"));
                 dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
@@ -941,7 +977,7 @@ impl App {
                 self.detail.request_token = self.detail.request_token.saturating_add(1);
                 let token = self.detail.request_token;
                 self.loading = true;
-                self.status = format!("Deleting {}...", target.name);
+                self.status = tr_format("Deleting {name}...", &[("{name}", target.name.clone())]);
                 self.sync_status();
                 sender.oneshot_command(async move { delete_object(token, target).await });
             }
@@ -960,8 +996,10 @@ impl App {
                 self.sync_log_controls();
                 self.sync_terminal_controls();
                 self.sync_port_forward_controls();
-                self.toaster
-                    .add_toast(adw::Toast::new(&format!("Deleted {name}.")));
+                self.toaster.add_toast(adw::Toast::new(&tr_format(
+                    "Deleted {name}.",
+                    &[("{name}", name)],
+                )));
                 self.refresh_objects(sender);
             }
             AppMsg::ObjectDeleted(token, Err(error)) => {
@@ -969,7 +1007,7 @@ impl App {
                     return;
                 }
                 self.loading = false;
-                self.status = String::from("Unable to delete object.");
+                self.status = tr("Unable to delete object.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
@@ -1012,7 +1050,7 @@ impl App {
                     if let Err(error) = result {
                         self.detail
                             .port_status_label
-                            .set_label("Port-forward stopped.");
+                            .set_label(&tr("Port-forward stopped."));
                         self.toaster.add_toast(adw::Toast::new(&error));
                     }
                 }
@@ -1029,8 +1067,8 @@ impl App {
             }
             AppMsg::ShowImportFile => {
                 let dialog = gtk::FileDialog::builder()
-                    .title("Import Kubeconfig")
-                    .accept_label("Import")
+                    .title(tr("Import Kubeconfig"))
+                    .accept_label(tr("Import"))
                     .modal(true)
                     .build();
                 let sender = sender.clone();
@@ -1042,7 +1080,7 @@ impl App {
                             if let Some(path) = file.path() {
                                 sender.input(AppMsg::ImportKubeconfig(path));
                             } else {
-                                sender.input(AppMsg::Toast(String::from(
+                                sender.input(AppMsg::Toast(tr(
                                     "Selected file is not available on the local filesystem.",
                                 )));
                             }
@@ -1075,7 +1113,7 @@ impl App {
                 self.loading = false;
                 self.stop_object_watch();
                 self.objects.clear();
-                self.status = String::from("Unable to list selected resource.");
+                self.status = tr("Unable to list selected resource.");
                 self.sync_status();
                 self.rebuild_object_list();
                 self.toaster.add_toast(adw::Toast::new(&error));
@@ -1098,7 +1136,8 @@ impl App {
                         self.schedule_object_list_refresh(&sender);
                     }
                     ObjectWatchEvent::Error(error) => {
-                        self.status = format!("Live watch reconnecting: {error}");
+                        self.status =
+                            tr_format("Live watch reconnecting: {error}", &[("{error}", error)]);
                         self.sync_status();
                     }
                 }
@@ -1116,7 +1155,7 @@ impl App {
                 }
                 self.object_watch_abort_handle = None;
                 if let Err(error) = result {
-                    self.status = format!("Live watch stopped: {error}");
+                    self.status = tr_format("Live watch stopped: {error}", &[("{error}", error)]);
                     self.sync_status();
                 }
             }
@@ -1131,9 +1170,9 @@ impl App {
                 };
                 self.loading = true;
                 self.status = if self.editing_cluster {
-                    String::from("Saving cluster...")
+                    tr("Saving cluster...")
                 } else {
-                    String::from("Adding cluster...")
+                    tr("Adding cluster...")
                 };
                 self.setup_button.set_sensitive(false);
                 self.sync_status();
@@ -1141,34 +1180,38 @@ impl App {
             }
             AppMsg::ClusterAdded(Ok((path, context_name))) => {
                 self.loading = true;
-                self.status = String::from("Loading kubeconfig...");
+                self.status = tr("Loading kubeconfig...");
                 self.setup_button.set_sensitive(true);
                 self.setup_token_entry.set_text("");
                 self.editing_context_name = None;
                 self.cluster_dialog.close();
-                self.toaster
-                    .add_toast(adw::Toast::new(&format!("Cluster saved to {path}")));
+                self.toaster.add_toast(adw::Toast::new(&tr_format(
+                    "Cluster saved to {path}",
+                    &[("{path}", path)],
+                )));
                 sender.oneshot_command(async move { load_state_for_cluster(context_name).await });
             }
             AppMsg::ClusterAdded(Err(error)) => {
                 self.loading = false;
                 self.setup_button.set_sensitive(true);
-                self.status = String::from("Unable to add cluster.");
+                self.status = tr("Unable to add cluster.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
             AppMsg::ImportKubeconfig(path) => {
                 self.loading = true;
-                self.status = String::from("Importing kubeconfig...");
+                self.status = tr("Importing kubeconfig...");
                 self.sync_status();
                 sender.oneshot_command(async move { import_kubeconfig(path).await });
             }
             AppMsg::KubeconfigImported(Ok((path, context_names))) => {
                 self.loading = true;
-                self.status = String::from("Loading kubeconfig...");
+                self.status = tr("Loading kubeconfig...");
                 self.cluster_dialog.close();
-                self.toaster
-                    .add_toast(adw::Toast::new(&format!("Kubeconfig imported to {path}")));
+                self.toaster.add_toast(adw::Toast::new(&tr_format(
+                    "Kubeconfig imported to {path}",
+                    &[("{path}", path)],
+                )));
                 sender.oneshot_command(async move {
                     load_state_for_imported_clusters(context_names).await
                 });
@@ -1190,18 +1233,18 @@ impl App {
                 self.loading = false;
                 self.sync_dropdowns(Some(sender.clone()));
                 self.enter_clusters_page(sender);
-                self.status = String::from("Kubeconfig imported.");
+                self.status = tr("Kubeconfig imported.");
                 self.sync_status();
             }
             AppMsg::StateLoadedForImportedClusters(_, Err(error)) => {
                 self.loading = false;
-                self.status = String::from("Unable to reload kubeconfig.");
+                self.status = tr("Unable to reload kubeconfig.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
             AppMsg::KubeconfigImported(Err(error)) => {
                 self.loading = false;
-                self.status = String::from("Unable to import kubeconfig.");
+                self.status = tr("Unable to import kubeconfig.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
             }

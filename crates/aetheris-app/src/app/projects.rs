@@ -103,14 +103,14 @@ impl ObjectColumn {
         Self::Age,
     ];
 
-    pub(super) fn label(self) -> &'static str {
+    pub(super) fn label(self) -> String {
         match self {
-            Self::Namespace => "Namespace",
-            Self::Status => "Status",
-            Self::Cpu => "CPU",
-            Self::Memory => "Memory",
-            Self::Api => "API",
-            Self::Age => "Age",
+            Self::Namespace => tr("Namespace"),
+            Self::Status => tr("Status"),
+            Self::Cpu => tr("CPU"),
+            Self::Memory => tr("Memory"),
+            Self::Api => tr("API"),
+            Self::Age => tr("Age"),
         }
     }
 
@@ -138,13 +138,13 @@ impl StatusFilter {
         Self::Failed,
     ];
 
-    pub(super) fn label(self) -> &'static str {
+    pub(super) fn label(self) -> String {
         match self {
-            Self::Ready => "Ready",
-            Self::Unavailable => "Unavailable",
-            Self::Running => "Running",
-            Self::Pending => "Pending",
-            Self::Failed => "Failed",
+            Self::Ready => tr("Ready"),
+            Self::Unavailable => tr("Unavailable"),
+            Self::Running => tr("Running"),
+            Self::Pending => tr("Pending"),
+            Self::Failed => tr("Failed"),
         }
     }
 
@@ -188,15 +188,15 @@ impl ResourceSection {
         Self::Custom,
     ];
 
-    pub(super) fn label(self) -> &'static str {
+    pub(super) fn label(self) -> String {
         match self {
-            Self::Workloads => "Workloads",
-            Self::Network => "Network",
-            Self::Storage => "Storage",
-            Self::Configuration => "Configuration",
-            Self::Access => "Access",
-            Self::Cluster => "Cluster",
-            Self::Custom => "Custom",
+            Self::Workloads => tr("Workloads"),
+            Self::Network => tr("Network"),
+            Self::Storage => tr("Storage"),
+            Self::Configuration => tr("Configuration"),
+            Self::Access => tr("Access"),
+            Self::Cluster => tr("Cluster"),
+            Self::Custom => tr("Custom"),
         }
     }
 
@@ -455,13 +455,28 @@ impl ProjectStore {
             return Ok(());
         };
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|error| format!("Unable to create project config directory: {error}"))?;
+            fs::create_dir_all(parent).map_err(|error| {
+                tr_format(
+                    "Unable to create project config directory: {error}",
+                    &[("{error}", error.to_string())],
+                )
+            })?;
         }
-        let data = serde_json::to_string_pretty(self)
-            .map_err(|error| format!("Unable to encode projects: {error}"))?;
-        fs::write(&path, data)
-            .map_err(|error| format!("Unable to write project config {}: {error}", path.display()))
+        let data = serde_json::to_string_pretty(self).map_err(|error| {
+            tr_format(
+                "Unable to encode projects: {error}",
+                &[("{error}", error.to_string())],
+            )
+        })?;
+        fs::write(&path, data).map_err(|error| {
+            tr_format(
+                "Unable to write project config {path}: {error}",
+                &[
+                    ("{path}", path.display().to_string()),
+                    ("{error}", error.to_string()),
+                ],
+            )
+        })
     }
 
     pub(super) fn read_from_disk() -> Option<Self> {

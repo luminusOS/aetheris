@@ -22,7 +22,7 @@ pub(super) fn format_error(error: anyhow::Error) -> String {
     let headline = chain
         .next()
         .map(ToString::to_string)
-        .unwrap_or_else(|| String::from("Unknown error"));
+        .unwrap_or_else(|| tr("Unknown error"));
 
     // Only the root cause, not every link: middle-of-the-chain wrapping
     // context tends to just repeat the headline in other words.
@@ -42,12 +42,13 @@ pub(super) fn terminal_error_message(error: &str) -> String {
         || lower.contains("pods/exec")
         || (lower.contains("cannot create") && lower.contains("exec"))
     {
-        return String::from(
-            "You do not have permission to open a terminal for this Pod. Your Kubernetes user needs create access to pods/exec in this namespace.",
-        );
+        return tr("You do not have permission to open a terminal for this Pod. Your Kubernetes user needs create access to pods/exec in this namespace.");
     }
 
-    format!("Terminal failed to start: {error}")
+    tr_format(
+        "Terminal failed to start: {error}",
+        &[("{error}", error.to_string())],
+    )
 }
 
 /// Kubernetes RBAC denials spell out the exact user, resource, API group,
@@ -62,7 +63,10 @@ fn forbidden_summary(message: &str) -> Option<String> {
     if position < 2 || words[position - 1] != "is" {
         return None;
     }
-    Some(format!("{} is forbidden", words[position - 2]))
+    Some(tr_format(
+        "{resource} is forbidden",
+        &[("{resource}", words[position - 2].to_string())],
+    ))
 }
 
 pub(super) fn object_matches(object: &ObjectSummary, query: &str) -> bool {

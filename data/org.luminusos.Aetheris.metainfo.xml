@@ -3,6 +3,7 @@
   <id>org.luminusos.Aetheris</id>
   <name>Aetheris</name>
   <summary>Native Kubernetes client for GNOME</summary>
+  <summary xml:lang="pt-BR">Cliente Kubernetes nativo para GNOME</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <developer id="org.luminusos">
@@ -33,6 +34,13 @@
       <li>Inspect resources with overview, YAML, conditions, events, related pods, logs, and metrics</li>
       <li>Apply YAML, create resources, delete resources, scale deployments, cordon and drain nodes</li>
       <li>Open multiple interactive pod terminals through VTE</li>
+    </ul>
+    <p xml:lang="pt-BR">Aetheris é um cliente Kubernetes nativo para GNOME que organiza clusters por projeto e mantém operações comuns próximas dos recursos que você está inspecionando.</p>
+    <ul>
+      <li xml:lang="pt-BR">Navegue por recursos de clusters com atualizações ao vivo</li>
+      <li xml:lang="pt-BR">Inspecione detalhes, YAML, eventos, condições, métricas e Pods relacionados</li>
+      <li xml:lang="pt-BR">Crie, aplique, exclua, escale, faça cordon e drain em recursos compatíveis</li>
+      <li xml:lang="pt-BR">Leia logs, encaminhe portas e abra terminais interativos em Pods</li>
     </ul>
   </description>
   <launchable type="desktop-id">org.luminusos.Aetheris.desktop</launchable>

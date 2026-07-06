@@ -1,0 +1,1642 @@
+# Portuguese translations for Aetheris package
+# Traduções em português brasileiro para o pacote Aetheris.
+# Copyright (C) 2026 THE Aetheris'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the Aetheris package.
+# Automatically generated, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Aetheris\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-07-06 14:56-0300\n"
+"PO-Revision-Date: 2026-07-06 14:50-0300\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: crates/aetheris-app/src/app/component.rs:48
+msgid "Add project"
+msgstr "Adicionar projeto"
+
+#: crates/aetheris-app/src/app/component.rs:55
+msgid "Add Project"
+msgstr "Adicionar Projeto"
+
+#: crates/aetheris-app/src/app/component.rs:63
+msgid "No Projects Yet"
+msgstr "Ainda Não Há Projetos"
+
+#: crates/aetheris-app/src/app/component.rs:64
+msgid "Create a project to organize your clusters."
+msgstr "Crie um projeto para organizar seus clusters."
+
+#: crates/aetheris-app/src/app/component.rs:70
+#: crates/aetheris-app/src/app/methods.rs:388
+msgid "No cluster"
+msgstr "Nenhum cluster"
+
+#: crates/aetheris-app/src/app/component.rs:75
+msgid "Back to clusters"
+msgstr "Voltar aos clusters"
+
+#: crates/aetheris-app/src/app/component.rs:79
+msgid "Edit Cluster..."
+msgstr "Editar Cluster..."
+
+#: crates/aetheris-app/src/app/component.rs:80
+msgid "Remove from Project"
+msgstr "Remover do Projeto"
+
+#: crates/aetheris-app/src/app/component.rs:83
+msgid "Cluster options"
+msgstr "Opções do cluster"
+
+#: crates/aetheris-app/src/app/component.rs:88
+msgid "Refresh cluster health"
+msgstr "Atualizar saúde do cluster"
+
+#: crates/aetheris-app/src/app/component.rs:97
+msgid "Add cluster"
+msgstr "Adicionar cluster"
+
+#: crates/aetheris-app/src/app/component.rs:99
+#: crates/aetheris-app/src/app/handler.rs:1071
+msgid "Import"
+msgstr "Importar"
+
+#: crates/aetheris-app/src/app/component.rs:104
+#: crates/aetheris-app/src/app/component.rs:508
+#: crates/aetheris-app/src/app/dialogs.rs:176
+#: crates/aetheris-app/src/app/methods.rs:188
+#: crates/aetheris-app/src/app/methods.rs:192
+msgid "Add Cluster"
+msgstr "Adicionar Cluster"
+
+#: crates/aetheris-app/src/app/component.rs:112
+msgid "No Clusters Yet"
+msgstr "Ainda Não Há Clusters"
+
+#: crates/aetheris-app/src/app/component.rs:113
+msgid "Add a cluster to start browsing this project."
+msgstr "Adicione um cluster para começar a navegar neste projeto."
+
+#: crates/aetheris-app/src/app/component.rs:126
+#: crates/aetheris-app/src/app/component.rs:135
+#: crates/aetheris-app/src/app/dialogs.rs:9
+#: crates/aetheris-app/src/app/layout.rs:26
+#: crates/aetheris-app/src/app/object_detail.rs:261
+#: crates/aetheris-app/src/app/projects.rs:108
+#: crates/aetheris-app/src/app/yaml.rs:307
+msgid "Namespace"
+msgstr "Namespace"
+
+#: crates/aetheris-app/src/app/component.rs:130
+msgid "Use"
+msgstr "Usar"
+
+#: crates/aetheris-app/src/app/component.rs:131
+msgid "Use and save this namespace"
+msgstr "Usar e salvar este namespace"
+
+#: crates/aetheris-app/src/app/component.rs:138
+#: crates/aetheris-app/src/app/handler.rs:143
+#: crates/aetheris-app/src/app/widgets.rs:115
+msgid "Rename"
+msgstr "Renomear"
+
+#: crates/aetheris-app/src/app/component.rs:141
+msgid "Project Name"
+msgstr "Nome do Projeto"
+
+#: crates/aetheris-app/src/app/component.rs:144
+#: crates/aetheris-app/src/app/component.rs:194
+#: crates/aetheris-app/src/app/component.rs:528
+#: crates/aetheris-app/src/app/handler.rs:133
+msgid "Create"
+msgstr "Criar"
+
+#: crates/aetheris-app/src/app/component.rs:147
+#: crates/aetheris-app/src/app/handler.rs:132
+msgid "Separate clusters by environment or company"
+msgstr "Separe clusters por ambiente ou empresa"
+
+#: crates/aetheris-app/src/app/component.rs:149
+msgid "Rename Project..."
+msgstr "Renomear Projeto..."
+
+#: crates/aetheris-app/src/app/component.rs:151
+msgid "Duplicate Project"
+msgstr "Duplicar Projeto"
+
+#: crates/aetheris-app/src/app/component.rs:154
+msgid "Delete Project..."
+msgstr "Excluir Projeto..."
+
+#: crates/aetheris-app/src/app/component.rs:157
+msgid "Project options"
+msgstr "Opções do projeto"
+
+#: crates/aetheris-app/src/app/component.rs:167
+msgid "Search"
+msgstr "Pesquisar"
+
+#: crates/aetheris-app/src/app/component.rs:190
+msgid "Back to projects"
+msgstr "Voltar aos projetos"
+
+#: crates/aetheris-app/src/app/component.rs:196
+msgid "Create object from YAML"
+msgstr "Criar objeto a partir de YAML"
+
+#: crates/aetheris-app/src/app/component.rs:201
+msgid "Refresh resources"
+msgstr "Atualizar recursos"
+
+#: crates/aetheris-app/src/app/component.rs:206
+msgid "Back to objects"
+msgstr "Voltar aos objetos"
+
+#: crates/aetheris-app/src/app/component.rs:210
+msgid "Objects"
+msgstr "Objetos"
+
+#: crates/aetheris-app/src/app/component.rs:222
+#: crates/aetheris-app/src/app/component.rs:880
+#: crates/aetheris-app/src/app/handler.rs:1183
+#: crates/aetheris-app/src/app/handler.rs:1209
+msgid "Loading kubeconfig..."
+msgstr "Carregando kubeconfig..."
+
+#: crates/aetheris-app/src/app/component.rs:241
+#: crates/aetheris-app/src/app/component.rs:489
+#: crates/aetheris-app/src/app/object_detail.rs:259
+#: crates/aetheris-app/src/app/widgets.rs:616
+#: crates/aetheris-app/src/app/yaml.rs:300
+msgid "Name"
+msgstr "Nome"
+
+#: crates/aetheris-app/src/app/component.rs:286
+msgid "Scale"
+msgstr "Escalar"
+
+#: crates/aetheris-app/src/app/component.rs:288
+msgid "Scale deployment replicas"
+msgstr "Escalar réplicas do deployment"
+
+#: crates/aetheris-app/src/app/component.rs:293
+#: crates/aetheris-app/src/app/methods.rs:790
+msgid "Cordon"
+msgstr "Cordon"
+
+#: crates/aetheris-app/src/app/component.rs:295
+msgid "Toggle node scheduling"
+msgstr "Alternar agendamento do nó"
+
+#: crates/aetheris-app/src/app/component.rs:300
+#: crates/aetheris-app/src/app/handler.rs:767
+msgid "Drain"
+msgstr "Drain"
+
+#: crates/aetheris-app/src/app/component.rs:302
+msgid "Drain eligible pods from this node"
+msgstr "Drenar Pods elegíveis deste nó"
+
+#: crates/aetheris-app/src/app/component.rs:308
+msgid "Explain"
+msgstr "Explicar"
+
+#: crates/aetheris-app/src/app/component.rs:310
+msgid "Explain this YAML manifest"
+msgstr "Explicar este manifesto YAML"
+
+#: crates/aetheris-app/src/app/component.rs:314
+msgid "Apply YAML"
+msgstr "Aplicar YAML"
+
+#: crates/aetheris-app/src/app/component.rs:316
+msgid "Apply edited YAML to the cluster"
+msgstr "Aplicar YAML editado ao cluster"
+
+#: crates/aetheris-app/src/app/component.rs:321
+#: crates/aetheris-app/src/app/handler.rs:862
+msgid "Save YAML"
+msgstr "Salvar YAML"
+
+#: crates/aetheris-app/src/app/component.rs:323
+msgid "Save YAML to a local file"
+msgstr "Salvar YAML em um arquivo local"
+
+#: crates/aetheris-app/src/app/component.rs:328
+msgid "Delete this object"
+msgstr "Excluir este objeto"
+
+#: crates/aetheris-app/src/app/component.rs:338
+msgid "Open terminal"
+msgstr "Abrir terminal"
+
+#: crates/aetheris-app/src/app/component.rs:349
+#: crates/aetheris-app/src/app/handler.rs:610
+#: crates/aetheris-app/src/app/methods.rs:744
+msgid "Hide summary to see more of this tab"
+msgstr "Ocultar resumo para ver mais desta aba"
+
+#: crates/aetheris-app/src/app/component.rs:367
+#: crates/aetheris-app/src/app/object_detail.rs:355
+msgid "Pods are shown for Deployments"
+msgstr "Pods são exibidos para Deployments"
+
+#: crates/aetheris-app/src/app/component.rs:368
+#: crates/aetheris-app/src/app/object_detail.rs:356
+msgid "Open a Deployment to inspect its related Pods."
+msgstr "Abra um Deployment para inspecionar os Pods relacionados."
+
+#: crates/aetheris-app/src/app/component.rs:372
+#: crates/aetheris-app/src/app/object_detail.rs:388
+#: crates/aetheris-app/src/app/streams.rs:419
+#: crates/aetheris-app/src/app/streams.rs:433
+msgid "No containers"
+msgstr "Nenhum contêiner"
+
+#: crates/aetheris-app/src/app/component.rs:375
+msgid "Follow"
+msgstr "Seguir"
+
+#: crates/aetheris-app/src/app/component.rs:379
+msgid "Timestamps"
+msgstr "Timestamps"
+
+#: crates/aetheris-app/src/app/component.rs:383
+#: crates/aetheris-app/src/app/component.rs:421
+msgid "Start"
+msgstr "Iniciar"
+
+#: crates/aetheris-app/src/app/component.rs:385
+msgid "Start log streaming"
+msgstr "Iniciar streaming de logs"
+
+#: crates/aetheris-app/src/app/component.rs:389
+#: crates/aetheris-app/src/app/component.rs:427
+msgid "Stop"
+msgstr "Parar"
+
+#: crates/aetheris-app/src/app/component.rs:391
+msgid "Stop log streaming"
+msgstr "Parar streaming de logs"
+
+#: crates/aetheris-app/src/app/component.rs:395
+msgid "Clear"
+msgstr "Limpar"
+
+#: crates/aetheris-app/src/app/component.rs:397
+msgid "Clear visible logs"
+msgstr "Limpar logs visíveis"
+
+#: crates/aetheris-app/src/app/component.rs:401
+msgid "Save logs to a local file"
+msgstr "Salvar logs em um arquivo local"
+
+#: crates/aetheris-app/src/app/component.rs:404
+#: crates/aetheris-app/src/app/streams.rs:86
+#: crates/aetheris-app/src/app/streams.rs:428
+msgid "Logs are available for Pods."
+msgstr "Logs estão disponíveis para Pods."
+
+#: crates/aetheris-app/src/app/component.rs:415
+msgid "Local port, or 0 for an automatic port"
+msgstr "Porta local, ou 0 para uma porta automática"
+
+#: crates/aetheris-app/src/app/component.rs:419
+msgid "Pod port to forward"
+msgstr "Porta do Pod para encaminhar"
+
+#: crates/aetheris-app/src/app/component.rs:423
+msgid "Start port forwarding"
+msgstr "Iniciar encaminhamento de porta"
+
+#: crates/aetheris-app/src/app/component.rs:429
+msgid "Stop port forwarding"
+msgstr "Parar encaminhamento de porta"
+
+#: crates/aetheris-app/src/app/component.rs:433
+#: crates/aetheris-app/src/app/streams.rs:312
+#: crates/aetheris-app/src/app/streams.rs:378
+msgid "Port forwarding is available for Pods."
+msgstr "Encaminhamento de porta está disponível para Pods."
+
+#: crates/aetheris-app/src/app/component.rs:493
+msgid "API Server"
+msgstr "Servidor da API"
+
+#: crates/aetheris-app/src/app/component.rs:497
+msgid "Bearer Token"
+msgstr "Token Bearer"
+
+#: crates/aetheris-app/src/app/component.rs:501
+msgid "CA Data"
+msgstr "Dados da CA"
+
+#: crates/aetheris-app/src/app/component.rs:505
+msgid "Skip TLS Verification"
+msgstr "Ignorar verificação TLS"
+
+#: crates/aetheris-app/src/app/component.rs:512
+#: crates/aetheris-app/src/app/dialogs.rs:208
+#: crates/aetheris-app/src/app/methods.rs:190
+msgid "Connect with token"
+msgstr "Conectar com token"
+
+#: crates/aetheris-app/src/app/component.rs:572
+msgid "Show Sidebar"
+msgstr "Mostrar Barra Lateral"
+
+#: crates/aetheris-app/src/app/dialogs.rs:18
+msgid "Use a Custom Namespace"
+msgstr "Usar um Namespace Personalizado"
+
+#: crates/aetheris-app/src/app/dialogs.rs:24
+msgid ""
+"Enter a namespace that was not returned by the cluster. It will be saved for "
+"this project."
+msgstr ""
+"Enter a namespace that was not returned by the cluster. It will be saved for "
+"this project."
+
+#: crates/aetheris-app/src/app/dialogs.rs:48
+#: crates/aetheris-app/src/app/dialogs.rs:57
+msgid "Rename Namespace"
+msgstr "Renomear Namespace"
+
+#: crates/aetheris-app/src/app/dialogs.rs:63
+msgid ""
+"This only renames the saved shortcut. It does not rename anything in the "
+"cluster."
+msgstr ""
+"This only renames the saved shortcut. It does not rename anything in the "
+"cluster."
+
+#: crates/aetheris-app/src/app/dialogs.rs:88
+#: crates/aetheris-app/src/app/handler.rs:130
+msgid "New Project"
+msgstr "Novo Projeto"
+
+#: crates/aetheris-app/src/app/dialogs.rs:120
+msgid "Create from YAML"
+msgstr "Criar a partir de YAML"
+
+#: crates/aetheris-app/src/app/dialogs.rs:199
+msgid "Choose how to connect"
+msgstr "Escolha como conectar"
+
+#: crates/aetheris-app/src/app/dialogs.rs:209
+msgid "Use an API server URL and bearer token."
+msgstr "Use uma URL do servidor da API e um token bearer."
+
+#: crates/aetheris-app/src/app/dialogs.rs:213
+msgid "Import kubeconfig"
+msgstr "Importar kubeconfig"
+
+#: crates/aetheris-app/src/app/dialogs.rs:214
+msgid "Merge contexts from an existing kubeconfig file."
+msgstr "Mesclar contextos de um arquivo kubeconfig existente."
+
+#: crates/aetheris-app/src/app/dialogs.rs:236
+msgid "Back to connection options"
+msgstr "Voltar às opções de conexão"
+
+#: crates/aetheris-app/src/app/handler.rs:26
+#: crates/aetheris-app/src/app/handler.rs:84
+#: crates/aetheris-app/src/app/handler.rs:270
+msgid "Select a project."
+msgstr "Selecione um projeto."
+
+#: crates/aetheris-app/src/app/handler.rs:40
+msgid "Kubeconfig unavailable."
+msgstr "Kubeconfig indisponível."
+
+#: crates/aetheris-app/src/app/handler.rs:64
+msgid "Cluster saved."
+msgstr "Cluster salvo."
+
+#: crates/aetheris-app/src/app/handler.rs:69
+#: crates/aetheris-app/src/app/handler.rs:1241
+msgid "Unable to reload kubeconfig."
+msgstr "Não foi possível recarregar o kubeconfig."
+
+#: crates/aetheris-app/src/app/handler.rs:95
+#: crates/aetheris-app/src/app/methods.rs:66
+msgid "Select a cluster."
+msgstr "Selecione um cluster."
+
+#: crates/aetheris-app/src/app/handler.rs:102
+msgid "Refreshing clusters."
+msgstr "Atualizando clusters."
+
+#: crates/aetheris-app/src/app/handler.rs:140
+msgid "Rename Project"
+msgstr "Renomear Projeto"
+
+#: crates/aetheris-app/src/app/handler.rs:142
+msgid "Choose a new name for this project"
+msgstr "Escolha um novo nome para este projeto"
+
+#: crates/aetheris-app/src/app/handler.rs:156
+#: crates/aetheris-app/src/app/handler.rs:181
+msgid "A project with this name already exists."
+msgstr "Já existe um projeto com este nome."
+
+#: crates/aetheris-app/src/app/handler.rs:201
+#, rust-format
+msgid "{name} copy"
+msgstr "cópia de {name}"
+
+#: crates/aetheris-app/src/app/handler.rs:205
+#, rust-format
+msgid "{name} copy {suffix}"
+msgstr "cópia {suffix} de {name}"
+
+#: crates/aetheris-app/src/app/handler.rs:221
+#, rust-format
+msgid "Duplicated as {name}"
+msgstr "Duplicado como {name}"
+
+#: crates/aetheris-app/src/app/handler.rs:229
+msgid "At least one project must remain."
+msgstr "Pelo menos um projeto deve permanecer."
+
+#: crates/aetheris-app/src/app/handler.rs:234
+msgid "Delete project?"
+msgstr "Excluir projeto?"
+
+#: crates/aetheris-app/src/app/handler.rs:236
+#, rust-format
+msgid ""
+"This removes \"{name}\" from Aetheris, including its saved clusters and "
+"namespaces. The clusters themselves are not affected."
+msgstr ""
+"Isto remove \"{name}\" do Aetheris, incluindo seus clusters e namespaces "
+"salvos. Os clusters em si não são afetados."
+
+#: crates/aetheris-app/src/app/handler.rs:240
+#: crates/aetheris-app/src/app/handler.rs:767
+#: crates/aetheris-app/src/app/handler.rs:962
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: crates/aetheris-app/src/app/handler.rs:240
+#: crates/aetheris-app/src/app/handler.rs:962
+msgid "Delete"
+msgstr "Excluir"
+
+#: crates/aetheris-app/src/app/handler.rs:294
+msgid "No listable Kubernetes resources found."
+msgstr "Nenhum recurso Kubernetes listável foi encontrado."
+
+#: crates/aetheris-app/src/app/handler.rs:305
+msgid "Unable to discover resources."
+msgstr "Não foi possível descobrir recursos."
+
+#: crates/aetheris-app/src/app/handler.rs:353
+#, rust-format
+msgid "Removed {context} from this project."
+msgstr "{context} removido deste projeto."
+
+#: crates/aetheris-app/src/app/handler.rs:423
+msgid "Namespace removed"
+msgstr "Namespace removido"
+
+#: crates/aetheris-app/src/app/handler.rs:458
+msgid "Namespace renamed"
+msgstr "Namespace renomeado"
+
+#: crates/aetheris-app/src/app/handler.rs:461
+msgid "A namespace with this name already exists."
+msgstr "Já existe um namespace com este nome."
+
+#: crates/aetheris-app/src/app/handler.rs:544
+#, rust-format
+msgid "Showing details for {name}"
+msgstr "Exibindo detalhes de {name}"
+
+#: crates/aetheris-app/src/app/handler.rs:566
+msgid "Unable to load object detail."
+msgstr "Não foi possível carregar detalhes do objeto."
+
+#: crates/aetheris-app/src/app/handler.rs:608
+msgid "Show summary"
+msgstr "Mostrar resumo"
+
+#: crates/aetheris-app/src/app/handler.rs:632
+msgid "Select a resource before creating YAML."
+msgstr "Selecione um recurso antes de criar YAML."
+
+#: crates/aetheris-app/src/app/handler.rs:651
+#, rust-format
+msgid "Creating {resource}..."
+msgstr "Criando {resource}..."
+
+#: crates/aetheris-app/src/app/handler.rs:664
+#, rust-format
+msgid "Created {name}."
+msgstr "{name} criado."
+
+#: crates/aetheris-app/src/app/handler.rs:671
+msgid "Unable to create object."
+msgstr "Não foi possível criar o objeto."
+
+#: crates/aetheris-app/src/app/handler.rs:686
+#, rust-format
+msgid "Scaling {name}..."
+msgstr "Escalando {name}..."
+
+#: crates/aetheris-app/src/app/handler.rs:697
+#, rust-format
+msgid "Scaled {name}"
+msgstr "{name} escalado"
+
+#: crates/aetheris-app/src/app/handler.rs:703
+msgid "Deployment scaled."
+msgstr "Deployment escalado."
+
+#: crates/aetheris-app/src/app/handler.rs:710
+msgid "Unable to scale deployment."
+msgstr "Não foi possível escalar o deployment."
+
+#: crates/aetheris-app/src/app/handler.rs:725
+#, rust-format
+msgid "Updating {name}..."
+msgstr "Atualizando {name}..."
+
+#: crates/aetheris-app/src/app/handler.rs:736
+#, rust-format
+msgid "Updated {name}"
+msgstr "{name} atualizado"
+
+#: crates/aetheris-app/src/app/handler.rs:742
+msgid "Node scheduling updated."
+msgstr "Agendamento do nó atualizado."
+
+#: crates/aetheris-app/src/app/handler.rs:749
+msgid "Unable to update node scheduling."
+msgstr "Não foi possível atualizar o agendamento do nó."
+
+#: crates/aetheris-app/src/app/handler.rs:761
+msgid "Drain node?"
+msgstr "Fazer drain do nó?"
+
+#: crates/aetheris-app/src/app/handler.rs:763
+#, rust-format
+msgid ""
+"This will remove eligible Pods from node {name}. DaemonSet, mirror and "
+"completed Pods are skipped."
+msgstr ""
+"Isto removerá Pods elegíveis do nó {name}. Pods de DaemonSet, mirror e "
+"concluídos são ignorados."
+
+#: crates/aetheris-app/src/app/handler.rs:788
+#, rust-format
+msgid "Draining {name}..."
+msgstr "Fazendo drain de {name}..."
+
+#: crates/aetheris-app/src/app/handler.rs:797
+#, rust-format
+msgid "Drained {name}"
+msgstr "Drain concluído em {name}"
+
+#: crates/aetheris-app/src/app/handler.rs:803
+#, rust-format
+msgid "Drain started for {count} Pods."
+msgstr "Drain iniciado para {count} Pods."
+
+#: crates/aetheris-app/src/app/handler.rs:812
+msgid "Unable to drain node."
+msgstr "Não foi possível fazer drain do nó."
+
+#: crates/aetheris-app/src/app/handler.rs:827
+#, rust-format
+msgid "Applying {name}..."
+msgstr "Aplicando {name}..."
+
+#: crates/aetheris-app/src/app/handler.rs:836
+#, rust-format
+msgid "Applied {name}"
+msgstr "{name} aplicado"
+
+#: crates/aetheris-app/src/app/handler.rs:842
+msgid "YAML applied."
+msgstr "YAML aplicado."
+
+#: crates/aetheris-app/src/app/handler.rs:849
+msgid "Unable to apply YAML."
+msgstr "Não foi possível aplicar o YAML."
+
+#: crates/aetheris-app/src/app/handler.rs:863
+#: crates/aetheris-app/src/app/handler.rs:912
+#: crates/aetheris-app/src/app/methods.rs:186
+msgid "Save"
+msgstr "Salvar"
+
+#: crates/aetheris-app/src/app/handler.rs:877
+#: crates/aetheris-app/src/app/handler.rs:926
+msgid "Selected destination is not available on the local filesystem."
+msgstr ""
+"O destino selecionado não está disponível no sistema de arquivos local."
+
+#: crates/aetheris-app/src/app/handler.rs:891
+#: crates/aetheris-app/src/app/handler.rs:940
+#, rust-format
+msgid "Saved {path}."
+msgstr "{path} salvo."
+
+#: crates/aetheris-app/src/app/handler.rs:895
+#: crates/aetheris-app/src/app/handler.rs:944
+#, rust-format
+msgid "Unable to save {path}: {error}"
+msgstr "Não foi possível salvar {path}: {error}"
+
+#: crates/aetheris-app/src/app/handler.rs:911
+msgid "Save Logs"
+msgstr "Salvar Logs"
+
+#: crates/aetheris-app/src/app/handler.rs:956
+msgid "Delete object?"
+msgstr "Excluir objeto?"
+
+#: crates/aetheris-app/src/app/handler.rs:958
+#, rust-format
+msgid "This will delete {kind} {name}."
+msgstr "Isto excluirá {kind} {name}."
+
+#: crates/aetheris-app/src/app/handler.rs:980
+#, rust-format
+msgid "Deleting {name}..."
+msgstr "Excluindo {name}..."
+
+#: crates/aetheris-app/src/app/handler.rs:1000
+#, rust-format
+msgid "Deleted {name}."
+msgstr "{name} excluído."
+
+#: crates/aetheris-app/src/app/handler.rs:1010
+msgid "Unable to delete object."
+msgstr "Não foi possível excluir o objeto."
+
+#: crates/aetheris-app/src/app/handler.rs:1053
+msgid "Port-forward stopped."
+msgstr "Port-forward parado."
+
+#: crates/aetheris-app/src/app/handler.rs:1070
+msgid "Import Kubeconfig"
+msgstr "Importar Kubeconfig"
+
+#: crates/aetheris-app/src/app/handler.rs:1084
+msgid "Selected file is not available on the local filesystem."
+msgstr ""
+"O arquivo selecionado não está disponível no sistema de arquivos local."
+
+#: crates/aetheris-app/src/app/handler.rs:1116
+msgid "Unable to list selected resource."
+msgstr "Não foi possível listar o recurso selecionado."
+
+#: crates/aetheris-app/src/app/handler.rs:1140
+#, rust-format
+msgid "Live watch reconnecting: {error}"
+msgstr "Watch ao vivo reconectando: {error}"
+
+#: crates/aetheris-app/src/app/handler.rs:1158
+#, rust-format
+msgid "Live watch stopped: {error}"
+msgstr "Watch ao vivo parado: {error}"
+
+#: crates/aetheris-app/src/app/handler.rs:1173
+msgid "Saving cluster..."
+msgstr "Salvando cluster..."
+
+#: crates/aetheris-app/src/app/handler.rs:1175
+msgid "Adding cluster..."
+msgstr "Adicionando cluster..."
+
+#: crates/aetheris-app/src/app/handler.rs:1189
+#, rust-format
+msgid "Cluster saved to {path}"
+msgstr "Cluster salvo em {path}"
+
+#: crates/aetheris-app/src/app/handler.rs:1197
+msgid "Unable to add cluster."
+msgstr "Não foi possível adicionar o cluster."
+
+#: crates/aetheris-app/src/app/handler.rs:1203
+msgid "Importing kubeconfig..."
+msgstr "Importando kubeconfig..."
+
+#: crates/aetheris-app/src/app/handler.rs:1212
+#, rust-format
+msgid "Kubeconfig imported to {path}"
+msgstr "Kubeconfig importado para {path}"
+
+#: crates/aetheris-app/src/app/handler.rs:1236
+msgid "Kubeconfig imported."
+msgstr "Kubeconfig importado."
+
+#: crates/aetheris-app/src/app/handler.rs:1247
+msgid "Unable to import kubeconfig."
+msgstr "Não foi possível importar o kubeconfig."
+
+#: crates/aetheris-app/src/app/layout.rs:33
+msgid "Resources"
+msgstr "Recursos"
+
+#: crates/aetheris-app/src/app/layout.rs:88
+msgid "Filters"
+msgstr "Filtros"
+
+#: crates/aetheris-app/src/app/layout.rs:137
+msgid "No objects"
+msgstr "Nenhum objeto"
+
+#: crates/aetheris-app/src/app/layout.rs:139
+msgid "The selected resource has no objects or could not be loaded."
+msgstr "O recurso selecionado não tem objetos ou não pôde ser carregado."
+
+#: crates/aetheris-app/src/app/layout.rs:178
+#: crates/aetheris-app/src/app/object_detail.rs:260
+#: crates/aetheris-app/src/app/projects.rs:109
+msgid "Status"
+msgstr "Status"
+
+#: crates/aetheris-app/src/app/layout.rs:190
+msgid "Columns"
+msgstr "Colunas"
+
+#: crates/aetheris-app/src/app/layout.rs:228
+msgid "Select a Project"
+msgstr "Selecione um Projeto"
+
+#: crates/aetheris-app/src/app/layout.rs:234
+msgid ""
+"Projects keep clusters, namespaces and resources separated by environment, "
+"team or company."
+msgstr ""
+"Projects keep clusters, namespaces and resources separated by environment, "
+"team or company."
+
+#: crates/aetheris-app/src/app/layout.rs:242
+msgid "Projects"
+msgstr "Projetos"
+
+#: crates/aetheris-app/src/app/layout.rs:310
+#: crates/aetheris-app/src/app/layout.rs:324
+msgid "Clusters"
+msgstr "Clusters"
+
+#: crates/aetheris-app/src/app/layout.rs:316
+msgid "Pick a cluster to browse, or add a new one to this project."
+msgstr "Escolha um cluster para navegar ou adicione um novo a este projeto."
+
+#: crates/aetheris-app/src/app/methods.rs:182
+msgid "Edit Cluster"
+msgstr "Editar Cluster"
+
+#: crates/aetheris-app/src/app/methods.rs:184
+msgid "Edit cluster"
+msgstr "Editar cluster"
+
+#: crates/aetheris-app/src/app/methods.rs:219
+#: crates/aetheris-app/src/app/methods.rs:252
+msgid "Select a Kubernetes context."
+msgstr "Selecione um contexto Kubernetes."
+
+#: crates/aetheris-app/src/app/methods.rs:237
+#, rust-format
+msgid "Discovering resources in {context}..."
+msgstr "Descobrindo recursos em {context}..."
+
+#: crates/aetheris-app/src/app/methods.rs:258
+msgid "Select a resource."
+msgstr "Selecione um recurso."
+
+#: crates/aetheris-app/src/app/methods.rs:270
+#, rust-format
+msgid "Loading {resource}..."
+msgstr "Carregando {resource}..."
+
+#: crates/aetheris-app/src/app/methods.rs:357
+msgid "objects"
+msgstr "objetos"
+
+#: crates/aetheris-app/src/app/methods.rs:369
+#, rust-format
+msgid "{filtered}/{total} objects in {resource}"
+msgstr "{filtered}/{total} objetos em {resource}"
+
+#: crates/aetheris-app/src/app/methods.rs:558
+msgid "No resources"
+msgstr "Nenhum recurso"
+
+#: crates/aetheris-app/src/app/methods.rs:559
+msgid "Connect to a cluster to load API resources."
+msgstr "Conecte-se a um cluster para carregar recursos da API."
+
+#: crates/aetheris-app/src/app/methods.rs:730
+#, rust-format
+msgid "Loading details for {name}..."
+msgstr "Carregando detalhes de {name}..."
+
+#: crates/aetheris-app/src/app/methods.rs:788
+msgid "Uncordon"
+msgstr "Desfazer cordon"
+
+#: crates/aetheris-app/src/app/methods.rs:822
+#, rust-format
+msgid "Pods ({count})"
+msgstr "Pods ({count})"
+
+#: crates/aetheris-app/src/app/methods.rs:831
+#, rust-format
+msgid "Conditions ({count})"
+msgstr "Condições ({count})"
+
+#: crates/aetheris-app/src/app/methods.rs:840
+#, rust-format
+msgid "Containers ({count})"
+msgstr "Contêineres ({count})"
+
+#: crates/aetheris-app/src/app/methods.rs:849
+#, rust-format
+msgid "Recent Events ({count})"
+msgstr "Eventos Recentes ({count})"
+
+#: crates/aetheris-app/src/app/methods.rs:853
+#: crates/aetheris-app/src/app/object_detail.rs:222
+msgid "Logs"
+msgstr "Logs"
+
+#: crates/aetheris-app/src/app/methods.rs:854
+#: crates/aetheris-app/src/app/object_detail.rs:129
+msgid "YAML"
+msgstr "YAML"
+
+#: crates/aetheris-app/src/app/object_detail.rs:76
+msgid "Port Forward"
+msgstr "Encaminhamento de Porta"
+
+#: crates/aetheris-app/src/app/object_detail.rs:78
+msgid "Local"
+msgstr "Local"
+
+#: crates/aetheris-app/src/app/object_detail.rs:79
+msgid "Remote"
+msgstr "Remota"
+
+#: crates/aetheris-app/src/app/object_detail.rs:141
+msgid "Recent Events"
+msgstr "Eventos Recentes"
+
+#: crates/aetheris-app/src/app/object_detail.rs:153
+msgid "Conditions"
+msgstr "Condições"
+
+#: crates/aetheris-app/src/app/object_detail.rs:165
+#: crates/aetheris-app/src/app/yaml.rs:628
+msgid "Containers"
+msgstr "Contêineres"
+
+#: crates/aetheris-app/src/app/object_detail.rs:189
+msgid "Pods"
+msgstr "Pods"
+
+#: crates/aetheris-app/src/app/object_detail.rs:262
+#: crates/aetheris-app/src/app/projects.rs:113
+msgid "Age"
+msgstr "Idade"
+
+#: crates/aetheris-app/src/app/object_detail.rs:263
+msgid "Kind"
+msgstr "Tipo"
+
+#: crates/aetheris-app/src/app/object_detail.rs:264
+#: crates/aetheris-app/src/app/projects.rs:110
+msgid "CPU"
+msgstr "CPU"
+
+#: crates/aetheris-app/src/app/object_detail.rs:265
+#: crates/aetheris-app/src/app/yaml.rs:293
+msgid "API Version"
+msgstr "Versão da API"
+
+#: crates/aetheris-app/src/app/object_detail.rs:266
+#: crates/aetheris-app/src/app/projects.rs:111
+msgid "Memory"
+msgstr "Memória"
+
+#: crates/aetheris-app/src/app/object_detail.rs:307
+msgid "Unable to load events"
+msgstr "Não foi possível carregar eventos"
+
+#: crates/aetheris-app/src/app/object_detail.rs:316
+msgid "No events"
+msgstr "Nenhum evento"
+
+#: crates/aetheris-app/src/app/object_detail.rs:317
+msgid "No events were found for this object."
+msgstr "Nenhum evento foi encontrado para este objeto."
+
+#: crates/aetheris-app/src/app/object_detail.rs:335
+msgid "No conditions"
+msgstr "Nenhuma condição"
+
+#: crates/aetheris-app/src/app/object_detail.rs:336
+msgid "This object does not expose status conditions."
+msgstr "Este objeto não expõe condições de status."
+
+#: crates/aetheris-app/src/app/object_detail.rs:363
+msgid "No related Pods"
+msgstr "Nenhum Pod relacionado"
+
+#: crates/aetheris-app/src/app/object_detail.rs:364
+msgid "No Pods matched this Deployment selector."
+msgstr "Nenhum Pod correspondeu ao seletor deste Deployment."
+
+#: crates/aetheris-app/src/app/object_detail.rs:389
+msgid "This Pod does not expose containers in its spec."
+msgstr "Este Pod não expõe contêineres na especificação."
+
+#: crates/aetheris-app/src/app/object_detail.rs:408
+#: crates/aetheris-app/src/app/projects.rs:145
+msgid "Running"
+msgstr "Em execução"
+
+#: crates/aetheris-app/src/app/object_detail.rs:415
+msgid "CPU usage"
+msgstr "Uso de CPU"
+
+#: crates/aetheris-app/src/app/object_detail.rs:421
+msgid "Memory usage"
+msgstr "Uso de memória"
+
+#: crates/aetheris-app/src/app/object_detail.rs:427
+msgid "Metrics unavailable"
+msgstr "Métricas indisponíveis"
+
+#: crates/aetheris-app/src/app/projects.rs:112
+msgid "API"
+msgstr "API"
+
+#: crates/aetheris-app/src/app/projects.rs:143
+msgid "Ready"
+msgstr "Pronto"
+
+#: crates/aetheris-app/src/app/projects.rs:144
+msgid "Unavailable"
+msgstr "Indisponível"
+
+#: crates/aetheris-app/src/app/projects.rs:146
+msgid "Pending"
+msgstr "Pendente"
+
+#: crates/aetheris-app/src/app/projects.rs:147
+msgid "Failed"
+msgstr "Falhou"
+
+#: crates/aetheris-app/src/app/projects.rs:193
+msgid "Workloads"
+msgstr "Workloads"
+
+#: crates/aetheris-app/src/app/projects.rs:194
+msgid "Network"
+msgstr "Rede"
+
+#: crates/aetheris-app/src/app/projects.rs:195
+msgid "Storage"
+msgstr "Armazenamento"
+
+#: crates/aetheris-app/src/app/projects.rs:196
+msgid "Configuration"
+msgstr "Configuração"
+
+#: crates/aetheris-app/src/app/projects.rs:197
+msgid "Access"
+msgstr "Acesso"
+
+#: crates/aetheris-app/src/app/projects.rs:198
+msgid "Cluster"
+msgstr "Cluster"
+
+#: crates/aetheris-app/src/app/projects.rs:199
+msgid "Custom"
+msgstr "Personalizado"
+
+#: crates/aetheris-app/src/app/projects.rs:460
+#, rust-format
+msgid "Unable to create project config directory: {error}"
+msgstr "Não foi possível criar o diretório de configuração do projeto: {error}"
+
+#: crates/aetheris-app/src/app/projects.rs:467
+#, rust-format
+msgid "Unable to encode projects: {error}"
+msgstr "Não foi possível codificar os projetos: {error}"
+
+#: crates/aetheris-app/src/app/projects.rs:473
+#, rust-format
+msgid "Unable to write project config {path}: {error}"
+msgstr "Não foi possível gravar a configuração do projeto {path}: {error}"
+
+#: crates/aetheris-app/src/app/streams.rs:92
+msgid "Select a container before starting logs."
+msgstr "Selecione um contêiner antes de iniciar os logs."
+
+#: crates/aetheris-app/src/app/streams.rs:165
+msgid "Terminal is available for Pods."
+msgstr "Terminal está disponível para Pods."
+
+#: crates/aetheris-app/src/app/streams.rs:170
+#: crates/aetheris-app/src/app/streams.rs:470
+msgid "This Pod has no containers in its spec."
+msgstr "This Pod has no containers in its spec."
+
+#: crates/aetheris-app/src/app/streams.rs:220
+msgid "Terminal windows are not available in the Windows build yet."
+msgstr "Janelas de terminal ainda não estão disponíveis na build Windows."
+
+#: crates/aetheris-app/src/app/streams.rs:382
+msgid "Starting port-forward..."
+msgstr "Iniciando port-forward..."
+
+#: crates/aetheris-app/src/app/streams.rs:386
+msgid "Choose local and remote ports to forward this Pod."
+msgstr "Escolha as portas local e remota para encaminhar este Pod."
+
+#: crates/aetheris-app/src/app/streams.rs:394
+#, rust-format
+msgid "Forwarding 127.0.0.1:{local_port} to the selected Pod."
+msgstr "Encaminhando 127.0.0.1:{local_port} para o Pod selecionado."
+
+#: crates/aetheris-app/src/app/streams.rs:401
+msgid "Port-forward connection active."
+msgstr "Conexão de port-forward ativa."
+
+#: crates/aetheris-app/src/app/streams.rs:406
+msgid "Waiting for the next local connection..."
+msgstr "Aguardando a próxima conexão local..."
+
+#: crates/aetheris-app/src/app/streams.rs:468
+msgid "Streaming pod logs..."
+msgstr "Transmitindo logs do Pod..."
+
+#: crates/aetheris-app/src/app/streams.rs:472
+msgid "Select a container and start logs."
+msgstr "Selecione um contêiner e inicie os logs."
+
+#: crates/aetheris-app/src/app/streams.rs:566
+msgid "YAML Explanation"
+msgstr "Explicação do YAML"
+
+#: crates/aetheris-app/src/app/streams.rs:593
+msgid "Container"
+msgstr "Contêiner"
+
+#: crates/aetheris-app/src/app/utils.rs:25
+msgid "Unknown error"
+msgstr "Erro desconhecido"
+
+#: crates/aetheris-app/src/app/utils.rs:46
+msgid ""
+"You do not have permission to open a terminal for this Pod. Your Kubernetes "
+"user needs create access to pods/exec in this namespace."
+msgstr ""
+"You do not have permission to open a terminal for this Pod. Your Kubernetes "
+"user needs create access to pods/exec in this namespace."
+
+#: crates/aetheris-app/src/app/utils.rs:51
+#, rust-format
+msgid "Terminal failed to start: {error}"
+msgstr "Falha ao iniciar o terminal: {error}"
+
+#: crates/aetheris-app/src/app/utils.rs:69
+#, rust-format
+msgid "{resource} is forbidden"
+msgstr "{resource} é proibido"
+
+#: crates/aetheris-app/src/app/widgets.rs:36
+msgid "Filter namespaces"
+msgstr "Filtrar namespaces"
+
+#: crates/aetheris-app/src/app/widgets.rs:91
+msgid "resource type"
+msgid_plural "resource types"
+msgstr[0] "tipo de recurso"
+msgstr[1] "tipos de recurso"
+
+#: crates/aetheris-app/src/app/widgets.rs:127
+msgid "Remove"
+msgstr "Remover"
+
+#: crates/aetheris-app/src/app/widgets.rs:145
+msgid "Add namespace"
+msgstr "Adicionar namespace"
+
+#: crates/aetheris-app/src/app/widgets.rs:453
+msgid "Checking..."
+msgstr "Verificando..."
+
+#: crates/aetheris-app/src/app/widgets.rs:454
+msgid "Active"
+msgstr "Ativo"
+
+#: crates/aetheris-app/src/app/widgets.rs:456
+msgid "Unreachable"
+msgstr "Inalcançável"
+
+#: crates/aetheris-app/src/app/widgets.rs:468
+msgid "Checking cluster..."
+msgstr "Verificando cluster..."
+
+#: crates/aetheris-app/src/app/widgets.rs:469
+msgid "Could not reach this cluster."
+msgstr "Não foi possível acessar este cluster."
+
+#: crates/aetheris-app/src/app/widgets.rs:476
+msgid "Kubernetes cluster"
+msgstr "Cluster Kubernetes"
+
+#: crates/aetheris-app/src/app/widgets.rs:897
+msgid "Unknown"
+msgstr "Erro desconhecido"
+
+#: crates/aetheris-app/src/app/widgets.rs:1032
+#: crates/aetheris-app/src/app/yaml.rs:40
+msgid "Find previous match (Shift+Enter)"
+msgstr "Encontrar ocorrência anterior (Shift+Enter)"
+
+#: crates/aetheris-app/src/app/widgets.rs:1036
+#: crates/aetheris-app/src/app/yaml.rs:44
+msgid "Find next match (Enter)"
+msgstr "Encontrar próxima ocorrência (Enter)"
+
+#: crates/aetheris-app/src/app/widgets.rs:1043
+#: crates/aetheris-app/src/app/yaml.rs:51
+msgid "Close search (Escape)"
+msgstr "Fechar pesquisa (Escape)"
+
+#: crates/aetheris-app/src/app/widgets.rs:1071
+#: crates/aetheris-app/src/app/yaml.rs:75
+msgid "No matches"
+msgstr "Nenhuma ocorrência"
+
+#: crates/aetheris-app/src/app/yaml.rs:78
+msgid "match"
+msgid_plural "matches"
+msgstr[0] "ocorrência"
+msgstr[1] "ocorrências"
+
+#: crates/aetheris-app/src/app/yaml.rs:216
+#, rust-format
+msgid "Line {line}: {message}"
+msgstr "Linha {line}: {message}"
+
+#: crates/aetheris-app/src/app/yaml.rs:240
+msgid "Unable to parse this YAML"
+msgstr "Não foi possível interpretar este YAML"
+
+#: crates/aetheris-app/src/app/yaml.rs:245
+msgid "This is not a Kubernetes object"
+msgstr "Isto não é um objeto Kubernetes"
+
+#: crates/aetheris-app/src/app/yaml.rs:246
+msgid ""
+"The document is valid YAML, but Kubernetes manifests must be maps with "
+"fields such as apiVersion, kind and metadata."
+msgstr ""
+"O documento é um YAML válido, mas manifestos Kubernetes devem ser mapas com "
+"campos como apiVersion, kind e metadata."
+
+#: crates/aetheris-app/src/app/yaml.rs:283
+msgid "Summary"
+msgstr "Resumo"
+
+#: crates/aetheris-app/src/app/yaml.rs:286
+msgid "Resource"
+msgstr "Recurso"
+
+#: crates/aetheris-app/src/app/yaml.rs:295
+msgid "Identifies the Kubernetes API group and version that owns this object."
+msgstr ""
+"Identifica o grupo e a versão da API Kubernetes que possuem este objeto."
+
+#: crates/aetheris-app/src/app/yaml.rs:302
+msgid "Unique object name inside its scope."
+msgstr "Nome único do objeto dentro de seu escopo."
+
+#: crates/aetheris-app/src/app/yaml.rs:316
+msgid "How Kubernetes Uses It"
+msgstr "Como o Kubernetes Usa Isto"
+
+#: crates/aetheris-app/src/app/yaml.rs:319
+msgid "Declared"
+msgstr "Declarado"
+
+#: crates/aetheris-app/src/app/yaml.rs:321
+msgid "Not declared"
+msgstr "Não declarado"
+
+#: crates/aetheris-app/src/app/yaml.rs:324
+msgid "Desired State"
+msgstr "Estado Desejado"
+
+#: crates/aetheris-app/src/app/yaml.rs:331
+#: crates/aetheris-app/src/app/yaml.rs:454
+#: crates/aetheris-app/src/app/yaml.rs:609
+#: crates/aetheris-app/src/app/yaml.rs:618
+#: crates/aetheris-app/src/app/yaml.rs:671
+#: crates/aetheris-app/src/app/yaml.rs:723
+msgid "Present"
+msgstr "Presente"
+
+#: crates/aetheris-app/src/app/yaml.rs:333
+msgid "Managed by cluster"
+msgstr "Gerenciado pelo cluster"
+
+#: crates/aetheris-app/src/app/yaml.rs:336
+msgid "Live State"
+msgstr "Estado Atual"
+
+#: crates/aetheris-app/src/app/yaml.rs:338
+msgid ""
+"Status is written by Kubernetes controllers and usually should not be edited "
+"manually."
+msgstr ""
+"Status é escrito pelos controllers Kubernetes e geralmente não deve ser "
+"editado manualmente."
+
+#: crates/aetheris-app/src/app/yaml.rs:346
+msgid "Metadata"
+msgstr "Metadados"
+
+#: crates/aetheris-app/src/app/yaml.rs:348
+msgid ""
+"Labels and annotations are commonly used for selection, automation and "
+"ownership."
+msgstr ""
+"Labels e anotações são comumente usadas para seleção, automação e ownership."
+
+#: crates/aetheris-app/src/app/yaml.rs:354
+msgid "Labels"
+msgstr "Labels"
+
+#: crates/aetheris-app/src/app/yaml.rs:358
+msgid "label"
+msgid_plural "labels"
+msgstr[0] "label"
+msgstr[1] "labels"
+
+#: crates/aetheris-app/src/app/yaml.rs:360
+msgid "Small key/value pairs used by selectors and grouping."
+msgstr "Pequenos pares chave/valor usados por seletores e agrupamento."
+
+#: crates/aetheris-app/src/app/yaml.rs:368
+msgid "Annotations"
+msgstr "Anotações"
+
+#: crates/aetheris-app/src/app/yaml.rs:372
+msgid "annotation"
+msgid_plural "annotations"
+msgstr[0] "anotação"
+msgstr[1] "anotações"
+
+#: crates/aetheris-app/src/app/yaml.rs:374
+msgid "Free-form metadata used by tools, controllers and integrations."
+msgstr "Metadados livres usados por ferramentas, controllers e integrações."
+
+#: crates/aetheris-app/src/app/yaml.rs:387
+#: crates/aetheris-app/src/app/yaml.rs:760
+msgid "Spec"
+msgstr "Spec"
+
+#: crates/aetheris-app/src/app/yaml.rs:397
+msgid "Data"
+msgstr "Dados"
+
+#: crates/aetheris-app/src/app/yaml.rs:399
+msgid "Payload fields used by configuration-oriented resources."
+msgstr "Campos de payload usados por recursos orientados a configuração."
+
+#: crates/aetheris-app/src/app/yaml.rs:409
+#: crates/aetheris-app/src/app/yaml.rs:423
+#: crates/aetheris-app/src/app/yaml.rs:711
+msgid "entry"
+msgid_plural "entries"
+msgstr[0] "entrada"
+msgstr[1] "entradas"
+
+#: crates/aetheris-app/src/app/yaml.rs:411
+msgid "Key/value payload. In Secrets these values are base64 encoded."
+msgstr ""
+"Payload chave/valor. Em Secrets, estes valores são codificados em base64."
+
+#: crates/aetheris-app/src/app/yaml.rs:425
+msgid "Plain string Secret input converted by Kubernetes into data."
+msgstr "Entrada textual de Secret convertida pelo Kubernetes em data."
+
+#: crates/aetheris-app/src/app/yaml.rs:446
+msgid "Other Fields"
+msgstr "Outros Campos"
+
+#: crates/aetheris-app/src/app/yaml.rs:448
+msgid "These fields are interpreted according to the resource schema."
+msgstr "Estes campos são interpretados de acordo com o schema do recurso."
+
+#: crates/aetheris-app/src/app/yaml.rs:455
+msgid "Additional top-level field in this manifest."
+msgstr "Campo adicional de nível superior neste manifesto."
+
+#: crates/aetheris-app/src/app/yaml.rs:490
+#, rust-format
+msgid "{kind} Manifest"
+msgstr "Manifesto {kind}"
+
+#: crates/aetheris-app/src/app/yaml.rs:500
+#, rust-format
+msgid "{name} at cluster scope"
+msgstr "{name} no escopo do cluster"
+
+#: crates/aetheris-app/src/app/yaml.rs:505
+#, rust-format
+msgid "{name} in namespace {namespace}"
+msgstr "{name} no namespace {namespace}"
+
+#: crates/aetheris-app/src/app/yaml.rs:570
+msgid "This resource is cluster-scoped and does not belong to a namespace."
+msgstr "Este recurso tem escopo de cluster e não pertence a um namespace."
+
+#: crates/aetheris-app/src/app/yaml.rs:572
+msgid ""
+"Namespace that scopes this resource and separates it from other environments."
+msgstr "Namespace que delimita este recurso e o separa de outros ambientes."
+
+#: crates/aetheris-app/src/app/yaml.rs:580
+msgid ""
+"ConfigMaps usually express desired configuration through data instead of "
+"spec."
+msgstr ""
+"ConfigMaps geralmente expressam a configuração desejada por meio de data em "
+"vez de spec."
+
+#: crates/aetheris-app/src/app/yaml.rs:582
+msgid ""
+"Secrets usually express desired sensitive data through data or stringData "
+"instead of spec."
+msgstr ""
+"Secrets geralmente expressam dados sensíveis desejados por meio de data ou "
+"stringData em vez de spec."
+
+#: crates/aetheris-app/src/app/yaml.rs:583
+msgid "This manifest does not include a spec section."
+msgstr "Este manifesto não inclui uma seção spec."
+
+#: crates/aetheris-app/src/app/yaml.rs:601
+msgid "Replicas"
+msgstr "Réplicas"
+
+#: crates/aetheris-app/src/app/yaml.rs:602
+msgid "Number of Pod copies the Deployment should keep running."
+msgstr "Número de cópias de Pod que o Deployment deve manter em execução."
+
+#: crates/aetheris-app/src/app/yaml.rs:608
+#: crates/aetheris-app/src/app/yaml.rs:670
+msgid "Selector"
+msgstr "Seletor"
+
+#: crates/aetheris-app/src/app/yaml.rs:610
+msgid "Matches the Pods managed by this Deployment."
+msgstr "Corresponde aos Pods gerenciados por este Deployment."
+
+#: crates/aetheris-app/src/app/yaml.rs:617
+msgid "Pod Template"
+msgstr "Template de Pod"
+
+#: crates/aetheris-app/src/app/yaml.rs:619
+msgid "Template used to create new Pods."
+msgstr "Template usado para criar novos Pods."
+
+#: crates/aetheris-app/src/app/yaml.rs:632
+msgid "container"
+msgid_plural "containers"
+msgstr[0] "contêiner"
+msgstr[1] "contêineres"
+
+#: crates/aetheris-app/src/app/yaml.rs:634
+msgid "Application containers started together in this Pod."
+msgstr "Contêineres de aplicação iniciados juntos neste Pod."
+
+#: crates/aetheris-app/src/app/yaml.rs:643
+msgid "Restart Policy"
+msgstr "Política de Reinício"
+
+#: crates/aetheris-app/src/app/yaml.rs:644
+msgid "Controls how Kubernetes restarts containers after exit."
+msgstr "Controla como o Kubernetes reinicia contêineres após a saída."
+
+#: crates/aetheris-app/src/app/yaml.rs:652
+msgid "Node"
+msgstr "Nó"
+
+#: crates/aetheris-app/src/app/yaml.rs:653
+msgid "Node currently targeted by this Pod."
+msgstr "Nó atualmente alvo deste Pod."
+
+#: crates/aetheris-app/src/app/yaml.rs:663
+msgid "Type"
+msgstr "Tipo"
+
+#: crates/aetheris-app/src/app/yaml.rs:664
+msgid "Controls how the Service is exposed."
+msgstr "Controla como o Service é exposto."
+
+#: crates/aetheris-app/src/app/yaml.rs:672
+msgid "Selects Pods that receive traffic from this Service."
+msgstr "Seleciona Pods que recebem tráfego deste Service."
+
+#: crates/aetheris-app/src/app/yaml.rs:679
+msgid "Ports"
+msgstr "Portas"
+
+#: crates/aetheris-app/src/app/yaml.rs:683
+msgid "port"
+msgid_plural "ports"
+msgstr[0] "porta"
+msgstr[1] "portas"
+
+#: crates/aetheris-app/src/app/yaml.rs:685
+msgid "Network ports exposed by this Service."
+msgstr "Portas de rede expostas por este Service."
+
+#: crates/aetheris-app/src/app/yaml.rs:694
+msgid "Rules"
+msgstr "Regras"
+
+#: crates/aetheris-app/src/app/yaml.rs:698
+msgid "rule"
+msgid_plural "rules"
+msgstr[0] "regra"
+msgstr[1] "regras"
+
+#: crates/aetheris-app/src/app/yaml.rs:700
+msgid "HTTP routing rules handled by this Ingress."
+msgstr "Regras de roteamento HTTP tratadas por este Ingress."
+
+#: crates/aetheris-app/src/app/yaml.rs:707
+msgid "TLS"
+msgstr "TLS"
+
+#: crates/aetheris-app/src/app/yaml.rs:713
+msgid "TLS certificate routing configuration."
+msgstr "Configuração de roteamento de certificado TLS."
+
+#: crates/aetheris-app/src/app/yaml.rs:722
+msgid "Job Template"
+msgstr "Template de Job"
+
+#: crates/aetheris-app/src/app/yaml.rs:724
+msgid "Template used to create scheduled Jobs."
+msgstr "Template usado para criar Jobs agendados."
+
+#: crates/aetheris-app/src/app/yaml.rs:733
+msgid "Schedule"
+msgstr "Agenda"
+
+#: crates/aetheris-app/src/app/yaml.rs:734
+msgid "Cron schedule used to create Jobs."
+msgstr "Agenda cron usada para criar Jobs."
+
+#: crates/aetheris-app/src/app/yaml.rs:752
+msgid "Field declared in the desired state for this resource."
+msgstr "Campo declarado no estado desejado deste recurso."
+
+#: crates/aetheris-app/src/app/yaml.rs:761
+msgid "Empty"
+msgstr "Vazio"
+
+#: crates/aetheris-app/src/app/yaml.rs:762
+msgid "No desired-state fields are declared in this spec."
+msgstr "Nenhum campo de estado desejado foi declarado nesta spec."
+
+#: crates/aetheris-app/src/app/yaml.rs:793
+msgid "Not set"
+msgstr "Não definido"
+
+#: crates/aetheris-app/src/app/yaml.rs:801
+msgid "item"
+msgid_plural "items"
+msgstr[0] "item"
+msgstr[1] "itens"
+
+#: crates/aetheris-app/src/app/yaml.rs:808
+msgid "field"
+msgid_plural "fields"
+msgstr[0] "campo"
+msgstr[1] "campos"
+
+#: crates/aetheris-app/src/app/yaml.rs:811
+msgid "Tagged value"
+msgstr "Valor com tag"
+
+#: crates/aetheris-app/src/app/yaml.rs:850
+msgid "Runs one or more containers together on a node."
+msgstr "Executa um ou mais contêineres juntos em um nó."
+
+#: crates/aetheris-app/src/app/yaml.rs:851
+msgid "Manages ReplicaSets and keeps the desired number of Pods running."
+msgstr "Gerencia ReplicaSets e mantém o número desejado de Pods em execução."
+
+#: crates/aetheris-app/src/app/yaml.rs:852
+msgid "Gives a stable virtual address and discovery name to a set of Pods."
+msgstr ""
+"Fornece um endereço virtual estável e um nome de descoberta para um conjunto "
+"de Pods."
+
+#: crates/aetheris-app/src/app/yaml.rs:853
+msgid "Routes external HTTP or HTTPS traffic to Services."
+msgstr "Roteia tráfego HTTP ou HTTPS externo para Services."
+
+#: crates/aetheris-app/src/app/yaml.rs:854
+msgid "Stores non-secret configuration consumed by Pods."
+msgstr "Armazena configuração não secreta consumida por Pods."
+
+#: crates/aetheris-app/src/app/yaml.rs:855
+msgid "Stores sensitive configuration. Values under data are base64 encoded."
+msgstr ""
+"Armazena configuração sensível. Valores em data são codificados em base64."
+
+#: crates/aetheris-app/src/app/yaml.rs:856
+msgid "Runs Pods until a task completes successfully."
+msgstr "Executa Pods até uma tarefa ser concluída com sucesso."
+
+#: crates/aetheris-app/src/app/yaml.rs:857
+msgid "Creates Jobs on a schedule."
+msgstr "Cria Jobs em uma agenda."
+
+#: crates/aetheris-app/src/app/yaml.rs:858
+msgid "Partitions namespaced resources inside a cluster."
+msgstr "Particiona recursos com namespace dentro de um cluster."
+
+#: crates/aetheris-app/src/app/yaml.rs:859
+msgid "Represents a worker machine registered in the cluster."
+msgstr "Representa uma máquina worker registrada no cluster."
+
+#: crates/aetheris-app/src/app/yaml.rs:860
+msgid "Declares the Kubernetes resource type for this manifest."
+msgstr "Declara o tipo de recurso Kubernetes deste manifesto."
+
+#: crates/aetheris-app/src/app/yaml.rs:866
+msgid ""
+"Desired Pod configuration, including containers, volumes, restart policy and "
+"scheduling hints."
+msgstr ""
+"Configuração desejada do Pod, incluindo contêineres, volumes, política de "
+"reinício e dicas de agendamento."
+
+#: crates/aetheris-app/src/app/yaml.rs:867
+msgid ""
+"Desired Deployment state, usually replicas, selector and the Pod template."
+msgstr ""
+"Estado desejado do Deployment, geralmente réplicas, seletor e template do "
+"Pod."
+
+#: crates/aetheris-app/src/app/yaml.rs:868
+msgid "Desired Service routing, including selector, type and exposed ports."
+msgstr ""
+"Roteamento desejado do Service, incluindo seletor, tipo e portas expostas."
+
+#: crates/aetheris-app/src/app/yaml.rs:869
+msgid "Desired routing rules, TLS configuration and backend Services."
+msgstr ""
+"Regras de roteamento desejadas, configuração TLS e Services de backend."
+
+#: crates/aetheris-app/src/app/yaml.rs:870
+msgid ""
+"Desired one-shot workload, including completion policy and Pod template."
+msgstr ""
+"Workload desejado de execução única, incluindo política de conclusão e "
+"template do Pod."
+
+#: crates/aetheris-app/src/app/yaml.rs:871
+msgid "Desired schedule and Job template."
+msgstr "Agenda desejada e template de Job."
+
+#: crates/aetheris-app/src/app/yaml.rs:872
+msgid ""
+"Node spec is mostly managed by Kubernetes and should be edited carefully."
+msgstr ""
+"A spec do Node é gerenciada principalmente pelo Kubernetes e deve ser "
+"editada com cuidado."
+
+#: crates/aetheris-app/src/app/yaml.rs:873
+msgid ""
+"Desired state for this resource. Controllers reconcile the live object "
+"toward this section."
+msgstr ""
+"Estado desejado deste recurso. Controllers reconciliam o objeto atual em "
+"direção a esta seção."

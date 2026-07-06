@@ -21,6 +21,7 @@ assets = [
   "../../data/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png",
   "../../data/icons/hicolor/512x512/apps/org.luminusos.Aetheris.png",
   "../../data/icons/hicolor/symbolic/apps/org.luminusos.Aetheris-symbolic.svg",
+  "../../po/pt_BR/LC_MESSAGES/org.luminusos.Aetheris.mo",
 ]
 auto_link = true
 auto_link_exclude_list = [
@@ -49,6 +50,7 @@ resources = [
   "../../data/style.css",
   "../../data/org.luminusos.Aetheris.metainfo.xml",
   "../../data/icons/hicolor",
+  "../../po/pt_BR/LC_MESSAGES/org.luminusos.Aetheris.mo",
 ]
 
 [dependencies]
@@ -67,3 +69,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 vte4 = "0.10"
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+gettext-rs = { version = "0.7", features = ["gettext-system"] }
