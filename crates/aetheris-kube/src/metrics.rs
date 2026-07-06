@@ -121,7 +121,6 @@ fn format_cpu_quantity(cores: f64) -> String {
     format!("{}m", (cores * 1000.0).ceil().max(0.0) as u64)
 }
 
-/// Mebibytes, like `kubectl top`: "83Mi".
 fn format_memory_quantity(bytes: f64) -> String {
     format!("{}Mi", (bytes / (1024.0 * 1024.0)).ceil().max(0.0) as u64)
 }

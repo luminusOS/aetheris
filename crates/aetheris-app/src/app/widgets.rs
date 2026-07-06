@@ -151,7 +151,6 @@ pub(super) fn add_namespace_selector_row() -> gtk::ListBoxRow {
 
 fn selector_action_row(title: &str, icon_name: &str) -> gtk::ListBoxRow {
     let row = gtk::ListBoxRow::new();
-    // Exempts the row from the selector popover's search filter.
     row.set_widget_name("selector-action-row");
     row.set_activatable(true);
     let action = adw::ActionRow::builder()
@@ -695,9 +694,6 @@ fn column_view_header(view: &gtk::ColumnView) -> Option<gtk::Widget> {
     None
 }
 
-/// Header-click sorter for one data column of the object tables; `None`
-/// for columns where sorting isn't meaningful. Ties fall back to the
-/// object name so the order is deterministic.
 pub(super) fn object_column_sorter(column: ObjectColumn) -> Option<gtk::CustomSorter> {
     match column {
         ObjectColumn::Namespace => Some(summary_sorter(|a, b| {
@@ -762,8 +758,6 @@ pub(super) fn connect_object_column_persistence(
         let width = view_column.fixed_width();
         let clamped = clamp_table_column_width(table_column, width);
         if clamped != width {
-            // Snap back into range; the set re-fires this notify with an
-            // in-range value.
             view_column.set_fixed_width(clamped);
             return;
         }
@@ -1012,9 +1006,6 @@ pub(super) fn grid_label(text: &str, width: Option<i32>, hexpand: bool) -> gtk::
     label
 }
 
-/// Shared by `grid_label` (at construction) and the live column-resize
-/// drag (updating an existing label in place) so the two never drift out
-/// of sync with each other.
 fn set_grid_label_pixel_width(label: &gtk::Label, width: i32) {
     // Conservative average px/char so max-width-chars' Pango-side estimate
     // stays comfortably under the pinned size_request floor for real

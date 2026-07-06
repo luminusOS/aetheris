@@ -75,9 +75,6 @@ impl Component for App {
             .tooltip_text("Back to clusters")
             .build();
         cluster_back_button.add_css_class("flat");
-        // HIG-style menu (as in Nautilus): a gio::Menu model instead of
-        // custom buttons — no icons, and registered accelerators render on
-        // the right edge of each item.
         let cluster_menu = gtk::gio::Menu::new();
         cluster_menu.append(Some("Edit Cluster…"), Some("win.cluster-edit"));
         cluster_menu.append(Some("Remove from Project"), Some("win.cluster-remove"));
@@ -656,9 +653,6 @@ impl Component for App {
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowClusters)
         });
-        // Backing actions for the hamburger menus. Registered on the window
-        // ("win." prefix); the accels are what the popover shows on the
-        // right of each item.
         type MenuAction = (&'static str, &'static [&'static str], fn() -> AppMsg);
         let menu_actions: [MenuAction; 5] = [
             ("cluster-edit", &["<primary>E"], || {

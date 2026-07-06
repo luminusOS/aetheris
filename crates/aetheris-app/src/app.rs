@@ -269,9 +269,6 @@ pub(super) enum ClusterSummaryState {
     Error(String),
 }
 
-/// Everything belonging to the object detail page: the header back button,
-/// the overview/YAML/events widgets, the logs and port-forward panes, and
-/// the state of what is currently being shown or streamed there.
 pub(super) struct DetailPane {
     back_button: gtk::Button,
     stack: gtk::Stack,
