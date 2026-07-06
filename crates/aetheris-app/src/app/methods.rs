@@ -227,10 +227,13 @@ impl App {
         self.detail.exec_target = None;
         self.detail.port_forward_target = None;
         self.loading = true;
+        self.namespaces = with_all_namespace(Vec::new());
         self.resources.clear();
         self.objects.clear();
+        self.selected_namespace = String::from("all");
         self.selected_resource = None;
         self.status = format!("Discovering resources in {context}...");
+        self.sync_dropdowns(Some(sender.clone()));
         self.rebuild_resource_list(Some(sender.clone()));
         self.rebuild_object_list();
         self.sync_terminal_controls();
@@ -298,6 +301,31 @@ impl App {
             || self.projects.selected_project().is_some_and(|project| {
                 project.has_custom_namespace(self.selected_context.as_deref(), namespace)
             })
+    }
+
+    pub(super) fn preferred_namespace_for_selected_context(&self, fallback: &str) -> String {
+        self.projects
+            .last_namespace_for_context(self.selected_context.as_deref())
+            .filter(|namespace| self.namespace_is_known(namespace))
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                self.namespaces
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| String::from(fallback))
+            })
+    }
+
+    pub(super) fn remember_selected_namespace(&mut self) {
+        let Some(context) = self.selected_context.clone() else {
+            return;
+        };
+        if self
+            .projects
+            .set_last_namespace_for_context(&context, &self.selected_namespace)
+        {
+            self.save_projects_or_toast();
+        }
     }
 
     pub(super) fn remember_namespace(&mut self, namespace: &str) {

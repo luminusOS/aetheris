@@ -4,6 +4,8 @@ use super::*;
 pub struct ProjectStore {
     pub(super) projects: Vec<Project>,
     pub(super) selected_project: Option<String>,
+    #[serde(default)]
+    pub(super) last_namespaces_by_context: Vec<ContextNamespaceSelection>,
     #[serde(default = "default_object_columns")]
     pub(super) visible_object_columns: Vec<ObjectColumn>,
     #[serde(default)]
@@ -24,6 +26,12 @@ pub(super) struct Project {
 pub(super) struct ContextNamespaces {
     pub(super) context: String,
     pub(super) namespaces: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct ContextNamespaceSelection {
+    pub(super) context: String,
+    pub(super) namespace: String,
 }
 
 #[derive(Debug, Clone)]
@@ -250,6 +258,7 @@ impl Default for ProjectStore {
                 custom_namespaces_by_context: Vec::new(),
             }],
             selected_project: Some(String::from(DEFAULT_PROJECT_NAME)),
+            last_namespaces_by_context: Vec::new(),
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
@@ -264,6 +273,7 @@ impl ProjectStore {
         store.normalize_object_column_widths();
         store.normalize_object_name_width();
         store.normalize_contexts(contexts);
+        store.normalize_last_namespaces(contexts);
         if let Err(error) = store.save() {
             tracing::warn!("Unable to persist projects: {error}");
         }
@@ -323,6 +333,46 @@ impl ProjectStore {
             ObjectTableColumn::Name => self.set_object_name_width(width),
             ObjectTableColumn::Data(column) => self.set_object_column_width(column, width),
         }
+    }
+
+    pub(super) fn last_namespace_for_context(&self, context: Option<&str>) -> Option<&str> {
+        let context = context?;
+        self.last_namespaces_by_context
+            .iter()
+            .find(|entry| entry.context == context)
+            .map(|entry| entry.namespace.as_str())
+    }
+
+    pub(super) fn set_last_namespace_for_context(
+        &mut self,
+        context: &str,
+        namespace: &str,
+    ) -> bool {
+        let context = context.trim();
+        let namespace = namespace.trim();
+        if context.is_empty() || namespace.is_empty() {
+            return false;
+        }
+
+        if let Some(entry) = self
+            .last_namespaces_by_context
+            .iter_mut()
+            .find(|entry| entry.context == context)
+        {
+            if entry.namespace == namespace {
+                return false;
+            }
+            entry.namespace = namespace.to_owned();
+            return true;
+        }
+
+        self.last_namespaces_by_context
+            .push(ContextNamespaceSelection {
+                context: context.to_owned(),
+                namespace: namespace.to_owned(),
+            });
+        self.normalize_last_namespaces(&[]);
+        true
     }
 
     fn set_object_name_width(&mut self, width: i32) -> bool {
@@ -474,6 +524,28 @@ impl ProjectStore {
             project.contexts.dedup();
             project.normalize_custom_namespaces();
         }
+    }
+
+    fn normalize_last_namespaces(&mut self, contexts: &[ContextInfo]) {
+        if !contexts.is_empty() {
+            let live_names: BTreeSet<&str> = contexts
+                .iter()
+                .map(|context| context.name.as_str())
+                .collect();
+            self.last_namespaces_by_context
+                .retain(|entry| live_names.contains(entry.context.as_str()));
+        }
+
+        for entry in &mut self.last_namespaces_by_context {
+            entry.context = entry.context.trim().to_owned();
+            entry.namespace = entry.namespace.trim().to_owned();
+        }
+        self.last_namespaces_by_context
+            .retain(|entry| !entry.context.is_empty() && !entry.namespace.is_empty());
+        self.last_namespaces_by_context
+            .sort_by(|left, right| left.context.cmp(&right.context));
+        self.last_namespaces_by_context
+            .dedup_by(|left, right| left.context == right.context);
     }
 
     pub(super) fn add_contexts_to_selected_project<I>(&mut self, contexts: I)
@@ -658,6 +730,7 @@ mod tests {
                 custom_namespaces_by_context: Vec::new(),
             }],
             selected_project: Some(String::from("Work")),
+            last_namespaces_by_context: Vec::new(),
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
@@ -681,6 +754,10 @@ mod tests {
                 }],
             }],
             selected_project: Some(String::from("Work")),
+            last_namespaces_by_context: vec![ContextNamespaceSelection {
+                context: String::from("prod"),
+                namespace: String::from("team-a"),
+            }],
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
@@ -697,6 +774,61 @@ mod tests {
             project.custom_namespaces_for_context(Some("prod")),
             vec![String::from("billing")]
         );
+        assert_eq!(
+            store.last_namespace_for_context(Some("prod")),
+            Some("team-a")
+        );
+    }
+
+    #[test]
+    fn last_namespace_is_stored_by_context() {
+        let mut store = ProjectStore::default();
+
+        assert!(store.set_last_namespace_for_context("prod", "team-a"));
+        assert_eq!(
+            store.last_namespace_for_context(Some("prod")),
+            Some("team-a")
+        );
+        assert!(!store.set_last_namespace_for_context("prod", "team-a"));
+        assert!(store.set_last_namespace_for_context("prod", "team-b"));
+        assert_eq!(
+            store.last_namespace_for_context(Some("prod")),
+            Some("team-b")
+        );
+        assert_eq!(store.last_namespaces_by_context.len(), 1);
+    }
+
+    #[test]
+    fn normalize_contexts_prunes_last_namespaces_for_deleted_contexts() {
+        let mut store = ProjectStore {
+            projects: vec![Project {
+                name: String::from("Work"),
+                contexts: vec![String::from("prod")],
+                custom_namespaces_by_context: Vec::new(),
+            }],
+            selected_project: Some(String::from("Work")),
+            last_namespaces_by_context: vec![
+                ContextNamespaceSelection {
+                    context: String::from("prod"),
+                    namespace: String::from("team-a"),
+                },
+                ContextNamespaceSelection {
+                    context: String::from("external"),
+                    namespace: String::from("team-b"),
+                },
+            ],
+            visible_object_columns: default_object_columns(),
+            object_name_width: None,
+            object_column_widths: Vec::new(),
+        };
+
+        store.normalize_last_namespaces(&[context("prod")]);
+
+        assert_eq!(
+            store.last_namespace_for_context(Some("prod")),
+            Some("team-a")
+        );
+        assert_eq!(store.last_namespace_for_context(Some("external")), None);
     }
 
     #[test]

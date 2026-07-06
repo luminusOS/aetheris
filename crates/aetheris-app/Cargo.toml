@@ -14,6 +14,7 @@ path = "src/main.rs"
 icon = "../../data/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png"
 desktop_entry = "../../data/org.luminusos.Aetheris.desktop"
 assets = [
+  "../../data/style.css",
   "../../data/org.luminusos.Aetheris.metainfo.xml",
   "../../data/icons/hicolor/64x64/apps/org.luminusos.Aetheris.png",
   "../../data/icons/hicolor/128x128/apps/org.luminusos.Aetheris.png",
@@ -45,6 +46,7 @@ name = "Aetheris"
 identifier = "org.luminusos.Aetheris"
 icon = ["target/macos/aetheris.icns"]
 resources = [
+  "../../data/style.css",
   "../../data/org.luminusos.Aetheris.metainfo.xml",
   "../../data/icons/hicolor",
 ]

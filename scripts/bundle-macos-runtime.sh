@@ -141,6 +141,10 @@ if [ -d "data/icons/hicolor" ]; then
   mkdir -p "$share/icons/hicolor"
   cp -R data/icons/hicolor/. "$share/icons/hicolor/"
 fi
+if [ -f "data/style.css" ]; then
+  mkdir -p "$share/aetheris"
+  cp data/style.css "$share/aetheris/style.css"
+fi
 
 while IFS= read -r plugin; do
   [ -n "$plugin" ] && fix_binary "$plugin" >/dev/null

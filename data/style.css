@@ -1,0 +1,206 @@
+.resource-row-selected {
+  background-color: alpha(currentColor, 0.08);
+}
+
+.resource-row-selected:hover {
+  background-color: alpha(currentColor, 0.11);
+}
+
+.project-icon {
+  border-radius: 999px;
+  background-color: alpha(currentColor, 0.08);
+}
+
+.status-chip {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 700;
+  font-size: 0.82em;
+}
+
+.status-good {
+  background-color: alpha(@success_color, 0.16);
+  color: @success_color;
+}
+
+.status-warning {
+  background-color: alpha(@warning_color, 0.18);
+  color: @warning_color;
+}
+
+.status-bad {
+  background-color: alpha(@error_color, 0.16);
+  color: @error_color;
+}
+
+.status-info {
+  background-color: alpha(@accent_color, 0.15);
+  color: @accent_color;
+}
+
+.status-neutral {
+  background-color: alpha(currentColor, 0.10);
+}
+
+.status-icon-good {
+  color: @success_color;
+}
+
+.status-icon-warning {
+  color: @warning_color;
+}
+
+.status-icon-bad {
+  color: @error_color;
+}
+
+.status-icon-info {
+  color: @accent_color;
+}
+
+.search-toolbar {
+  margin-left: 32px;
+  margin-right: 32px;
+}
+
+.content-clamp {
+  margin-left: 12px;
+  margin-right: 12px;
+}
+
+.column-resize-handle {
+  min-width: 10px;
+  border-radius: 999px;
+}
+
+.column-resize-handle:hover {
+  background-color: alpha(currentColor, 0.12);
+}
+
+.column-resize-handle-active {
+  background-color: alpha(@accent_color, 0.18);
+}
+
+.column-resize-line {
+  background-color: alpha(currentColor, 0.28);
+  min-width: 1px;
+  border-radius: 999px;
+}
+
+.filter-status-dot {
+  border-radius: 999px;
+  min-width: 10px;
+  min-height: 10px;
+}
+
+.filter-status-dot.status-good {
+  background-color: @success_color;
+  color: @success_color;
+}
+
+.filter-status-dot.status-warning {
+  background-color: @warning_color;
+  color: @warning_color;
+}
+
+.filter-status-dot.status-bad {
+  background-color: @error_color;
+  color: @error_color;
+}
+
+.filter-status-dot.status-neutral {
+  background-color: alpha(currentColor, 0.45);
+}
+
+.filter-chip {
+  border-radius: 999px;
+  padding: 7px 12px;
+  background-color: alpha(currentColor, 0.08);
+  min-height: 22px;
+}
+
+flowboxchild.filter-chip-child,
+flowboxchild.filter-chip-child:hover,
+flowboxchild.filter-chip-child:selected,
+flowboxchild.filter-chip-child:selected:hover {
+  background: transparent;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.filter-chip:hover {
+  background-color: alpha(currentColor, 0.11);
+}
+
+.filter-chip-active {
+  background-color: alpha(@accent_color, 0.18);
+  color: @accent_color;
+  font-weight: 700;
+}
+
+.filter-chip-active:hover {
+  background-color: alpha(@accent_color, 0.24);
+}
+
+scrolledwindow.aetheris-table-frame {
+  background-color: @card_bg_color;
+  border: 1px solid alpha(currentColor, 0.1);
+  border-radius: 12px;
+}
+
+columnview.aetheris-table,
+columnview.aetheris-table > listview {
+  background: transparent;
+}
+
+columnview.aetheris-table > header > button {
+  background-color: alpha(currentColor, 0.05);
+  border-bottom: 1px solid alpha(currentColor, 0.1);
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 1em;
+  color: alpha(@window_fg_color, 0.75);
+}
+
+columnview.aetheris-table > header > button:first-child {
+  border-top-left-radius: 11px;
+}
+
+columnview.aetheris-table > header > button:last-child {
+  border-top-right-radius: 11px;
+}
+
+columnview.aetheris-table > header > button:hover {
+  background-color: @shade_color;
+  color: @window_fg_color;
+}
+
+columnview.aetheris-table > header > button.sorted {
+  background-color: alpha(@accent_color, 0.15);
+  color: @accent_color;
+}
+
+columnview.aetheris-table > listview > row {
+  background: transparent;
+  border-bottom: 1px solid alpha(currentColor, 0.06);
+  padding: 2px 6px;
+}
+
+columnview.aetheris-table > listview > row:hover {
+  background-color: alpha(currentColor, 0.05);
+}
+
+/* CPU/Memory usage bars (same thresholds as Seabird): the LevelBar picks
+ * the class of the smallest offset >= its value - up to 85% "lb-normal",
+ * up to 95% "lb-warning", above that "lb-error". */
+levelbar block.lb-normal {
+  background-color: @view_fg_color;
+}
+
+levelbar block.lb-warning {
+  background-color: @warning_bg_color;
+}
+
+levelbar block.lb-error {
+  background-color: @destructive_bg_color;
+}

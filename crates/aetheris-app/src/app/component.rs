@@ -34,7 +34,7 @@ impl Component for App {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        load_app_css();
+        super::style::load_app_css();
 
         let project_list = gtk::ListBox::new();
         project_list.set_hexpand(true);

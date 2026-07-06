@@ -1,25 +1,6 @@
 use super::utils::text_buffer_text;
 use super::*;
 
-pub(super) fn load_app_css() {
-    let provider = gtk::CssProvider::new();
-    provider.load_from_string(APP_CSS);
-
-    if let Some(display) = gtk::gdk::Display::default() {
-        let theme = gtk::IconTheme::for_display(&display);
-        let icon_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/icons");
-        let action_icons = icon_root.join("hicolor/scalable/actions");
-        theme.add_search_path(icon_root);
-        theme.add_search_path(action_icons);
-
-        gtk::style_context_add_provider_for_display(
-            &display,
-            &provider,
-            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
-        );
-    }
-}
-
 pub(super) fn ensure_text_tag(
     buffer: &gtk::TextBuffer,
     name: &str,

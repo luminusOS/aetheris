@@ -20,11 +20,7 @@ impl App {
                     .find(|context| context.is_current)
                     .or_else(|| visible_contexts.first())
                     .map(|context| context.name.clone());
-                self.selected_namespace = self
-                    .namespaces
-                    .first()
-                    .cloned()
-                    .unwrap_or_else(|| String::from("default"));
+                self.selected_namespace = self.preferred_namespace_for_selected_context("default");
                 self.sync_dropdowns(Some(sender.clone()));
                 self.loading = false;
                 self.status = String::from("Select a project.");
@@ -61,13 +57,7 @@ impl App {
                     .iter()
                     .find(|context| context.name == context_name)
                     .map(|context| context.name.clone());
-                if !self.namespace_is_known(&self.selected_namespace) {
-                    self.selected_namespace = self
-                        .namespaces
-                        .first()
-                        .cloned()
-                        .unwrap_or_else(|| String::from("default"));
-                }
+                self.selected_namespace = self.preferred_namespace_for_selected_context("default");
                 self.loading = false;
                 self.sync_dropdowns(Some(sender.clone()));
                 self.enter_clusters_page(sender);
@@ -279,13 +269,7 @@ impl App {
                 }
                 self.namespaces = with_all_namespace(state.namespaces);
                 self.resources = state.resources;
-                if !self.namespace_is_known(&self.selected_namespace) {
-                    self.selected_namespace = self
-                        .namespaces
-                        .first()
-                        .cloned()
-                        .unwrap_or_else(|| String::from("all"));
-                }
+                self.selected_namespace = self.preferred_namespace_for_selected_context("all");
                 self.selected_resource = select_default_resource(&self.resources);
                 self.selected_resource_section = self
                     .selected_resource_kind()
@@ -369,6 +353,7 @@ impl App {
                 if let Some(namespace) = choices.get(index as usize) {
                     if self.selected_namespace != *namespace {
                         self.selected_namespace.clone_from(namespace);
+                        self.remember_selected_namespace();
                         self.sync_dropdowns(Some(sender.clone()));
                         self.show_object_list();
                         self.stop_log_stream();
@@ -386,6 +371,7 @@ impl App {
                 self.remember_namespace(&namespace);
                 if self.selected_namespace != namespace {
                     self.selected_namespace = namespace;
+                    self.remember_selected_namespace();
                     self.sync_dropdowns(Some(sender.clone()));
                     self.show_object_list();
                     self.stop_log_stream();
@@ -411,6 +397,7 @@ impl App {
                 self.save_projects_or_toast();
                 if self.selected_namespace == namespace {
                     self.selected_namespace = String::from("default");
+                    self.remember_selected_namespace();
                     self.sync_dropdowns(Some(sender.clone()));
                     self.show_object_list();
                     self.stop_log_stream();
@@ -444,6 +431,7 @@ impl App {
                     self.save_projects_or_toast();
                     if self.selected_namespace == old_name {
                         self.selected_namespace = new_name;
+                        self.remember_selected_namespace();
                         self.sync_dropdowns(Some(sender.clone()));
                         self.show_object_list();
                         self.stop_log_stream();
@@ -1198,13 +1186,7 @@ impl App {
                     .find(|context| context_names.iter().any(|name| name == &context.name))
                     .or_else(|| visible_contexts.first())
                     .map(|context| context.name.clone());
-                if !self.namespace_is_known(&self.selected_namespace) {
-                    self.selected_namespace = self
-                        .namespaces
-                        .first()
-                        .cloned()
-                        .unwrap_or_else(|| String::from("default"));
-                }
+                self.selected_namespace = self.preferred_namespace_for_selected_context("default");
                 self.loading = false;
                 self.sync_dropdowns(Some(sender.clone()));
                 self.enter_clusters_page(sender);

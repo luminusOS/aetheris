@@ -107,6 +107,8 @@ jobs:
           cp -r /clang64/share/gtksourceview-5 "$bundle/share/" || true
           cp -r /clang64/share/icons "$bundle/share/" || true
           cp -r /clang64/share/themes "$bundle/share/" || true
+          mkdir -p "$bundle/share/aetheris"
+          cp data/style.css "$bundle/share/aetheris/style.css"
           cp -r /clang64/lib/gdk-pixbuf-2.0 "$bundle/lib/" || true
           cp -r /clang64/lib/gio "$bundle/lib/" || true
           cp /clang64/ssl/certs/ca-bundle.crt "$bundle/ssl/certs/" 2>/dev/null || true
