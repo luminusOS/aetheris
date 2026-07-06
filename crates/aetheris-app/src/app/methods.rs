@@ -70,9 +70,9 @@ impl App {
     pub(super) fn show_object_list(&self) {
         self.content_stack.set_visible_child_name("list");
         self.content_header_stack.set_visible_child_name("search");
-        self.detail_back_button.set_visible(false);
-        self.detail_delete_button.set_visible(false);
-        self.detail_terminal_button.set_visible(false);
+        self.detail.back_button.set_visible(false);
+        self.detail.delete_button.set_visible(false);
+        self.detail.terminal_button.set_visible(false);
     }
 
     pub(super) fn sync_object_columns(&self) {
@@ -110,8 +110,8 @@ impl App {
         self.content_stack.set_visible_child_name("detail");
         self.content_title_label.set_label(title);
         self.content_header_stack.set_visible_child_name("title");
-        self.detail_back_button.set_visible(true);
-        self.detail_delete_button.set_visible(true);
+        self.detail.back_button.set_visible(true);
+        self.detail.delete_button.set_visible(true);
         self.sync_terminal_controls();
     }
 
@@ -224,8 +224,8 @@ impl App {
         self.stop_object_watch();
         self.stop_log_stream();
         self.stop_port_forward();
-        self.detail_exec_target = None;
-        self.detail_port_forward_target = None;
+        self.detail.exec_target = None;
+        self.detail.port_forward_target = None;
         self.loading = true;
         self.resources.clear();
         self.objects.clear();
@@ -419,34 +419,42 @@ impl App {
         self.custom_namespace_button.set_sensitive(!self.loading);
         self.rename_namespace_button.set_sensitive(!self.loading);
         self.project_create_button.set_sensitive(!self.loading);
-        self.detail_apply_button
-            .set_sensitive(self.detail_target.is_some() && !self.loading);
-        self.detail_download_yaml_button
-            .set_sensitive(self.detail_target.is_some() && !self.loading);
-        self.detail_explain_yaml_button
-            .set_sensitive(self.detail_target.is_some() && !self.loading);
-        self.detail_delete_button
-            .set_sensitive(self.detail_target.is_some() && !self.loading);
-        self.detail_terminal_button.set_sensitive(
-            self.detail_exec_target
+        self.detail
+            .apply_button
+            .set_sensitive(self.detail.target.is_some() && !self.loading);
+        self.detail
+            .download_yaml_button
+            .set_sensitive(self.detail.target.is_some() && !self.loading);
+        self.detail
+            .explain_yaml_button
+            .set_sensitive(self.detail.target.is_some() && !self.loading);
+        self.detail
+            .delete_button
+            .set_sensitive(self.detail.target.is_some() && !self.loading);
+        self.detail.terminal_button.set_sensitive(
+            self.detail
+                .exec_target
                 .as_ref()
                 .is_some_and(|target| !target.containers.is_empty())
                 && !self.loading,
         );
-        self.detail_scale_button.set_sensitive(
-            self.detail_target
+        self.detail.scale_button.set_sensitive(
+            self.detail
+                .target
                 .as_ref()
                 .is_some_and(|target| is_deployment_resource(&target.resource))
                 && !self.loading,
         );
-        self.detail_cordon_button.set_sensitive(
-            self.detail_target
+        self.detail.cordon_button.set_sensitive(
+            self.detail
+                .target
                 .as_ref()
                 .is_some_and(|target| is_node_resource(&target.resource))
                 && !self.loading,
         );
-        self.detail_drain_button.set_sensitive(
-            self.detail_target
+        self.detail.drain_button.set_sensitive(
+            self.detail
+                .target
                 .as_ref()
                 .is_some_and(|target| is_node_resource(&target.resource))
                 && !self.loading,
@@ -637,7 +645,7 @@ impl App {
     }
 
     pub(super) fn related_pod_at(&self, index: i32) -> Option<ObjectSummary> {
-        sorted_model_object(&self.detail_related_pods_sorted, index)
+        sorted_model_object(&self.detail.related_pods_sorted, index)
     }
 
     pub(super) fn open_object_detail(
@@ -650,7 +658,7 @@ impl App {
     ) {
         self.stop_log_stream();
         self.stop_port_forward();
-        self.detail_log_buffer.set_text("");
+        self.detail.log_buffer.set_text("");
         self.reset_detail_overview_layout();
         // Don't switch tabs yet: the previous object's detail page (and
         // whichever tab the user was on) stays on screen until the new
@@ -658,20 +666,20 @@ impl App {
         // back to YAML on the OLD object before the new one loads.
         // `sync_detail_tabs` (run once new data is in) already falls back
         // to "yaml" if the current tab isn't valid for the new object.
-        self.detail_target = Some(DetailTarget {
+        self.detail.target = Some(DetailTarget {
             context: context.clone(),
             resource: resource.clone(),
             namespace: namespace.clone(),
             name: name.clone(),
         });
-        self.detail_log_target =
+        self.detail.log_target =
             pod_log_target(context.clone(), &resource, namespace.clone(), name.clone());
-        self.detail_exec_target =
+        self.detail.exec_target =
             pod_log_target(context.clone(), &resource, namespace.clone(), name.clone());
-        self.detail_port_forward_target =
+        self.detail.port_forward_target =
             pod_log_target(context.clone(), &resource, namespace.clone(), name.clone());
-        self.detail_request_token = self.detail_request_token.saturating_add(1);
-        let detail_token = self.detail_request_token;
+        self.detail.request_token = self.detail.request_token.saturating_add(1);
+        let detail_token = self.detail.request_token;
         self.sync_log_controls();
         self.sync_terminal_controls();
         self.sync_port_forward_controls();
@@ -685,60 +693,68 @@ impl App {
     }
 
     pub(super) fn reset_detail_overview_layout(&self) {
-        self.detail_overview_section.set_visible(true);
-        self.detail_expand_logs_button
+        self.detail.overview_section.set_visible(true);
+        self.detail
+            .expand_logs_button
             .set_icon_name("view-fullscreen-symbolic");
-        self.detail_expand_logs_button
+        self.detail
+            .expand_logs_button
             .set_tooltip_text(Some("Hide summary to see more of this tab"));
     }
 
     pub(super) fn populate_detail_dialog(&mut self, detail: &ObjectDetail) {
-        self.detail_name_label.set_label(&detail.name);
-        self.detail_namespace_label.set_label(&detail.namespace);
-        self.detail_status_label.set_label(&detail.status);
-        self.detail_kind_label.set_label(&detail.kind);
-        self.detail_api_label.set_label(&detail.api_version);
-        self.detail_age_label.set_label(&detail.age);
-        self.detail_cpu_label.set_label(
+        self.detail.name_label.set_label(&detail.name);
+        self.detail.namespace_label.set_label(&detail.namespace);
+        self.detail.status_label.set_label(&detail.status);
+        self.detail.kind_label.set_label(&detail.kind);
+        self.detail.api_label.set_label(&detail.api_version);
+        self.detail.age_label.set_label(&detail.age);
+        self.detail.cpu_label.set_label(
             detail
                 .metrics
                 .as_ref()
                 .map(|usage| usage.cpu.as_str())
                 .unwrap_or("-"),
         );
-        self.detail_memory_label.set_label(
+        self.detail.memory_label.set_label(
             detail
                 .metrics
                 .as_ref()
                 .map(|usage| usage.memory.as_str())
                 .unwrap_or("-"),
         );
-        self.detail_yaml_buffer.set_text(&detail.yaml);
-        self.detail_node_unschedulable = detail.node_unschedulable;
-        self.detail_scale_spin
+        self.detail.yaml_buffer.set_text(&detail.yaml);
+        self.detail.node_unschedulable = detail.node_unschedulable;
+        self.detail
+            .scale_spin
             .set_value(detail.replicas.unwrap_or_default().into());
-        self.detail_scale_spin
+        self.detail
+            .scale_spin
             .set_visible(detail.replicas.is_some());
-        self.detail_scale_button
+        self.detail
+            .scale_button
             .set_visible(detail.replicas.is_some());
-        self.detail_cordon_button
+        self.detail
+            .cordon_button
             .set_visible(detail.node_unschedulable.is_some());
-        self.detail_drain_button
+        self.detail
+            .drain_button
             .set_visible(detail.node_unschedulable.is_some());
-        self.detail_explain_yaml_button.set_sensitive(true);
+        self.detail.explain_yaml_button.set_sensitive(true);
         if let Some(unschedulable) = detail.node_unschedulable {
-            self.detail_cordon_button
+            self.detail
+                .cordon_button
                 .set_label(if unschedulable { "Uncordon" } else { "Cordon" });
         }
-        rebuild_detail_events(&self.detail_events_list, detail);
-        rebuild_detail_conditions(&self.detail_conditions_list, detail);
+        rebuild_detail_events(&self.detail.events_list, detail);
+        rebuild_detail_conditions(&self.detail.conditions_list, detail);
         rebuild_related_pods(
-            &self.detail_related_pods_store,
-            &self.detail_related_pods_stack,
-            &self.detail_related_pods_message,
+            &self.detail.related_pods_store,
+            &self.detail.related_pods_stack,
+            &self.detail.related_pods_message,
             detail,
         );
-        rebuild_container_metrics(&self.detail_container_metrics_list, detail);
+        rebuild_container_metrics(&self.detail.container_metrics_list, detail);
         self.sync_detail_tabs(detail);
         self.sync_terminal_controls();
         self.sync_port_forward_controls();
@@ -746,46 +762,47 @@ impl App {
 
     pub(super) fn sync_detail_tabs(&self, detail: &ObjectDetail) {
         let show_logs = detail.kind == "Pod" && !detail.containers.is_empty();
-        self.detail_port_forward_group
+        self.detail
+            .port_forward_group
             .set_visible(detail.kind == "Pod");
         let show_pods = detail.kind == "Deployment";
         let show_conditions = !detail.conditions.is_empty();
         let show_containers = detail.kind == "Pod";
 
         set_stack_page(
-            &self.detail_stack,
+            &self.detail.stack,
             "pods",
             show_pods,
             &format!("Pods ({})", detail.related_pods.len()),
         );
         set_stack_page(
-            &self.detail_stack,
+            &self.detail.stack,
             "conditions",
             show_conditions,
             &format!("Conditions ({})", detail.conditions.len()),
         );
         set_stack_page(
-            &self.detail_stack,
+            &self.detail.stack,
             "containers",
             show_containers,
             &format!("Containers ({})", detail.containers.len()),
         );
         set_stack_page(
-            &self.detail_stack,
+            &self.detail.stack,
             "events",
             true,
             &format!("Recent Events ({})", detail.events.len()),
         );
-        set_stack_page(&self.detail_stack, "logs", show_logs, "Logs");
-        set_stack_page(&self.detail_stack, "yaml", true, "YAML");
+        set_stack_page(&self.detail.stack, "logs", show_logs, "Logs");
+        set_stack_page(&self.detail.stack, "yaml", true, "YAML");
 
-        let visible_name = self.detail_stack.visible_child_name();
+        let visible_name = self.detail.stack.visible_child_name();
         let visible_child_is_hidden = visible_name
             .as_deref()
-            .and_then(|name| self.detail_stack.child_by_name(name))
+            .and_then(|name| self.detail.stack.child_by_name(name))
             .is_some_and(|child| !child.is_visible());
         if visible_child_is_hidden {
-            self.detail_stack.set_visible_child_name("yaml");
+            self.detail.stack.set_visible_child_name("yaml");
         }
     }
 }

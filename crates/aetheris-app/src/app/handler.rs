@@ -520,7 +520,7 @@ impl App {
                 let Some(pod) = self.related_pod_at(index) else {
                     return;
                 };
-                let Some(target) = self.detail_target.clone() else {
+                let Some(target) = self.detail.target.clone() else {
                     return;
                 };
                 let namespace = Some(pod.namespace.clone());
@@ -533,7 +533,7 @@ impl App {
                 );
             }
             AppMsg::ObjectDetailLoaded(token, Ok(detail)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
@@ -546,14 +546,14 @@ impl App {
                 self.sync_status();
             }
             AppMsg::ObjectDetailLoaded(token, Err(error)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
-                self.detail_target = None;
-                self.detail_log_target = None;
-                self.detail_exec_target = None;
-                self.detail_port_forward_target = None;
+                self.detail.target = None;
+                self.detail.log_target = None;
+                self.detail.exec_target = None;
+                self.detail.port_forward_target = None;
                 self.sync_log_controls();
                 self.sync_terminal_controls();
                 self.sync_port_forward_controls();
@@ -576,7 +576,7 @@ impl App {
                 self.sync_port_forward_controls();
             }
             AppMsg::ClearPodLogs => {
-                self.detail_log_buffer.set_text("");
+                self.detail.log_buffer.set_text("");
             }
             AppMsg::ShowPodTerminal => {
                 self.show_pod_terminal(root, sender);
@@ -591,14 +591,15 @@ impl App {
                 self.send_terminal_input(token, text);
             }
             AppMsg::ToggleDetailOverview => {
-                let collapsed = self.detail_overview_section.is_visible();
-                self.detail_overview_section.set_visible(!collapsed);
-                self.detail_expand_logs_button.set_icon_name(if collapsed {
+                let collapsed = self.detail.overview_section.is_visible();
+                self.detail.overview_section.set_visible(!collapsed);
+                self.detail.expand_logs_button.set_icon_name(if collapsed {
                     "view-restore-symbolic"
                 } else {
                     "view-fullscreen-symbolic"
                 });
-                self.detail_expand_logs_button
+                self.detail
+                    .expand_logs_button
                     .set_tooltip_text(Some(if collapsed {
                         "Show summary"
                     } else {
@@ -659,15 +660,15 @@ impl App {
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
             AppMsg::ScaleDeployment => {
-                let Some(target) = self.detail_target.clone() else {
+                let Some(target) = self.detail.target.clone() else {
                     return;
                 };
                 if !is_deployment_resource(&target.resource) {
                     return;
                 }
-                let replicas = self.detail_scale_spin.value_as_int();
-                self.detail_request_token = self.detail_request_token.saturating_add(1);
-                let token = self.detail_request_token;
+                let replicas = self.detail.scale_spin.value_as_int();
+                self.detail.request_token = self.detail.request_token.saturating_add(1);
+                let token = self.detail.request_token;
                 self.loading = true;
                 self.status = format!("Scaling {}...", target.name);
                 self.sync_status();
@@ -676,7 +677,7 @@ impl App {
                 );
             }
             AppMsg::ObjectScaled(token, Ok(detail)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
@@ -689,7 +690,7 @@ impl App {
                     .add_toast(adw::Toast::new("Deployment scaled."));
             }
             AppMsg::ObjectScaled(token, Err(error)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
@@ -698,15 +699,15 @@ impl App {
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
             AppMsg::ToggleNodeScheduling => {
-                let Some(target) = self.detail_target.clone() else {
+                let Some(target) = self.detail.target.clone() else {
                     return;
                 };
                 if !is_node_resource(&target.resource) {
                     return;
                 }
-                let unschedulable = !self.detail_node_unschedulable.unwrap_or(false);
-                self.detail_request_token = self.detail_request_token.saturating_add(1);
-                let token = self.detail_request_token;
+                let unschedulable = !self.detail.node_unschedulable.unwrap_or(false);
+                self.detail.request_token = self.detail.request_token.saturating_add(1);
+                let token = self.detail.request_token;
                 self.loading = true;
                 self.status = format!("Updating {}...", target.name);
                 self.sync_status();
@@ -715,7 +716,7 @@ impl App {
                 });
             }
             AppMsg::NodeSchedulingUpdated(token, Ok(detail)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
@@ -728,7 +729,7 @@ impl App {
                     .add_toast(adw::Toast::new("Node scheduling updated."));
             }
             AppMsg::NodeSchedulingUpdated(token, Err(error)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
@@ -737,7 +738,7 @@ impl App {
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
             AppMsg::DrainNode => {
-                let Some(target) = self.detail_target.clone() else {
+                let Some(target) = self.detail.target.clone() else {
                     return;
                 };
                 if !is_node_resource(&target.resource) {
@@ -762,21 +763,21 @@ impl App {
                 });
             }
             AppMsg::ConfirmDrainNode => {
-                let Some(target) = self.detail_target.clone() else {
+                let Some(target) = self.detail.target.clone() else {
                     return;
                 };
                 if !is_node_resource(&target.resource) {
                     return;
                 }
-                self.detail_request_token = self.detail_request_token.saturating_add(1);
-                let token = self.detail_request_token;
+                self.detail.request_token = self.detail.request_token.saturating_add(1);
+                let token = self.detail.request_token;
                 self.loading = true;
                 self.status = format!("Draining {}...", target.name);
                 self.sync_status();
                 sender.oneshot_command(async move { drain_node(token, target).await });
             }
             AppMsg::NodeDrained(token, Ok((detail, count))) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
@@ -789,7 +790,7 @@ impl App {
                     .add_toast(adw::Toast::new(&format!("Drain started for {count} Pods.")));
             }
             AppMsg::NodeDrained(token, Err(error)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
@@ -801,19 +802,19 @@ impl App {
                 self.show_yaml_explanation(root);
             }
             AppMsg::ApplyYaml => {
-                let Some(target) = self.detail_target.clone() else {
+                let Some(target) = self.detail.target.clone() else {
                     return;
                 };
-                let yaml = text_buffer_text(&self.detail_yaml_buffer);
-                self.detail_request_token = self.detail_request_token.saturating_add(1);
-                let token = self.detail_request_token;
+                let yaml = text_buffer_text(&self.detail.yaml_buffer);
+                self.detail.request_token = self.detail.request_token.saturating_add(1);
+                let token = self.detail.request_token;
                 self.loading = true;
                 self.status = format!("Applying {}...", target.name);
                 self.sync_status();
                 sender.oneshot_command(async move { apply_object_yaml(token, target, yaml).await });
             }
             AppMsg::ObjectApplied(token, Ok(detail)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
@@ -825,7 +826,7 @@ impl App {
                 self.toaster.add_toast(adw::Toast::new("YAML applied."));
             }
             AppMsg::ObjectApplied(token, Err(error)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
@@ -834,9 +835,10 @@ impl App {
                 self.toaster.add_toast(adw::Toast::new(&error));
             }
             AppMsg::DownloadYaml => {
-                let yaml = text_buffer_text(&self.detail_yaml_buffer);
+                let yaml = text_buffer_text(&self.detail.yaml_buffer);
                 let name = self
-                    .detail_target
+                    .detail
+                    .target
                     .as_ref()
                     .map(|target| format!("{}.yaml", target.name))
                     .unwrap_or_else(|| String::from("object.yaml"));
@@ -878,9 +880,10 @@ impl App {
                 ))),
             },
             AppMsg::DownloadLogs => {
-                let logs = text_buffer_text(&self.detail_log_buffer);
+                let logs = text_buffer_text(&self.detail.log_buffer);
                 let name = self
-                    .detail_target
+                    .detail
+                    .target
                     .as_ref()
                     .map(|target| format!("{}.log", target.name))
                     .unwrap_or_else(|| String::from("pod.log"));
@@ -922,7 +925,7 @@ impl App {
                 ))),
             },
             AppMsg::DeleteObject => {
-                let Some(target) = self.detail_target.clone() else {
+                let Some(target) = self.detail.target.clone() else {
                     return;
                 };
                 let dialog = adw::AlertDialog::new(
@@ -944,25 +947,25 @@ impl App {
                 });
             }
             AppMsg::ConfirmDeleteObject => {
-                let Some(target) = self.detail_target.clone() else {
+                let Some(target) = self.detail.target.clone() else {
                     return;
                 };
-                self.detail_request_token = self.detail_request_token.saturating_add(1);
-                let token = self.detail_request_token;
+                self.detail.request_token = self.detail.request_token.saturating_add(1);
+                let token = self.detail.request_token;
                 self.loading = true;
                 self.status = format!("Deleting {}...", target.name);
                 self.sync_status();
                 sender.oneshot_command(async move { delete_object(token, target).await });
             }
             AppMsg::ObjectDeleted(token, Ok(name)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
-                self.detail_target = None;
-                self.detail_log_target = None;
-                self.detail_exec_target = None;
-                self.detail_port_forward_target = None;
+                self.detail.target = None;
+                self.detail.log_target = None;
+                self.detail.exec_target = None;
+                self.detail.port_forward_target = None;
                 self.stop_log_stream();
                 self.stop_port_forward();
                 self.show_object_list();
@@ -974,7 +977,7 @@ impl App {
                 self.refresh_objects(sender);
             }
             AppMsg::ObjectDeleted(token, Err(error)) => {
-                if token != self.detail_request_token {
+                if token != self.detail.request_token {
                     return;
                 }
                 self.loading = false;
@@ -1019,7 +1022,8 @@ impl App {
                     self.port_forward_abort_handle = None;
                     self.sync_port_forward_controls();
                     if let Err(error) = result {
-                        self.detail_port_status_label
+                        self.detail
+                            .port_status_label
                             .set_label("Port-forward stopped.");
                         self.toaster.add_toast(adw::Toast::new(&error));
                     }

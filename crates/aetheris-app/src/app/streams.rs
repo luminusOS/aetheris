@@ -66,7 +66,7 @@ impl App {
 
     pub(super) fn update_log_target_containers(&mut self, detail: &ObjectDetail) {
         let mut selected = None;
-        if let Some(target) = &mut self.detail_log_target {
+        if let Some(target) = &mut self.detail.log_target {
             target.containers.clone_from(&detail.containers);
             selected = Some(default_log_container_index(&target.pod, &target.containers));
         }
@@ -74,19 +74,19 @@ impl App {
     }
 
     pub(super) fn update_exec_target_containers(&mut self, detail: &ObjectDetail) {
-        if let Some(target) = &mut self.detail_exec_target {
+        if let Some(target) = &mut self.detail.exec_target {
             target.containers.clone_from(&detail.containers);
         }
         self.sync_terminal_controls();
     }
 
     pub(super) fn start_pod_logs(&mut self, sender: ComponentSender<Self>) {
-        let Some(target) = self.detail_log_target.clone() else {
+        let Some(target) = self.detail.log_target.clone() else {
             self.toaster
                 .add_toast(adw::Toast::new("Logs are available for Pods."));
             return;
         };
-        let Some(container) = selected_log_container(&self.detail_log_container_dropdown, &target)
+        let Some(container) = selected_log_container(&self.detail.log_container_dropdown, &target)
         else {
             self.toaster
                 .add_toast(adw::Toast::new("Select a container before starting logs."));
@@ -96,8 +96,8 @@ impl App {
         self.stop_log_stream();
         self.log_stream_token = self.log_stream_token.saturating_add(1);
         let token = self.log_stream_token;
-        let follow = self.detail_log_follow_check.is_active();
-        let timestamps = self.detail_log_timestamps_check.is_active();
+        let follow = self.detail.log_follow_check.is_active();
+        let timestamps = self.detail.log_timestamps_check.is_active();
         let request = PodLogRequest {
             namespace: target.namespace,
             pod: target.pod,
@@ -133,9 +133,10 @@ impl App {
 
     pub(super) fn maybe_start_visible_logs(&mut self, sender: ComponentSender<Self>) {
         if self.log_streaming
-            || self.detail_stack.visible_child_name().as_deref() != Some("logs")
+            || self.detail.stack.visible_child_name().as_deref() != Some("logs")
             || self
-                .detail_log_target
+                .detail
+                .log_target
                 .as_ref()
                 .is_none_or(|target| target.containers.is_empty())
         {
@@ -158,7 +159,7 @@ impl App {
         root: &<Self as Component>::Root,
         sender: ComponentSender<Self>,
     ) {
-        let Some(target) = self.detail_exec_target.clone() else {
+        let Some(target) = self.detail.exec_target.clone() else {
             self.toaster
                 .add_toast(adw::Toast::new("Terminal is available for Pods."));
             return;
@@ -304,14 +305,14 @@ impl App {
     pub(super) fn close_terminal_session(&mut self, _token: u64, _close_window: bool) {}
 
     pub(super) fn start_pod_port_forward(&mut self, sender: ComponentSender<Self>) {
-        let Some(target) = self.detail_port_forward_target.clone() else {
+        let Some(target) = self.detail.port_forward_target.clone() else {
             self.toaster
                 .add_toast(adw::Toast::new("Port forwarding is available for Pods."));
             return;
         };
 
-        let local_port = self.detail_port_local_spin.value_as_int().clamp(0, 65535) as u16;
-        let remote_port = self.detail_port_remote_spin.value_as_int().clamp(1, 65535) as u16;
+        let local_port = self.detail.port_local_spin.value_as_int().clamp(0, 65535) as u16;
+        let remote_port = self.detail.port_remote_spin.value_as_int().clamp(1, 65535) as u16;
         self.stop_port_forward();
         self.port_forward_token = self.port_forward_token.saturating_add(1);
         let token = self.port_forward_token;
@@ -354,24 +355,31 @@ impl App {
     }
 
     pub(super) fn sync_port_forward_controls(&self) {
-        let available = self.detail_port_forward_target.is_some();
-        self.detail_port_local_spin
+        let available = self.detail.port_forward_target.is_some();
+        self.detail
+            .port_local_spin
             .set_sensitive(available && !self.port_forwarding);
-        self.detail_port_remote_spin
+        self.detail
+            .port_remote_spin
             .set_sensitive(available && !self.port_forwarding);
-        self.detail_port_start_button
+        self.detail
+            .port_start_button
             .set_sensitive(available && !self.port_forwarding);
-        self.detail_port_stop_button
+        self.detail
+            .port_stop_button
             .set_sensitive(self.port_forwarding);
 
         if !available {
-            self.detail_port_status_label
+            self.detail
+                .port_status_label
                 .set_label("Port forwarding is available for Pods.");
         } else if self.port_forwarding {
-            self.detail_port_status_label
+            self.detail
+                .port_status_label
                 .set_label("Starting port-forward...");
         } else {
-            self.detail_port_status_label
+            self.detail
+                .port_status_label
                 .set_label("Choose local and remote ports to forward this Pod.");
         }
     }
@@ -379,16 +387,18 @@ impl App {
     pub(super) fn handle_port_forward_event(&self, event: PodPortForwardEvent) {
         match event {
             PodPortForwardEvent::Ready { local_port } => {
-                self.detail_port_status_label.set_label(&format!(
+                self.detail.port_status_label.set_label(&format!(
                     "Forwarding 127.0.0.1:{local_port} to the selected Pod."
                 ));
             }
             PodPortForwardEvent::ConnectionOpened => {
-                self.detail_port_status_label
+                self.detail
+                    .port_status_label
                     .set_label("Port-forward connection active.");
             }
             PodPortForwardEvent::ConnectionClosed => {
-                self.detail_port_status_label
+                self.detail
+                    .port_status_label
                     .set_label("Waiting for the next local connection...");
             }
         }
@@ -399,16 +409,18 @@ impl App {
     }
 
     pub(super) fn sync_log_controls_with_selection(&self, selected_override: Option<usize>) {
-        let Some(target) = &self.detail_log_target else {
-            self.detail_log_container_dropdown
+        let Some(target) = &self.detail.log_target else {
+            self.detail
+                .log_container_dropdown
                 .set_model(Some(&gtk::StringList::new(&["No containers"])));
-            self.detail_log_container_dropdown.set_selected(0);
-            self.detail_log_container_dropdown.set_sensitive(false);
-            self.detail_log_follow_check.set_sensitive(false);
-            self.detail_log_timestamps_check.set_sensitive(false);
-            self.detail_log_start_button.set_sensitive(false);
-            self.detail_log_stop_button.set_sensitive(false);
-            self.detail_log_status_label
+            self.detail.log_container_dropdown.set_selected(0);
+            self.detail.log_container_dropdown.set_sensitive(false);
+            self.detail.log_follow_check.set_sensitive(false);
+            self.detail.log_timestamps_check.set_sensitive(false);
+            self.detail.log_start_button.set_sensitive(false);
+            self.detail.log_stop_button.set_sensitive(false);
+            self.detail
+                .log_status_label
                 .set_label("Logs are available for Pods.");
             return;
         };
@@ -423,25 +435,33 @@ impl App {
         } else if target.containers.is_empty() {
             0
         } else {
-            (self.detail_log_container_dropdown.selected() as usize)
+            (self.detail.log_container_dropdown.selected() as usize)
                 .min(target.containers.len().saturating_sub(1))
         };
         let refs = labels.iter().map(String::as_str).collect::<Vec<_>>();
-        self.detail_log_container_dropdown
+        self.detail
+            .log_container_dropdown
             .set_model(Some(&gtk::StringList::new(&refs)));
-        self.detail_log_container_dropdown
+        self.detail
+            .log_container_dropdown
             .set_selected(selected as u32);
-        self.detail_log_container_dropdown
+        self.detail
+            .log_container_dropdown
             .set_sensitive(!target.containers.is_empty() && !self.log_streaming);
-        self.detail_log_follow_check
+        self.detail
+            .log_follow_check
             .set_sensitive(!target.containers.is_empty() && !self.log_streaming);
-        self.detail_log_timestamps_check
+        self.detail
+            .log_timestamps_check
             .set_sensitive(!target.containers.is_empty() && !self.log_streaming);
-        self.detail_log_start_button
+        self.detail
+            .log_start_button
             .set_sensitive(!target.containers.is_empty() && !self.log_streaming);
-        self.detail_log_stop_button
+        self.detail
+            .log_stop_button
             .set_sensitive(self.log_streaming);
-        self.detail_log_status_label
+        self.detail
+            .log_status_label
             .set_label(if self.log_streaming {
                 "Streaming pod logs..."
             } else if target.containers.is_empty() {
@@ -453,32 +473,33 @@ impl App {
 
     #[cfg(not(target_os = "windows"))]
     pub(super) fn sync_terminal_controls(&self) {
-        let Some(target) = &self.detail_exec_target else {
-            self.detail_terminal_button.set_visible(false);
-            self.detail_terminal_button.set_sensitive(false);
+        let Some(target) = &self.detail.exec_target else {
+            self.detail.terminal_button.set_visible(false);
+            self.detail.terminal_button.set_sensitive(false);
             return;
         };
 
         let available = !target.containers.is_empty();
-        self.detail_terminal_button.set_visible(true);
-        self.detail_terminal_button.set_sensitive(available);
+        self.detail.terminal_button.set_visible(true);
+        self.detail.terminal_button.set_sensitive(available);
     }
 
     #[cfg(target_os = "windows")]
     pub(super) fn sync_terminal_controls(&self) {
-        self.detail_terminal_button.set_visible(false);
-        self.detail_terminal_button.set_sensitive(false);
+        self.detail.terminal_button.set_visible(false);
+        self.detail.terminal_button.set_sensitive(false);
     }
 
     pub(super) fn append_log_line(&self, line: &str) {
-        insert_ansi_line(&self.detail_log_buffer, line);
-        let mut iter = self.detail_log_buffer.end_iter();
-        self.detail_log_buffer.insert(&mut iter, "\n");
+        insert_ansi_line(&self.detail.log_buffer, line);
+        let mut iter = self.detail.log_buffer.end_iter();
+        self.detail.log_buffer.insert(&mut iter, "\n");
         let mark =
-            self.detail_log_buffer
-                .create_mark(None, &self.detail_log_buffer.end_iter(), false);
-        self.detail_log_view.scroll_mark_onscreen(&mark);
-        self.detail_log_buffer.delete_mark(&mark);
+            self.detail
+                .log_buffer
+                .create_mark(None, &self.detail.log_buffer.end_iter(), false);
+        self.detail.log_view.scroll_mark_onscreen(&mark);
+        self.detail.log_buffer.delete_mark(&mark);
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -535,8 +556,8 @@ impl App {
 
     pub(super) fn show_yaml_explanation(&self, root: &<Self as Component>::Root) {
         let explanation = build_yaml_explanation_content(
-            &text_buffer_text(&self.detail_yaml_buffer),
-            self.detail_target.as_ref(),
+            &text_buffer_text(&self.detail.yaml_buffer),
+            self.detail.target.as_ref(),
         );
         let dialog = adw::Dialog::builder()
             .title("YAML Explanation")
