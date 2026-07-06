@@ -4,7 +4,7 @@ use anyhow::{Context as AnyhowContext, Result};
 use kube::config::{Config, KubeConfigOptions, Kubeconfig};
 use kube::Client;
 
-use crate::kubeconfig::{cluster_server, server_host};
+use crate::kubeconfig::{cluster_server, cluster_skips_tls_verify, server_host};
 use crate::{ContextInfo, KubeSession};
 
 #[derive(Debug, Clone)]
@@ -29,6 +29,9 @@ impl KubeManager {
                 let server = context
                     .and_then(|context| cluster_server(&self.kubeconfig, &context.cluster))
                     .unwrap_or_default();
+                let insecure_skip_tls_verify = context
+                    .map(|context| cluster_skips_tls_verify(&self.kubeconfig, &context.cluster))
+                    .unwrap_or_default();
                 ContextInfo {
                     name: named_context.name.clone(),
                     cluster: context
@@ -40,6 +43,7 @@ impl KubeManager {
                         .and_then(|context| context.user.clone())
                         .unwrap_or_default(),
                     is_current: current == Some(named_context.name.as_str()),
+                    insecure_skip_tls_verify,
                 }
             })
             .collect()
@@ -89,10 +93,12 @@ impl KubeManager {
         let config = Config::from_custom_kubeconfig(self.kubeconfig.clone(), &options)
             .await
             .with_context(|| format!("failed to build Kubernetes client for context {context}"))?;
+        let server = config.cluster_url.to_string();
         let client = Client::try_from(config).context("failed to create Kubernetes client")?;
         Ok(KubeSession {
             context: context.to_owned(),
             client,
+            server,
         })
     }
 }

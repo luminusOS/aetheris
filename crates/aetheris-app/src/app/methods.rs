@@ -5,10 +5,6 @@ use super::widgets::*;
 use super::*;
 
 impl App {
-    pub(super) fn show_setup(&self) {
-        self.root_stack.set_visible_child_name("setup");
-    }
-
     pub(super) fn show_projects(&self) {
         self.root_stack.set_visible_child_name("projects");
     }
@@ -119,9 +115,12 @@ impl App {
         self.sync_terminal_controls();
     }
 
+    // Nautilus behavior: picking something in the overlay sidebar dismisses
+    // it so the content it drives is immediately visible; when the sidebar
+    // sits side-by-side there is nothing to dismiss.
     pub(super) fn present_content_panel(&self) {
         if self.split_view.is_collapsed() {
-            self.split_view.set_show_content(true);
+            self.split_view.set_show_sidebar(false);
         }
     }
 
@@ -151,10 +150,19 @@ impl App {
     }
 
     pub(super) fn show_custom_namespace_dialog(&self, root: &<Self as Component>::Root) {
-        self.custom_namespace_entry
-            .set_text(custom_namespace_initial_text(&self.selected_namespace));
+        self.custom_namespace_entry.set_text("");
         self.custom_namespace_entry.grab_focus();
         self.custom_namespace_dialog.present(Some(root));
+    }
+
+    /// The add and edit flows share one cluster form; opening "add" must
+    /// not show whatever the last add/edit left behind.
+    pub(super) fn reset_cluster_dialog_form(&self) {
+        self.setup_name_entry.set_text("");
+        self.setup_server_entry.set_text("");
+        self.setup_token_entry.set_text("");
+        self.setup_ca_entry.set_text("");
+        self.setup_insecure_check.set_active(false);
     }
 
     pub(super) fn open_rename_namespace_dialog(
@@ -189,13 +197,15 @@ impl App {
         &mut self,
         context_name: &str,
         server: &str,
+        insecure_skip_tls_verify: bool,
         root: &<Self as Component>::Root,
     ) {
         self.setup_name_entry.set_text(context_name);
         self.setup_server_entry.set_text(server);
         self.setup_token_entry.set_text("");
         self.setup_ca_entry.set_text("");
-        self.setup_insecure_check.set_active(false);
+        self.setup_insecure_check
+            .set_active(insecure_skip_tls_verify);
         self.editing_context_name = Some(context_name.to_owned());
         self.set_cluster_dialog_editing(true);
         self.cluster_dialog_stack.set_visible_child_name("token");

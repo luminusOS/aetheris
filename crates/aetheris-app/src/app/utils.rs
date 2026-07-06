@@ -7,6 +7,16 @@ pub(super) fn text_buffer_text(buffer: &impl IsA<gtk::TextBuffer>) -> String {
         .to_string()
 }
 
+// Mirrors where `kube`'s `Kubeconfig::read` looks: every path in
+// $KUBECONFIG if set, otherwise ~/.kube/config. Used to tell "no kubeconfig
+// yet" (normal first run) apart from "kubeconfig exists but won't load".
+pub(super) fn kubeconfig_present() -> bool {
+    if let Some(paths) = std::env::var_os("KUBECONFIG") {
+        return std::env::split_paths(&paths).any(|path| path.exists());
+    }
+    dirs::home_dir().is_some_and(|home| home.join(".kube").join("config").exists())
+}
+
 pub(super) fn format_error(error: anyhow::Error) -> String {
     let mut chain = error.chain();
     let headline = chain
@@ -161,14 +171,6 @@ pub(super) fn default_log_container_index(pod: &str, containers: &[String]) -> u
         .iter()
         .position(|container| container == pod || pod.starts_with(&format!("{container}-")))
         .unwrap_or(0)
-}
-
-pub(super) fn custom_namespace_initial_text(selected_namespace: &str) -> &str {
-    if selected_namespace == "all" {
-        ""
-    } else {
-        selected_namespace
-    }
 }
 
 pub(super) fn with_all_namespace(mut namespaces: Vec<String>) -> Vec<String> {

@@ -28,6 +28,7 @@ dependencies = [
  "anyhow",
  "dirs",
  "futures",
+ "http",
  "k8s-openapi",
  "kube",
  "secrecy",

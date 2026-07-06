@@ -8,6 +8,8 @@ pub struct ContextInfo {
     pub host: String,
     pub user: String,
     pub is_current: bool,
+    #[serde(default)]
+    pub insecure_skip_tls_verify: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

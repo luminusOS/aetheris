@@ -3,12 +3,27 @@ use super::*;
 
 pub(super) async fn load_state() -> AppMsg {
     let result = async {
-        let manager = KubeManager::load()?;
-        let contexts = manager.load_contexts();
+        // A missing kubeconfig is the normal first-run state — the user
+        // hasn't added any cluster yet — so start empty and let them land
+        // on the projects page. Only a kubeconfig that exists on disk but
+        // cannot be read is a real error worth surfacing.
+        let manager = match KubeManager::load() {
+            Ok(manager) => Some(manager),
+            Err(error) if kubeconfig_present() => return Err(error),
+            Err(_) => None,
+        };
+        let contexts = manager
+            .as_ref()
+            .map(|manager| manager.load_contexts())
+            .unwrap_or_default();
+        let namespaces = manager
+            .as_ref()
+            .map(|manager| manager.namespaces())
+            .unwrap_or_default();
         let projects = ProjectStore::load(&contexts);
         Ok::<_, anyhow::Error>(LoadedState {
             contexts,
-            namespaces: with_all_namespace(manager.namespaces()),
+            namespaces: with_all_namespace(namespaces),
             projects,
         })
     }

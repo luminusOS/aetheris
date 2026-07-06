@@ -32,14 +32,18 @@ impl App {
                 self.sync_status();
             }
             AppMsg::Loaded(Err(error)) => {
+                // Kubeconfig exists but won't load. Still land on the
+                // projects page — saved projects are independent of the
+                // kubeconfig, and the add/import flows can rewrite it.
                 self.loading = false;
                 self.contexts.clear();
                 self.resources.clear();
                 self.objects.clear();
                 self.selected_context = None;
+                self.projects = ProjectStore::load(&[]);
                 self.status = String::from("Kubeconfig unavailable.");
                 self.toaster.add_toast(adw::Toast::new(&error));
-                self.show_setup();
+                self.show_projects();
                 self.sync_dropdowns(Some(sender.clone()));
                 self.rebuild_resource_list(Some(sender.clone()));
                 self.rebuild_object_list();
@@ -81,6 +85,10 @@ impl App {
                 self.stop_log_stream();
                 self.stop_port_forward();
                 self.show_object_list();
+                // The store may have changed since the page was last built
+                // (e.g. removing a cluster only rebuilds the clusters page),
+                // so refresh the rows before presenting them.
+                self.rebuild_project_list();
                 self.show_projects();
                 self.loading = false;
                 self.status = String::from("Select a project.");
@@ -316,15 +324,21 @@ impl App {
                 }
             }
             AppMsg::EditCurrentCluster => {
-                let Some((name, server)) = self
+                let Some((name, server, insecure)) = self
                     .selected_context
                     .as_deref()
                     .and_then(|selected| self.contexts.iter().find(|c| c.name == selected))
-                    .map(|context| (context.name.clone(), context.server.clone()))
+                    .map(|context| {
+                        (
+                            context.name.clone(),
+                            context.server.clone(),
+                            context.insecure_skip_tls_verify,
+                        )
+                    })
                 else {
                     return;
                 };
-                self.open_cluster_edit_dialog(&name, &server, root);
+                self.open_cluster_edit_dialog(&name, &server, insecure, root);
             }
             AppMsg::RemoveClusterFromProject => {
                 let Some(context) = self.selected_context.clone() else {
@@ -1012,6 +1026,7 @@ impl App {
                 }
             }
             AppMsg::ShowAddClusterDialog => {
+                self.reset_cluster_dialog_form();
                 self.set_cluster_dialog_editing(false);
                 self.cluster_dialog_stack.set_visible_child_name("options");
                 self.cluster_dialog.present(Some(root));

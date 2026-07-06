@@ -1,6 +1,6 @@
 use anyhow::{Context as AnyhowContext, Result};
 use k8s_openapi::api::core::v1::Namespace;
-use kube::api::{ApiResource, ListParams};
+use kube::api::{ApiResource, DynamicObject, ListParams};
 use kube::discovery::{verbs, Discovery, Scope};
 use kube::{Api, ResourceExt};
 
@@ -53,8 +53,29 @@ impl KubeSession {
     }
 
     pub async fn list_namespaces(&self) -> Result<Vec<String>> {
+        let native_error = match self.list_native_namespaces().await {
+            Ok(names) => return Ok(normalized_namespace_names(names)),
+            Err(error) => error,
+        };
+
+        // Scoped tokens on OpenShift and Rancher regularly lack cluster-wide
+        // `list namespaces`, but both platforms expose an endpoint that
+        // returns only what the caller can access, filtered server-side.
+        if let Ok(names) = self.list_openshift_projects().await {
+            return Ok(normalized_namespace_names(names));
+        }
+        if self.server.contains("/k8s/clusters/") {
+            if let Ok(names) = self.list_rancher_namespaces().await {
+                return Ok(normalized_namespace_names(names));
+            }
+        }
+
+        Err(native_error)
+    }
+
+    async fn list_native_namespaces(&self) -> Result<Vec<String>> {
         let namespaces: Api<Namespace> = Api::all(self.client.clone());
-        let mut names = namespaces
+        let names = namespaces
             .list(&ListParams::default())
             .await
             .with_context(|| {
@@ -66,17 +87,71 @@ impl KubeSession {
             .items
             .into_iter()
             .map(|namespace| namespace.name_any())
-            .collect::<Vec<_>>();
-
-        names.sort();
-        names.dedup();
-
-        if names.is_empty() {
-            names.push(String::from("default"));
-        }
-
+            .collect();
         Ok(names)
     }
+
+    /// OpenShift's Project API returns only the projects (namespaces) the
+    /// current user can see — the filtering happens server-side, so no
+    /// cluster-wide RBAC is needed. Same call the web console and
+    /// `oc get projects` make. Plain 404s on non-OpenShift clusters.
+    async fn list_openshift_projects(&self) -> Result<Vec<String>> {
+        let resource = ApiResource {
+            group: String::from("project.openshift.io"),
+            version: String::from("v1"),
+            api_version: String::from("project.openshift.io/v1"),
+            kind: String::from("Project"),
+            plural: String::from("projects"),
+        };
+        let projects: Api<DynamicObject> = Api::all_with(self.client.clone(), &resource);
+        let names = projects
+            .list(&ListParams::default())
+            .await?
+            .items
+            .into_iter()
+            .map(|project| project.name_any())
+            .collect();
+        Ok(names)
+    }
+
+    /// Rancher's Steve API (the one its own dashboard uses) also filters
+    /// namespaces by the caller's project memberships. It is served next to
+    /// the Kubernetes proxy this session already points at
+    /// (`…/k8s/clusters/<id>/v1/namespaces`) and accepts the same bearer
+    /// token, so the request goes through the existing client.
+    async fn list_rancher_namespaces(&self) -> Result<Vec<String>> {
+        let request = http::Request::get("/v1/namespaces").body(Vec::new())?;
+        let response: serde_json::Value = self.client.request(request).await?;
+        let names = steve_namespace_names(&response);
+        if names.is_empty() {
+            anyhow::bail!("Steve namespace listing returned no entries");
+        }
+        Ok(names)
+    }
+}
+
+fn steve_namespace_names(response: &serde_json::Value) -> Vec<String> {
+    let Some(items) = response.get("data").and_then(|data| data.as_array()) else {
+        return Vec::new();
+    };
+    items
+        .iter()
+        .filter_map(|item| {
+            item.get("id")
+                .or_else(|| item.pointer("/metadata/name"))
+                .and_then(|name| name.as_str())
+        })
+        .map(str::to_owned)
+        .collect()
+}
+
+fn normalized_namespace_names(mut names: Vec<String>) -> Vec<String> {
+    names.sort();
+    names.dedup();
+    if names.is_empty() {
+        names.push(String::from("default"));
+    }
+    names
 }
 
 pub(crate) fn api_resource(resource: &ResourceKind) -> ApiResource {
@@ -117,4 +192,52 @@ fn resource_group_order(resource: &ResourceKind) -> (u8, &str) {
     };
 
     (rank, resource.group.as_str())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalized_namespace_names, steve_namespace_names};
+
+    #[test]
+    fn steve_namespace_names_reads_collection_ids() {
+        let response = serde_json::json!({
+            "type": "collection",
+            "data": [
+                { "id": "cattle-system", "metadata": { "name": "cattle-system" } },
+                { "id": "rnds-dev" },
+                { "metadata": { "name": "no-id-namespace" } },
+            ],
+        });
+
+        assert_eq!(
+            steve_namespace_names(&response),
+            vec![
+                String::from("cattle-system"),
+                String::from("rnds-dev"),
+                String::from("no-id-namespace"),
+            ]
+        );
+    }
+
+    #[test]
+    fn steve_namespace_names_handles_non_collection_payloads() {
+        assert!(steve_namespace_names(&serde_json::json!({"type": "error"})).is_empty());
+        assert!(steve_namespace_names(&serde_json::json!(null)).is_empty());
+    }
+
+    #[test]
+    fn normalized_namespace_names_sorts_dedups_and_defaults() {
+        assert_eq!(
+            normalized_namespace_names(vec![
+                String::from("b"),
+                String::from("a"),
+                String::from("b"),
+            ]),
+            vec![String::from("a"), String::from("b")]
+        );
+        assert_eq!(
+            normalized_namespace_names(Vec::new()),
+            vec![String::from("default")]
+        );
+    }
 }

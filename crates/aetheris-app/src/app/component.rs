@@ -4,8 +4,7 @@ use super::dialogs::*;
 use super::layout::*;
 use super::object_detail::*;
 use super::widgets::{
-    action_menu_popover, menu_action_button, rebuild_column_filter_list,
-    rebuild_status_filter_list, selector_button_child, selector_popover,
+    rebuild_column_filter_list, rebuild_status_filter_list, selector_button_child, selector_popover,
 };
 use super::yaml::*;
 use super::*;
@@ -76,22 +75,22 @@ impl Component for App {
             .tooltip_text("Back to clusters")
             .build();
         cluster_back_button.add_css_class("flat");
+        // HIG-style menu (as in Nautilus): a gio::Menu model instead of
+        // custom buttons — no icons, and registered accelerators render on
+        // the right edge of each item.
+        let cluster_menu = gtk::gio::Menu::new();
+        cluster_menu.append(Some("Edit Cluster…"), Some("win.cluster-edit"));
+        cluster_menu.append(Some("Remove from Project"), Some("win.cluster-remove"));
         let cluster_menu_button = gtk::MenuButton::builder()
             .icon_name("open-menu-symbolic")
             .tooltip_text("Cluster options")
+            .menu_model(&cluster_menu)
             .build();
         let cluster_refresh_button = gtk::Button::builder()
             .icon_name("view-refresh-symbolic")
             .tooltip_text("Refresh cluster health")
             .build();
         cluster_refresh_button.add_css_class("flat");
-        let cluster_edit_button = menu_action_button("document-edit-symbolic", "Edit Cluster…");
-        let cluster_remove_button =
-            menu_action_button("user-trash-symbolic", "Remove from Project");
-        cluster_menu_button.set_popover(Some(&action_menu_popover(&[
-            &cluster_edit_button,
-            &cluster_remove_button,
-        ])));
         let cluster_list = gtk::ListBox::new();
         cluster_list.set_hexpand(true);
         cluster_list.add_css_class("boxed-list");
@@ -149,23 +148,24 @@ impl Component for App {
         project_create_button.add_css_class("suggested-action");
         let project_dialog_description =
             gtk::Label::new(Some("Separate clusters by environment or company"));
+        let project_menu = gtk::gio::Menu::new();
+        project_menu.append(Some("Rename Project…"), Some("win.project-rename"));
+        project_menu.append(Some("Duplicate Project"), Some("win.project-duplicate"));
+        project_menu.append(Some("Delete Project…"), Some("win.project-delete"));
         let project_menu_button = gtk::MenuButton::builder()
             .icon_name("open-menu-symbolic")
             .tooltip_text("Project options")
+            .menu_model(&project_menu)
             .build();
-        let project_rename_button = menu_action_button("document-edit-symbolic", "Rename Project…");
-        let project_duplicate_button =
-            menu_action_button("edit-copy-symbolic", "Duplicate Project");
-        let project_delete_button = menu_action_button("user-trash-symbolic", "Delete Project…");
-        project_delete_button.add_css_class("destructive-action");
-        project_menu_button.set_popover(Some(&action_menu_popover(&[
-            &project_rename_button,
-            &project_duplicate_button,
-            &project_delete_button,
-        ])));
+        // width-chars is the entry's *minimum* width and the header bar
+        // passes it straight up to the window: at 28 chars the whole content
+        // pane bottomed out around 589px and the window refused to shrink
+        // further (Adwaita then warns the toast overlay exceeds the window).
+        // Keep the minimum tiny and let hexpand grow it into whatever the
+        // header actually has.
         let search_entry = gtk::SearchEntry::builder()
             .placeholder_text("Search")
-            .width_chars(28)
+            .width_chars(8)
             .max_width_chars(75)
             .build();
         let status_filter_list = gtk::FlowBox::new();
@@ -222,6 +222,7 @@ impl Component for App {
             .label("Loading kubeconfig...")
             .xalign(0.0)
             .hexpand(true)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
             .build();
         let spinner = gtk::Spinner::builder().spinning(true).visible(true).build();
         let resource_list = gtk::ListBox::new();
@@ -506,8 +507,6 @@ impl Component for App {
         let cluster_token_back_button = gtk::Button::builder()
             .icon_name("go-previous-symbolic")
             .build();
-        let open_dialog_button = gtk::Button::builder().halign(gtk::Align::Center).build();
-        open_dialog_button.add_css_class("suggested-action");
         let custom_namespace_dialog =
             build_custom_namespace_dialog(&custom_namespace_entry, &custom_namespace_button);
         let rename_namespace_dialog =
@@ -548,22 +547,47 @@ impl Component for App {
         let root_stack = gtk::Stack::new();
         root_stack.set_hhomogeneous(false);
         root_stack.set_vhomogeneous(false);
-        let split_view = adw::NavigationSplitView::builder()
+        // Nautilus-style responsive sidebar: an overlay split view keeps the
+        // content pane always visible and slides the sidebar over it when
+        // collapsed, toggled from a header button — instead of the
+        // back-button navigation a NavigationSplitView would impose (which
+        // also stacked a second, automatic back button next to our own on
+        // the detail page whenever the view was collapsed).
+        let split_view = adw::OverlaySplitView::builder()
             .min_sidebar_width(180.0)
             .max_sidebar_width(240.0)
             .sidebar_width_fraction(0.22)
             .collapsed(false)
-            .show_content(true)
+            .enable_show_gesture(false)
+            .enable_hide_gesture(false)
             .build();
+        let sidebar_toggle_button = gtk::ToggleButton::builder()
+            .icon_name("sidebar-show-symbolic")
+            .tooltip_text("Show Sidebar")
+            .visible(false)
+            .build();
+        sidebar_toggle_button.add_css_class("flat");
+        split_view
+            .bind_property("show-sidebar", &sidebar_toggle_button, "active")
+            .bidirectional()
+            .sync_create()
+            .build();
+        // Px, not Sp: on Windows GTK folds the display scale into
+        // gtk-xft-dpi on top of the surface scale, so an Sp threshold gets
+        // scaled twice and can exceed even a maximized window — leaving the
+        // app permanently collapsed. Logical pixels are already
+        // scale-corrected on every backend.
         let compact_layout = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
             adw::BreakpointConditionLengthType::MaxWidth,
             900.0,
-            adw::LengthUnit::Sp,
+            adw::LengthUnit::Px,
         ));
         compact_layout.add_setters(&[
             (&split_view, "collapsed", true),
-            (&split_view, "show-content", false),
+            (&split_view, "enable-show-gesture", true),
+            (&split_view, "enable-hide-gesture", true),
         ]);
+        compact_layout.add_setter(&sidebar_toggle_button, "visible", Some(&true.to_value()));
         root.add_breakpoint(compact_layout);
 
         let sidebar = build_sidebar(SidebarWidgets {
@@ -574,6 +598,7 @@ impl Component for App {
             resource_list: &resource_list,
         });
         let content = build_content(ContentWidgets {
+            sidebar_toggle_button: &sidebar_toggle_button,
             detail_back_button: &detail_back_button,
             delete_button: &detail_delete_button,
             create_yaml_button: &create_yaml_button,
@@ -593,7 +618,6 @@ impl Component for App {
         });
         split_view.set_sidebar(Some(&sidebar));
         split_view.set_content(Some(&content));
-        root_stack.add_named(&build_empty_setup_page(&open_dialog_button), Some("setup"));
         root_stack.add_named(
             &build_projects_page(
                 &project_list,
@@ -632,22 +656,37 @@ impl Component for App {
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowClusters)
         });
-        cluster_edit_button.connect_clicked({
-            let sender = sender.clone();
-            let menu_button = cluster_menu_button.clone();
-            move |_| {
-                menu_button.popdown();
-                sender.input(AppMsg::EditCurrentCluster);
-            }
-        });
-        cluster_remove_button.connect_clicked({
-            let sender = sender.clone();
-            let menu_button = cluster_menu_button.clone();
-            move |_| {
-                menu_button.popdown();
-                sender.input(AppMsg::RemoveClusterFromProject);
-            }
-        });
+        // Backing actions for the hamburger menus. Registered on the window
+        // ("win." prefix); the accels are what the popover shows on the
+        // right of each item.
+        type MenuAction = (&'static str, &'static [&'static str], fn() -> AppMsg);
+        let menu_actions: [MenuAction; 5] = [
+            ("cluster-edit", &["<primary>E"], || {
+                AppMsg::EditCurrentCluster
+            }),
+            ("cluster-remove", &["<primary><shift>Delete"], || {
+                AppMsg::RemoveClusterFromProject
+            }),
+            ("project-rename", &["F2"], || {
+                AppMsg::ShowRenameProjectDialog
+            }),
+            ("project-duplicate", &["<primary>D"], || {
+                AppMsg::DuplicateProject
+            }),
+            ("project-delete", &["<primary>Delete"], || {
+                AppMsg::DeleteProject
+            }),
+        ];
+        let application = relm4::main_application();
+        for (name, accels, message) in menu_actions {
+            let action = gtk::gio::SimpleAction::new(name, None);
+            action.connect_activate({
+                let sender = sender.clone();
+                move |_, _| sender.input(message())
+            });
+            root.add_action(&action);
+            application.set_accels_for_action(&format!("win.{name}"), accels);
+        }
         add_cluster_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowAddClusterDialog)
@@ -707,30 +746,6 @@ impl Component for App {
         project_create_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::AddProject)
-        });
-        project_rename_button.connect_clicked({
-            let sender = sender.clone();
-            let menu_button = project_menu_button.clone();
-            move |_| {
-                menu_button.popdown();
-                sender.input(AppMsg::ShowRenameProjectDialog);
-            }
-        });
-        project_duplicate_button.connect_clicked({
-            let sender = sender.clone();
-            let menu_button = project_menu_button.clone();
-            move |_| {
-                menu_button.popdown();
-                sender.input(AppMsg::DuplicateProject);
-            }
-        });
-        project_delete_button.connect_clicked({
-            let sender = sender.clone();
-            let menu_button = project_menu_button.clone();
-            move |_| {
-                menu_button.popdown();
-                sender.input(AppMsg::DeleteProject);
-            }
         });
         search_entry.connect_search_changed({
             let sender = sender.clone();
@@ -838,10 +853,6 @@ impl Component for App {
         refresh_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::Refresh)
-        });
-        open_dialog_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ShowAddClusterDialog)
         });
         setup_button.connect_clicked({
             let sender = sender.clone();

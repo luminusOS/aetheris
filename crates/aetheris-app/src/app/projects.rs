@@ -436,23 +436,29 @@ impl ProjectStore {
 
         // The kubeconfig can be changed by kubectl/oc outside Aetheris. Keep
         // only clusters explicitly saved in projects.json; use the live
-        // kubeconfig here only to prune deleted/renamed entries.
-        let live_names: BTreeSet<&str> = contexts
-            .iter()
-            .map(|context| context.name.as_str())
-            .collect();
-        for project in &mut self.projects {
-            project
-                .contexts
-                .retain(|name| live_names.contains(name.as_str()));
-            let project_contexts = project
-                .contexts
+        // kubeconfig here only to prune deleted/renamed entries. An empty
+        // live list means the kubeconfig is missing or unreadable, not that
+        // every cluster was deleted — pruning against it (and persisting the
+        // result below) would wipe the user's saved clusters on a single bad
+        // startup, so leave the store alone until contexts load again.
+        if !contexts.is_empty() {
+            let live_names: BTreeSet<&str> = contexts
                 .iter()
-                .map(String::as_str)
-                .collect::<BTreeSet<_>>();
-            project
-                .custom_namespaces_by_context
-                .retain(|entry| project_contexts.contains(entry.context.as_str()));
+                .map(|context| context.name.as_str())
+                .collect();
+            for project in &mut self.projects {
+                project
+                    .contexts
+                    .retain(|name| live_names.contains(name.as_str()));
+                let project_contexts = project
+                    .contexts
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<BTreeSet<_>>();
+                project
+                    .custom_namespaces_by_context
+                    .retain(|entry| project_contexts.contains(entry.context.as_str()));
+            }
         }
 
         let selected_exists = self
@@ -639,6 +645,7 @@ mod tests {
             host: String::from("example.com"),
             user: format!("{name}-user"),
             is_current: false,
+            insecure_skip_tls_verify: false,
         }
     }
 
@@ -660,6 +667,36 @@ mod tests {
 
         let project = store.selected_project().unwrap();
         assert_eq!(project.contexts, vec![String::from("local")]);
+    }
+
+    #[test]
+    fn normalize_contexts_keeps_saved_contexts_when_live_list_is_empty() {
+        let mut store = ProjectStore {
+            projects: vec![Project {
+                name: String::from("Work"),
+                contexts: vec![String::from("prod"), String::from("stage")],
+                custom_namespaces_by_context: vec![ContextNamespaces {
+                    context: String::from("prod"),
+                    namespaces: vec![String::from("billing")],
+                }],
+            }],
+            selected_project: Some(String::from("Work")),
+            visible_object_columns: default_object_columns(),
+            object_name_width: None,
+            object_column_widths: Vec::new(),
+        };
+
+        store.normalize_contexts(&[]);
+
+        let project = store.selected_project().unwrap();
+        assert_eq!(
+            project.contexts,
+            vec![String::from("prod"), String::from("stage")]
+        );
+        assert_eq!(
+            project.custom_namespaces_for_context(Some("prod")),
+            vec![String::from("billing")]
+        );
     }
 
     #[test]

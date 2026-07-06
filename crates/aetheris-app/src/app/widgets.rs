@@ -24,43 +24,62 @@ pub(super) fn selector_button_child(label: &gtk::Label) -> gtk::Box {
 
 pub(super) fn selector_popover(list: &gtk::ListBox) -> gtk::Popover {
     let popover = gtk::Popover::new();
-    let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let content = gtk::Box::new(gtk::Orientation::Vertical, 6);
     content.set_margin_top(6);
     content.set_margin_bottom(6);
     content.set_margin_start(6);
     content.set_margin_end(6);
     list.add_css_class("boxed-list");
     list.set_selection_mode(gtk::SelectionMode::None);
-    content.append(list);
-    popover.set_child(Some(&content));
-    popover
-}
 
-pub(super) fn menu_action_button(icon_name: &str, label: &str) -> gtk::Button {
-    let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    content.set_margin_top(6);
-    content.set_margin_bottom(6);
-    content.set_margin_start(6);
-    content.set_margin_end(6);
-    content.append(&gtk::Image::from_icon_name(icon_name));
-    let text = gtk::Label::new(Some(label));
-    text.set_xalign(0.0);
-    text.set_hexpand(true);
-    content.append(&text);
+    let search_entry = gtk::SearchEntry::builder()
+        .placeholder_text("Filter namespaces")
+        .build();
+    content.append(&search_entry);
 
-    let button = gtk::Button::new();
-    button.set_child(Some(&content));
-    button.add_css_class("flat");
-    button
-}
-
-pub(super) fn action_menu_popover(buttons: &[&gtk::Button]) -> gtk::Popover {
-    let popover = gtk::Popover::new();
-    let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    content.set_margin_all(6);
-    for button in buttons {
-        content.append(*button);
-    }
+    let query = std::rc::Rc::new(std::cell::RefCell::new(String::new()));
+    list.set_filter_func({
+        let query = query.clone();
+        move |row| {
+            let query = query.borrow();
+            if query.is_empty() {
+                return true;
+            }
+            // Action rows ("Add namespace") stay visible no matter the
+            // query — they are commands, not candidates being filtered.
+            if row.widget_name() == "selector-action-row" {
+                return true;
+            }
+            row.child()
+                .and_then(|child| child.downcast::<adw::ActionRow>().ok())
+                .map(|action| action.title().to_lowercase().contains(query.as_str()))
+                .unwrap_or(true)
+        }
+    });
+    search_entry.connect_search_changed({
+        let list = list.clone();
+        move |entry| {
+            *query.borrow_mut() = entry.text().to_lowercase();
+            list.invalidate_filter();
+        }
+    });
+    // A stale query from the last time the popover was open would silently
+    // hide namespaces the next time it pops up.
+    popover.connect_closed({
+        let search_entry = search_entry.clone();
+        move |_| search_entry.set_text("")
+    });
+    // The list can hold dozens of entries (one per namespace); without a
+    // height cap the popover grows past the monitor edge, so size to the
+    // content only up to a limit and scroll beyond it.
+    let scroller = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .propagate_natural_height(true)
+        .propagate_natural_width(true)
+        .max_content_height(420)
+        .child(list)
+        .build();
+    content.append(&scroller);
     popover.set_child(Some(&content));
     popover
 }
@@ -132,6 +151,8 @@ pub(super) fn add_namespace_selector_row() -> gtk::ListBoxRow {
 
 fn selector_action_row(title: &str, icon_name: &str) -> gtk::ListBoxRow {
     let row = gtk::ListBoxRow::new();
+    // Exempts the row from the selector popover's search filter.
+    row.set_widget_name("selector-action-row");
     row.set_activatable(true);
     let action = adw::ActionRow::builder()
         .title(title)

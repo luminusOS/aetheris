@@ -38,9 +38,15 @@ impl KubeManager {
             bail!("bearer token is required");
         }
 
-        let user_name = existing_user_name
-            .clone()
-            .unwrap_or_else(|| format!("{}-user", request.context_name));
+        // A new token always goes into this context's own user entry. The
+        // existing user may be shared with other contexts (a rename reuses
+        // the original user), and writing the token there would silently
+        // replace the credentials those contexts still depend on.
+        let user_name = if request.bearer_token.is_empty() {
+            existing_user_name.clone().unwrap_or_default()
+        } else {
+            format!("{}-user", request.context_name)
+        };
 
         upsert_named_cluster(
             &mut kubeconfig.clusters,
@@ -230,6 +236,16 @@ pub(crate) fn cluster_server(kubeconfig: &Kubeconfig, cluster_name: &str) -> Opt
         .and_then(|cluster| cluster.server.clone())
 }
 
+pub(crate) fn cluster_skips_tls_verify(kubeconfig: &Kubeconfig, cluster_name: &str) -> bool {
+    kubeconfig
+        .clusters
+        .iter()
+        .find(|cluster| cluster.name == cluster_name)
+        .and_then(|cluster| cluster.cluster.as_ref())
+        .and_then(|cluster| cluster.insecure_skip_tls_verify)
+        .unwrap_or(false)
+}
+
 pub(crate) fn server_host(server: &str) -> String {
     let without_scheme = server
         .split_once("://")
@@ -384,6 +400,90 @@ mod tests {
             .map(|token| token.expose_secret().to_owned());
 
         assert_eq!(token.as_deref(), Some("sha256~imported"));
+
+        unsafe {
+            std::env::remove_var("KUBECONFIG");
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn add_token_cluster_with_new_token_does_not_clobber_a_shared_user() {
+        let _guard = KUBECONFIG_ENV_LOCK.lock().unwrap();
+        let path = test_kubeconfig_path("aetheris-kube-test-shared-user");
+
+        // Two contexts pointing at the same auth entry (happens after a
+        // rename reused the original user). Entering a new token for one of
+        // them must not overwrite the credentials the other still uses.
+        let mut kubeconfig = Kubeconfig::default();
+        for name in ["prd", "rnds"] {
+            kubeconfig.clusters.push(NamedCluster {
+                name: name.to_owned(),
+                cluster: Some(Cluster {
+                    server: Some(format!("https://{name}.example.com:6443")),
+                    ..Cluster::default()
+                }),
+                other: Default::default(),
+            });
+            kubeconfig.contexts.push(NamedContext {
+                name: name.to_owned(),
+                context: Some(KubeContext {
+                    cluster: name.to_owned(),
+                    user: Some(String::from("prd-user")),
+                    ..KubeContext::default()
+                }),
+                other: Default::default(),
+            });
+        }
+        kubeconfig.auth_infos.push(NamedAuthInfo {
+            name: String::from("prd-user"),
+            auth_info: Some(AuthInfo {
+                token: Some(SecretString::new(String::from("sha256~prd").into())),
+                ..AuthInfo::default()
+            }),
+            other: Default::default(),
+        });
+        let yaml = serde_yaml::to_string(&kubeconfig).unwrap();
+        std::fs::write(&path, yaml).unwrap();
+
+        unsafe {
+            std::env::set_var("KUBECONFIG", &path);
+        }
+
+        let edit = AddClusterRequest {
+            context_name: String::from("rnds"),
+            server: String::from("https://rnds.example.com:6443"),
+            bearer_token: String::from("sha256~rnds"),
+            certificate_authority_data: None,
+            insecure_skip_tls_verify: false,
+            original_context_name: Some(String::from("rnds")),
+        };
+        KubeManager::add_token_cluster(edit).expect("edit with a new token should succeed");
+
+        let kubeconfig = Kubeconfig::read_from(&path).expect("kubeconfig should be readable");
+        let token_of = |user: &str| {
+            kubeconfig
+                .auth_infos
+                .iter()
+                .find(|auth| auth.name == user)
+                .and_then(|auth| auth.auth_info.as_ref())
+                .and_then(|info| info.token.as_ref())
+                .map(|token| token.expose_secret().to_owned())
+        };
+
+        assert_eq!(
+            token_of("prd-user").as_deref(),
+            Some("sha256~prd"),
+            "the shared user's token must stay untouched"
+        );
+        assert_eq!(token_of("rnds-user").as_deref(), Some("sha256~rnds"));
+        let rnds_user = kubeconfig
+            .contexts
+            .iter()
+            .find(|context| context.name == "rnds")
+            .and_then(|context| context.context.as_ref())
+            .and_then(|context| context.user.clone());
+        assert_eq!(rnds_user.as_deref(), Some("rnds-user"));
 
         unsafe {
             std::env::remove_var("KUBECONFIG");

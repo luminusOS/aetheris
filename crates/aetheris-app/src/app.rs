@@ -294,7 +294,7 @@ pub struct App {
     status: String,
     toaster: adw::ToastOverlay,
     root_stack: gtk::Stack,
-    split_view: adw::NavigationSplitView,
+    split_view: adw::OverlaySplitView,
     project_list: gtk::ListBox,
     project_title_label: gtk::Label,
     add_project_button: gtk::Button,

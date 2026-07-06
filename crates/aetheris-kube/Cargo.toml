@@ -10,6 +10,7 @@ authors.workspace = true
 anyhow.workspace = true
 dirs.workspace = true
 futures.workspace = true
+http.workspace = true
 k8s-openapi.workspace = true
 kube.workspace = true
 secrecy.workspace = true

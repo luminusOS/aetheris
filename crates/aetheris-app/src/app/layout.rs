@@ -47,6 +47,7 @@ pub(super) fn build_sidebar(widgets: SidebarWidgets<'_>) -> adw::NavigationPage 
 }
 
 pub(super) struct ContentWidgets<'a> {
+    pub(super) sidebar_toggle_button: &'a gtk::ToggleButton,
     pub(super) detail_back_button: &'a gtk::Button,
     pub(super) delete_button: &'a gtk::Button,
     pub(super) create_yaml_button: &'a gtk::Button,
@@ -68,6 +69,7 @@ pub(super) struct ContentWidgets<'a> {
 pub(super) fn build_content(widgets: ContentWidgets<'_>) -> adw::NavigationPage {
     let toolbar = adw::ToolbarView::new();
     let header = adw::HeaderBar::new();
+    header.pack_start(widgets.sidebar_toggle_button);
     header.pack_start(widgets.detail_back_button);
     header.pack_start(widgets.refresh_button);
     header.pack_start(widgets.create_yaml_button);
@@ -192,45 +194,6 @@ pub(super) fn filter_popover(
 
     popover.set_child(Some(&content));
     popover
-}
-
-pub(super) fn build_empty_setup_page(add_button: &gtk::Button) -> adw::ToolbarView {
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
-
-    let outer = gtk::Box::new(gtk::Orientation::Vertical, 18);
-    outer.set_valign(gtk::Align::Center);
-    outer.set_halign(gtk::Align::Center);
-    outer.set_vexpand(true);
-    outer.set_margin_all(32);
-
-    let icon = gtk::Image::from_icon_name("network-server-symbolic");
-    icon.set_pixel_size(72);
-    icon.add_css_class("dim-label");
-    outer.append(&icon);
-
-    let title = gtk::Label::new(Some("No clusters yet"));
-    title.add_css_class("title-1");
-    title.set_justify(gtk::Justification::Center);
-    outer.append(&title);
-
-    let subtitle = gtk::Label::new(Some(
-        "Bring a cluster online and Aetheris will give you a calm place to explore it.",
-    ));
-    subtitle.set_wrap(true);
-    subtitle.set_justify(gtk::Justification::Center);
-    subtitle.set_max_width_chars(54);
-    subtitle.add_css_class("dim-label");
-    outer.append(&subtitle);
-
-    let button_content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    button_content.append(&gtk::Image::from_icon_name("list-add-symbolic"));
-    button_content.append(&gtk::Label::new(Some("Adicionar cluster")));
-    add_button.set_child(Some(&button_content));
-    outer.append(add_button);
-
-    toolbar.set_content(Some(&outer));
-    toolbar
 }
 
 pub(super) fn build_projects_page(
