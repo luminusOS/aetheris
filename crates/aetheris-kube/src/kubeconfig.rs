@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{Context as AnyhowContext, Result, bail};
+use base64::prelude::*;
 use kube::config::{
     AuthInfo, Cluster, Context as KubeContext, Kubeconfig, NamedAuthInfo, NamedCluster,
     NamedContext,
@@ -183,8 +184,37 @@ fn normalize_add_cluster_request(mut request: AddClusterRequest) -> Result<AddCl
     if !(request.server.starts_with("https://") || request.server.starts_with("http://")) {
         bail!("API server URL must start with http:// or https://");
     }
+    if request.insecure_skip_tls_verify && request.certificate_authority_data.is_some() {
+        bail!("CA data cannot be used when TLS verification is skipped");
+    }
+    request.certificate_authority_data = request
+        .certificate_authority_data
+        .map(normalize_certificate_authority_data)
+        .transpose()?;
 
     Ok(request)
+}
+
+fn normalize_certificate_authority_data(value: String) -> Result<String> {
+    if looks_like_pem_certificate(&value) {
+        return Ok(BASE64_STANDARD.encode(value.as_bytes()));
+    }
+
+    let compact = value.split_whitespace().collect::<String>();
+    let decoded = BASE64_STANDARD
+        .decode(compact.as_bytes())
+        .context("CA data must be a PEM certificate or base64-encoded PEM certificate")?;
+    let decoded = std::str::from_utf8(&decoded)
+        .context("CA data must decode to a PEM certificate, not raw DER bytes")?;
+    if !looks_like_pem_certificate(decoded) {
+        bail!("CA data must decode to a PEM certificate");
+    }
+
+    Ok(compact)
+}
+
+fn looks_like_pem_certificate(value: &str) -> bool {
+    value.contains("-----BEGIN CERTIFICATE-----") && value.contains("-----END CERTIFICATE-----")
 }
 
 fn kubeconfig_write_path() -> Result<PathBuf> {
@@ -271,6 +301,7 @@ pub(crate) fn server_host(server: &str) -> String {
 mod tests {
     use std::sync::Mutex;
 
+    use base64::prelude::*;
     use kube::config::{
         AuthInfo, Cluster, Context as KubeContext, Kubeconfig, NamedAuthInfo, NamedCluster,
         NamedContext,
@@ -333,6 +364,75 @@ mod tests {
             .map(|token| token.expose_secret().to_owned());
 
         assert_eq!(token.as_deref(), Some("sha256~original"));
+
+        unsafe {
+            std::env::remove_var("KUBECONFIG");
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn add_token_cluster_rejects_ca_when_tls_verification_is_skipped() {
+        let _guard = KUBECONFIG_ENV_LOCK.lock().unwrap();
+        let path = test_kubeconfig_path("aetheris-kube-test-insecure-ca");
+        unsafe {
+            std::env::set_var("KUBECONFIG", &path);
+        }
+
+        let request = AddClusterRequest {
+            context_name: String::from("invalid-tls"),
+            server: String::from("https://api.example.com:6443"),
+            bearer_token: String::from("sha256~token"),
+            certificate_authority_data: Some(test_ca_pem()),
+            insecure_skip_tls_verify: true,
+            original_context_name: None,
+        };
+        let error = KubeManager::add_token_cluster(request).expect_err("request must be rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains("CA data cannot be used when TLS verification is skipped")
+        );
+
+        unsafe {
+            std::env::remove_var("KUBECONFIG");
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn add_token_cluster_encodes_pem_ca_data() {
+        let _guard = KUBECONFIG_ENV_LOCK.lock().unwrap();
+        let path = test_kubeconfig_path("aetheris-kube-test-ca-pem");
+        unsafe {
+            std::env::set_var("KUBECONFIG", &path);
+        }
+
+        let ca = test_ca_pem();
+        let request = AddClusterRequest {
+            context_name: String::from("pem-ca"),
+            server: String::from("https://api.example.com:6443"),
+            bearer_token: String::from("sha256~token"),
+            certificate_authority_data: Some(ca.clone()),
+            insecure_skip_tls_verify: false,
+            original_context_name: None,
+        };
+        KubeManager::add_token_cluster(request).expect("PEM CA should be accepted");
+
+        let kubeconfig = Kubeconfig::read_from(&path).expect("kubeconfig should be readable");
+        let stored_ca = kubeconfig
+            .clusters
+            .iter()
+            .find(|cluster| cluster.name == "pem-ca")
+            .and_then(|cluster| cluster.cluster.as_ref())
+            .and_then(|cluster| cluster.certificate_authority_data.as_ref())
+            .expect("CA data should be stored");
+        let decoded = BASE64_STANDARD
+            .decode(stored_ca)
+            .expect("stored CA should be valid base64");
+
+        assert_eq!(decoded, ca.trim().as_bytes());
 
         unsafe {
             std::env::remove_var("KUBECONFIG");
@@ -640,5 +740,21 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ))
+    }
+
+    fn test_ca_pem() -> String {
+        String::from(
+            "-----BEGIN CERTIFICATE-----\n\
+             MIIBszCCAVmgAwIBAgIUeH9mTSZQm2u9uU2xK4w6cmzNmjcwCgYIKoZIzj0EAwIw\n\
+             FzEVMBMGA1UEAwwMYWV0aGVyaXMtdGVzdDAeFw0yNjAxMDEwMDAwMDBaFw0yNzAx\n\
+             MDEwMDAwMDBaMBcxFTATBgNVBAMMDGFldGhlcmlzLXRlc3QwWTATBgcqhkjOPQIB\n\
+             BggqhkjOPQMBBwNCAAQtsnR+S4p0lDNoe0JvLqR0ZGFxiiq7mU0u5KFLMZzU2l+O\n\
+             fZgLr9LkqJYTVX9BYRZL2uY5pKiBmqnH6r8jo1MwUTAdBgNVHQ4EFgQUX0T5hZlP\n\
+             Q0GYovLUG6CmH0iP2JwwHwYDVR0jBBgwFoAUX0T5hZlPQ0GYovLUG6CmH0iP2Jww\n\
+             DwYDVR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNIADBFAiEA7Lc8EX0GkL+5TMWX\n\
+             B4JrLuN94ZG6wGB5SYrYd7Lj5P8CIBtMn+5Y0rQkgC0yQZdTx95k7iU01AOhKy4s\n\
+             Qd6UpELK\n\
+             -----END CERTIFICATE-----\n",
+        )
     }
 }

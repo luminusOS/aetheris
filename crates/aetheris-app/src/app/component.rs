@@ -498,8 +498,11 @@ impl Component for App {
             .hexpand(true)
             .build();
         let setup_ca_entry = adw::EntryRow::builder()
-            .title(tr("CA Data"))
+            .title(tr("CA Certificate"))
             .hexpand(true)
+            .build();
+        let setup_ca_file_button = gtk::Button::builder()
+            .icon_name("document-open-symbolic")
             .build();
         let setup_insecure_check = adw::SwitchRow::builder()
             .title(tr("Skip TLS Verification"))
@@ -541,6 +544,7 @@ impl Component for App {
                 server_entry: &setup_server_entry,
                 token_entry: &setup_token_entry,
                 ca_entry: &setup_ca_entry,
+                ca_file_button: &setup_ca_file_button,
                 insecure_check: &setup_insecure_check,
                 add_button: &setup_button,
                 title_label: &cluster_token_title_label,
@@ -860,6 +864,10 @@ impl Component for App {
         setup_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::AddCluster)
+        });
+        setup_ca_file_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ShowCaFile)
         });
 
         let model = App {
