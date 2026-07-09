@@ -13,16 +13,6 @@ sudo dnf install -y \
   openssl-devel
 ```
 
-OpenConnect integration is optional while the VPN UI is under development. To
-build it locally, install the libopenconnect development files and enable the
-feature:
-
-```sh
-sudo dnf install -y openconnect-devel
-cargo check -p aetheris-openconnect --features system-libopenconnect
-cargo check -p aetheris-app --features openconnect
-```
-
 Run the app:
 
 ```sh
@@ -66,7 +56,6 @@ Aetheris has two Rust crates:
 
 - `aetheris-kube` — pure Kubernetes backend. It must not depend on GTK, Relm4, Libadwaita, or VTE.
 - `aetheris-app` — Relm4/GTK4 application. It owns UI state, widgets, project persistence, and command wiring.
-- `aetheris-openconnect` — optional libopenconnect integration. It owns C FFI and exposes only safe Rust types to the app.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for diagrams and module responsibilities.
 

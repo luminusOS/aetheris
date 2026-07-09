@@ -8,15 +8,18 @@ use crate::{KubeSession, ResourceKind, ResourceScope};
 
 impl KubeSession {
     pub async fn discover_resources(&self) -> Result<Vec<ResourceKind>> {
-        let discovery = Discovery::new(self.client.clone())
-            .run()
-            .await
-            .with_context(|| {
-                format!(
-                    "Could not discover Kubernetes resource types using context {}.",
-                    self.context
-                )
-            })?;
+        let discovery = match Discovery::new(self.client.clone()).run_aggregated().await {
+            Ok(discovery) => discovery,
+            Err(aggregated_error) => Discovery::new(self.client.clone())
+                .run()
+                .await
+                .with_context(|| {
+                    format!(
+                        "Could not discover Kubernetes resource types using context {}. Aggregated discovery also failed: {aggregated_error}",
+                        self.context
+                    )
+                })?,
+        };
         let mut resources = Vec::new();
 
         for group in discovery.groups_alphabetical() {

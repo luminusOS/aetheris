@@ -77,6 +77,9 @@ fn deployment_status_label(object: &DynamicObject) -> (String, Option<(i64, i64)
     if updated < desired {
         return (format!("Updating {ready}/{desired}"), ratio);
     }
+    if available > 0 {
+        return (format!("Available {available}/{desired}"), ratio);
+    }
     (format!("Unavailable {ready}/{desired}"), ratio)
 }
 
@@ -328,6 +331,27 @@ mod tests {
 
         assert_eq!(label, "Updating 3/10");
         assert_eq!(ratio, Some((3, 10)));
+    }
+
+    #[test]
+    fn deployment_status_label_reports_partial_availability() {
+        let object: DynamicObject = serde_json::from_value(serde_json::json!({
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": { "name": "web" },
+            "spec": { "replicas": 10 },
+            "status": {
+                "readyReplicas": 7,
+                "updatedReplicas": 10,
+                "availableReplicas": 7
+            }
+        }))
+        .unwrap();
+
+        let (label, ratio) = deployment_status_label(&object);
+
+        assert_eq!(label, "Available 7/10");
+        assert_eq!(ratio, Some((7, 10)));
     }
 
     #[test]

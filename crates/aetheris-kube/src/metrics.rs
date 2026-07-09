@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::time::Duration;
 
 use anyhow::Result;
 use kube::api::{ApiResource, DynamicObject, ListParams};
@@ -7,8 +8,25 @@ use serde_json::Value;
 
 use crate::{ContainerUsage, KubeSession, ResourceKind, ResourceUsage};
 
+const METRICS_TIMEOUT: Duration = Duration::from_secs(1);
+
 impl KubeSession {
     pub(crate) async fn resource_metrics(
+        &self,
+        resource: &ResourceKind,
+        namespace: Option<&str>,
+    ) -> Result<BTreeMap<(String, String), ResourceUsage>> {
+        match tokio::time::timeout(METRICS_TIMEOUT, async {
+            self.resource_metrics_inner(resource, namespace).await
+        })
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => anyhow::bail!("timed out while loading Kubernetes metrics"),
+        }
+    }
+
+    async fn resource_metrics_inner(
         &self,
         resource: &ResourceKind,
         namespace: Option<&str>,
@@ -39,6 +57,21 @@ impl KubeSession {
     }
 
     pub(crate) async fn pod_container_metrics(
+        &self,
+        namespace: &str,
+        pod: &str,
+    ) -> Result<Vec<ContainerUsage>> {
+        match tokio::time::timeout(METRICS_TIMEOUT, async {
+            self.pod_container_metrics_inner(namespace, pod).await
+        })
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => anyhow::bail!("timed out while loading container metrics"),
+        }
+    }
+
+    async fn pod_container_metrics_inner(
         &self,
         namespace: &str,
         pod: &str,

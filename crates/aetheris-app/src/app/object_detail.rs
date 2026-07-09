@@ -392,20 +392,23 @@ pub(super) fn rebuild_container_metrics(list: &gtk::ListBox, detail: &ObjectDeta
         return;
     }
 
-    for container in &detail.containers {
+    for container in &detail.container_resources {
         let usage = detail
             .container_metrics
             .iter()
-            .find(|usage| usage.name == *container);
+            .find(|usage| usage.name == container.name);
         list.append(&container_metric_row(container, usage));
     }
 }
 
-pub(super) fn container_metric_row(name: &str, usage: Option<&ContainerUsage>) -> gtk::ListBoxRow {
-    let row = gtk::ListBoxRow::new();
-    row.set_selectable(false);
-    let action = adw::ActionRow::builder().title(name).build();
-    action.add_prefix(&status_prefix_chip(&tr("Running")));
+pub(super) fn container_metric_row(
+    resources: &ContainerResources,
+    usage: Option<&ContainerUsage>,
+) -> adw::ExpanderRow {
+    let action = adw::ExpanderRow::builder()
+        .title(resources.name.as_str())
+        .expanded(false)
+        .build();
     if let Some(usage) = usage {
         let metrics = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         metrics.set_valign(gtk::Align::Center);
@@ -426,8 +429,73 @@ pub(super) fn container_metric_row(name: &str, usage: Option<&ContainerUsage>) -
     } else {
         action.set_subtitle(&tr("Metrics unavailable"));
     }
-    row.set_child(Some(&action));
+    action.add_row(&container_resource_row(
+        &tr("CPU"),
+        usage.map(|usage| usage.cpu.as_str()),
+        &resources.cpu_request,
+        &resources.cpu_limit,
+        "applications-engineering-symbolic",
+        format_cpu_quantity,
+    ));
+    action.add_row(&container_resource_row(
+        &tr("Memory"),
+        usage.map(|usage| usage.memory.as_str()),
+        &resources.memory_request,
+        &resources.memory_limit,
+        "drive-harddisk-symbolic",
+        format_memory_quantity,
+    ));
+    action
+}
+
+fn container_resource_row(
+    title: &str,
+    current: Option<&str>,
+    request: &str,
+    limit: &str,
+    icon_name: &str,
+    formatter: fn(&str) -> String,
+) -> adw::ActionRow {
+    let row = adw::ActionRow::builder().title(title).build();
+    row.add_prefix(&gtk::Image::from_icon_name(available_icon_name(
+        icon_name,
+        "applications-system-symbolic",
+    )));
+    row.add_suffix(&resource_text_pair(
+        &tr("Current"),
+        current.unwrap_or("-"),
+        formatter,
+    ));
+    row.add_suffix(&resource_text_pair(&tr("Request"), request, formatter));
+    row.add_suffix(&resource_text_pair(&tr("Limit"), limit, formatter));
     row
+}
+
+fn resource_text_pair(label: &str, value: &str, formatter: fn(&str) -> String) -> gtk::Box {
+    let pair = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    pair.set_valign(gtk::Align::Center);
+    pair.set_margin_start(10);
+
+    let title = gtk::Label::new(Some(label));
+    title.add_css_class("caption");
+    title.add_css_class("dim-label");
+    title.set_xalign(1.0);
+    pair.append(&title);
+
+    let value_label = gtk::Label::new(Some(&format_resource_value(value, formatter)));
+    value_label.add_css_class("caption");
+    value_label.set_xalign(1.0);
+    value_label.set_tooltip_text(Some(value));
+    pair.append(&value_label);
+    pair
+}
+
+fn format_resource_value(value: &str, formatter: fn(&str) -> String) -> String {
+    if value.is_empty() || value == "-" {
+        String::from("-")
+    } else {
+        formatter(value)
+    }
 }
 
 fn format_cpu_quantity(value: &str) -> String {

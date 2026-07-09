@@ -55,14 +55,9 @@ resources = [
 
 [features]
 default = []
-openconnect = [
-  "dep:aetheris-openconnect",
-  "aetheris-openconnect/system-libopenconnect",
-]
 
 [dependencies]
 aetheris-kube = { path = "../aetheris-kube" }
-aetheris-openconnect = { path = "../aetheris-openconnect", optional = true }
 anyhow = "1"
 dirs = "6"
 futures = "0.3"
