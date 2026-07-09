@@ -1065,6 +1065,26 @@ impl App {
                 self.set_cluster_dialog_editing(false);
                 self.cluster_dialog_stack.set_visible_child_name("token");
             }
+            AppMsg::ShowCaFile => {
+                let dialog = gtk::FileDialog::builder()
+                    .title(tr("Choose CA Certificate"))
+                    .accept_label(tr("Choose"))
+                    .modal(true)
+                    .build();
+                let sender = sender.clone();
+                dialog.open(
+                    Some(root),
+                    gtk::gio::Cancellable::NONE,
+                    move |result| match result {
+                        Ok(file) => sender.input(read_ca_file(file)),
+                        Err(error) => {
+                            if !error.matches(gtk::gio::IOErrorEnum::Cancelled) {
+                                sender.input(AppMsg::Toast(error.to_string()));
+                            }
+                        }
+                    },
+                );
+            }
             AppMsg::ShowImportFile => {
                 let dialog = gtk::FileDialog::builder()
                     .title(tr("Import Kubeconfig"))
@@ -1092,6 +1112,13 @@ impl App {
                         }
                     },
                 );
+            }
+            AppMsg::CaFileLoaded(Ok(data)) => {
+                self.setup_ca_entry.set_text(data.trim());
+                self.setup_insecure_check.set_active(false);
+            }
+            AppMsg::CaFileLoaded(Err(error)) => {
+                self.toaster.add_toast(adw::Toast::new(&error));
             }
             AppMsg::Refresh => {
                 if self.resources.is_empty() {
@@ -1251,4 +1278,23 @@ impl App {
             AppMsg::Toast(text) => self.toaster.add_toast(adw::Toast::new(&text)),
         }
     }
+}
+
+fn read_ca_file(file: gtk::gio::File) -> AppMsg {
+    let Some(path) = file.path() else {
+        return AppMsg::Toast(tr(
+            "Selected file is not available on the local filesystem.",
+        ));
+    };
+
+    let result = fs::read_to_string(&path).map_err(|error| {
+        tr_format(
+            "Unable to read {path}: {error}",
+            &[
+                ("{path}", path.display().to_string()),
+                ("{error}", error.to_string()),
+            ],
+        )
+    });
+    AppMsg::CaFileLoaded(result)
 }

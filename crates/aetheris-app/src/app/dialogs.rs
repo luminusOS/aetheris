@@ -162,6 +162,7 @@ pub(super) struct ClusterDialogWidgets<'a> {
     pub(super) server_entry: &'a adw::EntryRow,
     pub(super) token_entry: &'a adw::PasswordEntryRow,
     pub(super) ca_entry: &'a adw::EntryRow,
+    pub(super) ca_file_button: &'a gtk::Button,
     pub(super) insecure_check: &'a adw::SwitchRow,
     pub(super) add_button: &'a gtk::Button,
     pub(super) title_label: &'a gtk::Label,
@@ -244,6 +245,12 @@ pub(super) fn token_cluster_page(
     title.add_css_class("title-3");
     heading.append(title);
     container.append(&heading);
+
+    widgets.ca_file_button.add_css_class("flat");
+    widgets
+        .ca_file_button
+        .set_tooltip_text(Some(&tr("Choose CA certificate file")));
+    widgets.ca_entry.add_suffix(widgets.ca_file_button);
 
     container.append(&entry_list(&[
         widgets.name_entry.upcast_ref(),
