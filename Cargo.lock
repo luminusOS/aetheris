@@ -7,6 +7,7 @@ name = "aetheris-app"
 version = "1.3.0"
 dependencies = [
  "aetheris-kube",
+ "aetheris-openconnect",
  "anyhow",
  "dirs",
  "futures",
@@ -39,6 +40,14 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "aetheris-openconnect"
+version = "1.3.0"
+dependencies = [
+ "pkg-config",
+ "thiserror",
 ]
 
 [[package]]
