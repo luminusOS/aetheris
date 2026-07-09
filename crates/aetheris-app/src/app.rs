@@ -47,15 +47,14 @@ use widgets::{
 
 const DEFAULT_PROJECT_NAME: &str = "Default";
 const OBJECT_NAME_WIDTH: i32 = 244;
+const OBJECT_IMAGE_WIDTH: i32 = 180;
 const OBJECT_NAMESPACE_WIDTH: i32 = 132;
 const OBJECT_STATUS_WIDTH: i32 = 64;
 const OBJECT_METRIC_WIDTH: i32 = 64;
 const OBJECT_API_WIDTH: i32 = 96;
 const OBJECT_AGE_WIDTH: i32 = 56;
 const OBJECT_COLUMN_MIN_WIDTH: i32 = 48;
-const OBJECT_COLUMN_MAX_WIDTH: i32 = 260;
 const OBJECT_NAME_MIN_WIDTH: i32 = 160;
-const OBJECT_NAME_MAX_WIDTH: i32 = 520;
 
 #[derive(Debug, Clone)]
 pub(super) enum ClusterSummaryState {

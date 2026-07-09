@@ -590,7 +590,8 @@ pub(super) fn is_cluster_resource(resource: &ResourceKind) -> bool {
     )
 }
 
-const RELATED_POD_COLUMNS: [ObjectColumn; 3] = [
+const RELATED_POD_COLUMNS: [ObjectColumn; 4] = [
+    ObjectColumn::Image,
     ObjectColumn::Namespace,
     ObjectColumn::Api,
     ObjectColumn::Age,
@@ -691,6 +692,11 @@ fn column_view_header(view: &gtk::ColumnView) -> Option<gtk::Widget> {
 
 pub(super) fn object_column_sorter(column: ObjectColumn) -> Option<gtk::CustomSorter> {
     match column {
+        ObjectColumn::Image => Some(summary_sorter(|a, b| {
+            super::utils::pod_main_image(&a.images)
+                .cmp(&super::utils::pod_main_image(&b.images))
+                .then_with(|| a.name.cmp(&b.name))
+        })),
         ObjectColumn::Namespace => Some(summary_sorter(|a, b| {
             a.namespace
                 .cmp(&b.namespace)
@@ -762,8 +768,8 @@ pub(super) fn connect_object_column_persistence(
 
 fn clamp_table_column_width(column: ObjectTableColumn, width: i32) -> i32 {
     match column {
-        ObjectTableColumn::Name => width.clamp(OBJECT_NAME_MIN_WIDTH, OBJECT_NAME_MAX_WIDTH),
-        ObjectTableColumn::Data(_) => width.clamp(OBJECT_COLUMN_MIN_WIDTH, OBJECT_COLUMN_MAX_WIDTH),
+        ObjectTableColumn::Name => width.max(OBJECT_NAME_MIN_WIDTH),
+        ObjectTableColumn::Data(_) => width.max(OBJECT_COLUMN_MIN_WIDTH),
     }
 }
 
@@ -866,6 +872,28 @@ pub(super) fn object_data_column_factory(column: ObjectColumn) -> gtk::SignalLis
                 let object = boxed.borrow::<ObjectSummary>();
                 let (text, tooltip) = match column {
                     ObjectColumn::Namespace => (object.namespace.clone(), None),
+                    ObjectColumn::Image => {
+                        let Some(main_image) = super::utils::pod_main_image(&object.images) else {
+                            return;
+                        };
+                        let extra = object.images.len().saturating_sub(1);
+                        let text = if extra > 0 {
+                            format!(
+                                "{} {}",
+                                main_image,
+                                tr_format("+ {count} more", &[("{count}", extra.to_string())])
+                            )
+                        } else {
+                            main_image
+                        };
+                        let tooltip = object
+                            .images
+                            .iter()
+                            .map(|image| super::utils::shortened_image(image))
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        (text, (!tooltip.is_empty()).then_some(tooltip))
+                    }
                     ObjectColumn::Status => match object.status_ratio {
                         Some((ready, desired)) => {
                             (format!("{ready}/{desired}"), Some(object.status.clone()))

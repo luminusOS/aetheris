@@ -5,3 +5,5 @@
 builddir/
 dist/
 crates/aetheris-app/libs/
+.codex/
+graphify-out/

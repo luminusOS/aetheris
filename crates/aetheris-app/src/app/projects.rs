@@ -6,6 +6,8 @@ pub struct ProjectStore {
     pub(super) selected_project: Option<String>,
     #[serde(default)]
     pub(super) last_namespaces_by_context: Vec<ContextNamespaceSelection>,
+    #[serde(default)]
+    pub(super) object_column_schema_version: u32,
     #[serde(default = "default_object_columns")]
     pub(super) visible_object_columns: Vec<ObjectColumn>,
     #[serde(default)]
@@ -73,6 +75,7 @@ pub(super) enum StatusFilter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ObjectColumn {
+    Image,
     Namespace,
     Status,
     Cpu,
@@ -94,7 +97,8 @@ pub(super) struct ObjectColumnWidth {
 }
 
 impl ObjectColumn {
-    pub(super) const ALL: [Self; 6] = [
+    pub(super) const ALL: [Self; 7] = [
+        Self::Image,
         Self::Namespace,
         Self::Status,
         Self::Cpu,
@@ -105,6 +109,7 @@ impl ObjectColumn {
 
     pub(super) fn label(self) -> String {
         match self {
+            Self::Image => tr("Image"),
             Self::Namespace => tr("Namespace"),
             Self::Status => tr("Status"),
             Self::Cpu => tr("CPU"),
@@ -116,6 +121,7 @@ impl ObjectColumn {
 
     pub(super) fn default_width(self) -> i32 {
         match self {
+            Self::Image => OBJECT_IMAGE_WIDTH,
             Self::Namespace => OBJECT_NAMESPACE_WIDTH,
             Self::Status => OBJECT_STATUS_WIDTH,
             Self::Cpu | Self::Memory => OBJECT_METRIC_WIDTH,
@@ -128,6 +134,8 @@ impl ObjectColumn {
 pub(super) fn default_object_columns() -> Vec<ObjectColumn> {
     ObjectColumn::ALL.to_vec()
 }
+
+const OBJECT_COLUMN_SCHEMA_VERSION: u32 = 1;
 
 impl StatusFilter {
     pub(super) const ALL: [Self; 5] = [
@@ -251,6 +259,24 @@ impl ResourceSection {
 
 impl Default for ProjectStore {
     fn default() -> Self {
+        Self::with_default_project()
+    }
+}
+
+impl ProjectStore {
+    fn empty() -> Self {
+        Self {
+            projects: Vec::new(),
+            selected_project: None,
+            last_namespaces_by_context: Vec::new(),
+            object_column_schema_version: OBJECT_COLUMN_SCHEMA_VERSION,
+            visible_object_columns: default_object_columns(),
+            object_name_width: None,
+            object_column_widths: Vec::new(),
+        }
+    }
+
+    fn with_default_project() -> Self {
         Self {
             projects: vec![Project {
                 name: String::from(DEFAULT_PROJECT_NAME),
@@ -259,16 +285,18 @@ impl Default for ProjectStore {
             }],
             selected_project: Some(String::from(DEFAULT_PROJECT_NAME)),
             last_namespaces_by_context: Vec::new(),
+            object_column_schema_version: OBJECT_COLUMN_SCHEMA_VERSION,
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
         }
     }
-}
 
-impl ProjectStore {
     pub(super) fn load(contexts: &[ContextInfo]) -> Self {
-        let mut store = Self::read_from_disk().unwrap_or_default();
+        let Some(mut store) = Self::read_from_disk() else {
+            return Self::empty();
+        };
+        store.migrate_object_columns();
         store.normalize_object_columns();
         store.normalize_object_column_widths();
         store.normalize_object_name_width();
@@ -315,13 +343,13 @@ impl ProjectStore {
             .find(|entry| entry.column == column)
             .map(|entry| entry.width)
             .unwrap_or_else(|| column.default_width())
-            .clamp(OBJECT_COLUMN_MIN_WIDTH, OBJECT_COLUMN_MAX_WIDTH)
+            .max(OBJECT_COLUMN_MIN_WIDTH)
     }
 
     pub(super) fn object_name_width(&self) -> i32 {
         self.object_name_width
             .unwrap_or(OBJECT_NAME_WIDTH)
-            .clamp(OBJECT_NAME_MIN_WIDTH, OBJECT_NAME_MAX_WIDTH)
+            .max(OBJECT_NAME_MIN_WIDTH)
     }
 
     pub(super) fn set_object_table_column_width(
@@ -376,7 +404,7 @@ impl ProjectStore {
     }
 
     fn set_object_name_width(&mut self, width: i32) -> bool {
-        let width = width.clamp(OBJECT_NAME_MIN_WIDTH, OBJECT_NAME_MAX_WIDTH);
+        let width = width.max(OBJECT_NAME_MIN_WIDTH);
         let next = (width != OBJECT_NAME_WIDTH).then_some(width);
         if self.object_name_width == next {
             return false;
@@ -386,7 +414,7 @@ impl ProjectStore {
     }
 
     pub(super) fn set_object_column_width(&mut self, column: ObjectColumn, width: i32) -> bool {
-        let width = width.clamp(OBJECT_COLUMN_MIN_WIDTH, OBJECT_COLUMN_MAX_WIDTH);
+        let width = width.max(OBJECT_COLUMN_MIN_WIDTH);
         if width == column.default_width() {
             let previous_len = self.object_column_widths.len();
             self.object_column_widths
@@ -424,13 +452,20 @@ impl ProjectStore {
         self.visible_object_columns.dedup();
     }
 
+    fn migrate_object_columns(&mut self) {
+        if self.object_column_schema_version < 1
+            && !self.visible_object_columns.contains(&ObjectColumn::Image)
+        {
+            self.visible_object_columns.push(ObjectColumn::Image);
+        }
+        self.object_column_schema_version = OBJECT_COLUMN_SCHEMA_VERSION;
+    }
+
     fn normalize_object_column_widths(&mut self) {
         self.object_column_widths
             .retain(|entry| ObjectColumn::ALL.contains(&entry.column));
         for entry in &mut self.object_column_widths {
-            entry.width = entry
-                .width
-                .clamp(OBJECT_COLUMN_MIN_WIDTH, OBJECT_COLUMN_MAX_WIDTH);
+            entry.width = entry.width.max(OBJECT_COLUMN_MIN_WIDTH);
         }
         self.object_column_widths.sort_by_key(|entry| {
             ObjectColumn::ALL
@@ -446,7 +481,7 @@ impl ProjectStore {
     fn normalize_object_name_width(&mut self) {
         self.object_name_width = self
             .object_name_width
-            .map(|width| width.clamp(OBJECT_NAME_MIN_WIDTH, OBJECT_NAME_MAX_WIDTH))
+            .map(|width| width.max(OBJECT_NAME_MIN_WIDTH))
             .filter(|width| *width != OBJECT_NAME_WIDTH);
     }
 
@@ -490,15 +525,6 @@ impl ProjectStore {
     }
 
     pub(super) fn normalize_contexts(&mut self, contexts: &[ContextInfo]) {
-        if self.projects.is_empty() {
-            self.projects.push(Project {
-                name: String::from(DEFAULT_PROJECT_NAME),
-                contexts: Vec::new(),
-                custom_namespaces_by_context: Vec::new(),
-            });
-            self.selected_project = Some(String::from(DEFAULT_PROJECT_NAME));
-        }
-
         // The kubeconfig can be changed by kubectl/oc outside Aetheris. Keep
         // only clusters explicitly saved in projects.json; use the live
         // kubeconfig here only to prune deleted/renamed entries. An empty
@@ -746,6 +772,7 @@ mod tests {
             }],
             selected_project: Some(String::from("Work")),
             last_namespaces_by_context: Vec::new(),
+            object_column_schema_version: OBJECT_COLUMN_SCHEMA_VERSION,
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
@@ -755,6 +782,16 @@ mod tests {
 
         let project = store.selected_project().unwrap();
         assert_eq!(project.contexts, vec![String::from("local")]);
+    }
+
+    #[test]
+    fn normalize_contexts_keeps_empty_store_empty() {
+        let mut store = ProjectStore::empty();
+
+        store.normalize_contexts(&[context("prod")]);
+
+        assert!(store.projects.is_empty());
+        assert_eq!(store.selected_project, None);
     }
 
     #[test]
@@ -773,6 +810,7 @@ mod tests {
                 context: String::from("prod"),
                 namespace: String::from("team-a"),
             }],
+            object_column_schema_version: OBJECT_COLUMN_SCHEMA_VERSION,
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
@@ -814,6 +852,35 @@ mod tests {
     }
 
     #[test]
+    fn object_table_columns_have_no_maximum_width() {
+        let mut store = ProjectStore::default();
+        let wide = 10_000;
+
+        assert!(store.set_object_column_width(ObjectColumn::Image, wide));
+        assert_eq!(store.object_column_width(ObjectColumn::Image), wide);
+
+        assert!(store.set_object_column_width(ObjectColumn::Namespace, wide));
+        assert_eq!(store.object_column_width(ObjectColumn::Namespace), wide);
+
+        assert!(store.set_object_table_column_width(ObjectTableColumn::Name, wide));
+        assert_eq!(store.object_name_width(), wide);
+    }
+
+    #[test]
+    fn object_table_columns_keep_minimum_width() {
+        let mut store = ProjectStore::default();
+
+        assert!(store.set_object_column_width(ObjectColumn::Image, 0));
+        assert_eq!(
+            store.object_column_width(ObjectColumn::Image),
+            OBJECT_COLUMN_MIN_WIDTH
+        );
+
+        assert!(store.set_object_table_column_width(ObjectTableColumn::Name, 0));
+        assert_eq!(store.object_name_width(), OBJECT_NAME_MIN_WIDTH);
+    }
+
+    #[test]
     fn normalize_contexts_prunes_last_namespaces_for_deleted_contexts() {
         let mut store = ProjectStore {
             projects: vec![Project {
@@ -832,6 +899,7 @@ mod tests {
                     namespace: String::from("team-b"),
                 },
             ],
+            object_column_schema_version: OBJECT_COLUMN_SCHEMA_VERSION,
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
