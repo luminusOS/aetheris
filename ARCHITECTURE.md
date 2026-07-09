@@ -10,7 +10,6 @@ flowchart TD
   UI --> Relm[Relm4 App Component]
   Relm --> Commands[Async Commands and Streams]
   Commands --> KubeCrate[aetheris-kube]
-  Commands -. optional VPN .-> OpenConnectCrate[aetheris-openconnect]
   KubeCrate --> Kubeconfig[Kubeconfig]
   KubeCrate --> Api[Kubernetes / OpenShift API]
   Relm --> Store[ProjectStore]
@@ -19,7 +18,7 @@ flowchart TD
   VTE --> Commands
 ```
 
-`aetheris-app` owns windows, widgets, user state, and persistence of Aetheris projects. `aetheris-kube` owns kubeconfig parsing, Kubernetes clients, discovery, list/watch, mutations, logs, exec, port-forwarding, metrics, and resource details. `aetheris-openconnect` is an optional native integration crate for libopenconnect; it isolates C FFI and exposes a Rust API for future VPN workflows.
+`aetheris-app` owns windows, widgets, user state, and persistence of Aetheris projects. `aetheris-kube` owns kubeconfig parsing, Kubernetes clients, discovery, list/watch, mutations, logs, exec, port-forwarding, metrics, and resource details.
 
 ## Crate Boundaries
 
@@ -41,17 +40,10 @@ flowchart LR
     Ops[Logs exec port-forward mutations]
   end
 
-  subgraph OpenConnect["aetheris-openconnect"]
-    SafeApi[Safe Rust API]
-    Ffi[libopenconnect FFI]
-  end
-
   Widgets --> State
   State --> Commands
   State --> Streams
   Commands --> Manager
-  Commands -. optional .-> SafeApi
-  SafeApi --> Ffi
   Streams --> Manager
   Manager --> Session
   Session --> Resources
@@ -60,7 +52,7 @@ flowchart LR
   Projects --> State
 ```
 
-The backend crate must not import GTK, Adwaita, Relm4, VTE, or application widgets. Shared data crosses the boundary through DTOs exported from `aetheris-kube::types`. Native C integrations are kept out of both UI widgets and `aetheris-kube`; each integration gets a focused crate such as `aetheris-openconnect`, with `unsafe` declarations confined to its FFI module.
+The backend crate must not import GTK, Adwaita, Relm4, VTE, or application widgets. Shared data crosses the boundary through DTOs exported from `aetheris-kube::types`.
 
 ## Application Lifecycle
 

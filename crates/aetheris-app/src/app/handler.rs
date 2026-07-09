@@ -1127,7 +1127,10 @@ impl App {
                     self.refresh_objects(sender);
                 }
             }
-            AppMsg::ObjectsLoaded(Ok(objects)) => {
+            AppMsg::ObjectsLoaded(token, Ok(objects)) => {
+                if token != self.object_load_token {
+                    return;
+                }
                 self.loading = false;
                 let count = objects.len();
                 self.objects = objects;
@@ -1136,7 +1139,10 @@ impl App {
                 self.rebuild_object_list();
                 self.start_object_watch(sender);
             }
-            AppMsg::ObjectsLoaded(Err(error)) => {
+            AppMsg::ObjectsLoaded(token, Err(error)) => {
+                if token != self.object_load_token {
+                    return;
+                }
                 self.loading = false;
                 self.stop_object_watch();
                 self.objects.clear();

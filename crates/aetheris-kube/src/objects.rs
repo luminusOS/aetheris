@@ -10,9 +10,9 @@ use serde_json::Value;
 
 use crate::status::{age_label, status_label};
 use crate::{
-    KubeSession, ObjectCondition, ObjectDetail, ObjectSummary, ObjectWatchEvent, PodSummary,
-    ResourceKind, ResourceRatio, ResourceScope, ResourceUsage, api_resource, namespace_scope,
-    resource_scope,
+    ContainerResources, KubeSession, ObjectCondition, ObjectDetail, ObjectSummary,
+    ObjectWatchEvent, PodSummary, ResourceKind, ResourceRatio, ResourceScope, ResourceUsage,
+    api_resource, namespace_scope, resource_scope,
 };
 
 impl KubeSession {
@@ -198,22 +198,35 @@ impl KubeSession {
                 self.context
             )
         })?;
-        let containers = object_containers(&object, resource);
+        let container_resources = object_container_resources(&object, resource);
+        let containers = container_resources
+            .iter()
+            .map(|container| container.name.clone())
+            .collect();
         let replicas = object_replicas(&object, resource);
         let node_unschedulable = object_node_unschedulable(&object, resource);
         let conditions = object_conditions(&object);
-        let metrics = self
-            .resource_metrics(resource, namespace)
-            .await
-            .unwrap_or_default();
-        let summary = object_summary(object.clone(), resource, &metrics);
-        let container_metrics = if resource.kind == "Pod" && resource.group.is_empty() {
-            self.pod_container_metrics(&summary.namespace, &summary.name)
-                .await
-                .unwrap_or_default()
+        let object_namespace = object.namespace().unwrap_or_else(|| String::from("-"));
+        let object_name = object.name_any();
+        let is_pod = resource.kind == "Pod" && resource.group.is_empty();
+        let (metrics, container_metrics) = if is_pod {
+            let (metrics, container_metrics) = tokio::join!(
+                self.resource_metrics(resource, namespace),
+                self.pod_container_metrics(&object_namespace, &object_name),
+            );
+            (
+                metrics.unwrap_or_default(),
+                container_metrics.unwrap_or_default(),
+            )
         } else {
-            Vec::new()
+            (
+                self.resource_metrics(resource, namespace)
+                    .await
+                    .unwrap_or_default(),
+                Vec::new(),
+            )
         };
+        let summary = object_summary(object.clone(), resource, &metrics);
         let yaml = serde_yaml::to_string(&object).context("failed to serialize object YAML")?;
         let related_pods = self
             .deployment_pods(resource, &summary.namespace, &object)
@@ -237,6 +250,7 @@ impl KubeSession {
             age: summary.age,
             metrics: summary.metrics,
             container_metrics,
+            container_resources,
             yaml,
             containers,
             related_pods,
@@ -498,7 +512,10 @@ pub(crate) fn quantity_as_f64(value: &str) -> Option<f64> {
     value.parse::<f64>().ok()
 }
 
-fn object_containers(object: &DynamicObject, resource: &ResourceKind) -> Vec<String> {
+fn object_container_resources(
+    object: &DynamicObject,
+    resource: &ResourceKind,
+) -> Vec<ContainerResources> {
     if resource.kind != "Pod" || !resource.group.is_empty() {
         return Vec::new();
     }
@@ -510,16 +527,34 @@ fn object_containers(object: &DynamicObject, resource: &ResourceKind) -> Vec<Str
 
     for field in ["containers", "initContainers", "ephemeralContainers"] {
         if let Some(items) = spec.get(field).and_then(serde_json::Value::as_array) {
-            containers.extend(items.iter().filter_map(|container| {
-                container
-                    .get("name")
-                    .and_then(serde_json::Value::as_str)
-                    .map(ToOwned::to_owned)
-            }));
+            containers.extend(items.iter().filter_map(container_resources));
         }
     }
 
     containers
+}
+
+fn container_resources(container: &Value) -> Option<ContainerResources> {
+    let name = container.get("name")?.as_str()?.to_owned();
+    let resources = container.get("resources");
+
+    Some(ContainerResources {
+        name,
+        cpu_request: resource_quantity(resources, "requests", "cpu"),
+        cpu_limit: resource_quantity(resources, "limits", "cpu"),
+        memory_request: resource_quantity(resources, "requests", "memory"),
+        memory_limit: resource_quantity(resources, "limits", "memory"),
+    })
+}
+
+fn resource_quantity(resources: Option<&Value>, section: &str, name: &str) -> String {
+    resources
+        .and_then(|resources| resources.get(section))
+        .and_then(|section| section.get(name))
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("-")
+        .to_owned()
 }
 
 fn object_images(object: &DynamicObject, resource: &ResourceKind) -> Vec<String> {
@@ -616,8 +651,8 @@ fn deployment_label_selector(object: &DynamicObject) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{object_images, quantity_as_f64, resource_ratio};
-    use crate::{ResourceKind, ResourceScope};
+    use super::{object_container_resources, object_images, quantity_as_f64, resource_ratio};
+    use crate::{ContainerResources, ResourceKind, ResourceScope};
     use kube::api::DynamicObject;
     use serde_json::json;
 
@@ -671,6 +706,79 @@ mod tests {
             vec![
                 String::from("docker.io/library/nginx:latest"),
                 String::from("example.com/sidecar:v1")
+            ]
+        );
+    }
+
+    #[test]
+    fn object_container_resources_reads_pod_container_requests_and_limits() {
+        let pod: DynamicObject = serde_json::from_value(json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "sample",
+                "namespace": "my-namespace"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "name": "app",
+                        "resources": {
+                            "requests": {"cpu": "250m", "memory": "128Mi"},
+                            "limits": {"cpu": "500m", "memory": "256Mi"}
+                        }
+                    },
+                    {
+                        "name": "sidecar",
+                        "resources": {
+                            "requests": {"cpu": "100m"}
+                        }
+                    }
+                ],
+                "initContainers": [
+                    {
+                        "name": "init",
+                        "resources": {
+                            "limits": {"memory": "64Mi"}
+                        }
+                    }
+                ]
+            }
+        }))
+        .expect("pod should deserialize");
+        let resource = ResourceKind {
+            group: String::new(),
+            version: String::from("v1"),
+            api_version: String::from("v1"),
+            kind: String::from("Pod"),
+            plural: String::from("pods"),
+            scope: ResourceScope::Namespaced,
+        };
+
+        assert_eq!(
+            object_container_resources(&pod, &resource),
+            vec![
+                ContainerResources {
+                    name: String::from("app"),
+                    cpu_request: String::from("250m"),
+                    cpu_limit: String::from("500m"),
+                    memory_request: String::from("128Mi"),
+                    memory_limit: String::from("256Mi"),
+                },
+                ContainerResources {
+                    name: String::from("sidecar"),
+                    cpu_request: String::from("100m"),
+                    cpu_limit: String::from("-"),
+                    memory_request: String::from("-"),
+                    memory_limit: String::from("-"),
+                },
+                ContainerResources {
+                    name: String::from("init"),
+                    cpu_request: String::from("-"),
+                    cpu_limit: String::from("-"),
+                    memory_request: String::from("-"),
+                    memory_limit: String::from("64Mi"),
+                },
             ]
         );
     }

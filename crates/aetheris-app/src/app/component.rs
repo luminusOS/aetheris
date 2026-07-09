@@ -971,6 +971,7 @@ impl Component for App {
                 node_unschedulable: None,
                 request_token: 0,
             },
+            object_load_token: 0,
             object_watch_token: 0,
             object_watch_abort_handle: None,
             log_streaming: false,

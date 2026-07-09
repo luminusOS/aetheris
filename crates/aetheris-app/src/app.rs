@@ -5,9 +5,10 @@ use std::{
 };
 
 use aetheris_kube::{
-    AddClusterRequest, ClusterSummary, ContainerUsage, ContextInfo, KubeManager, ObjectCondition,
-    ObjectDetail, ObjectEvent, ObjectSummary, ObjectWatchEvent, PodExecEvent, PodExecRequest,
-    PodLogRequest, PodPortForwardEvent, PodPortForwardRequest, ResourceKind, ResourceUsage,
+    AddClusterRequest, ClusterSummary, ContainerResources, ContainerUsage, ContextInfo,
+    KubeManager, ObjectCondition, ObjectDetail, ObjectEvent, ObjectSummary, ObjectWatchEvent,
+    PodExecEvent, PodExecRequest, PodLogRequest, PodPortForwardEvent, PodPortForwardRequest,
+    ResourceKind, ResourceUsage,
 };
 use futures::FutureExt;
 use futures::future::{AbortHandle, Abortable};
@@ -178,6 +179,7 @@ pub struct App {
     object_columns: Vec<(ObjectTableColumn, gtk::ColumnViewColumn)>,
     object_list_stack: gtk::Stack,
     detail: DetailPane,
+    object_load_token: u64,
     object_watch_token: u64,
     object_watch_abort_handle: Option<AbortHandle>,
     log_streaming: bool,
@@ -308,7 +310,7 @@ pub enum AppMsg {
     CaFileLoaded(Result<String, String>),
     ShowImportFile,
     Refresh,
-    ObjectsLoaded(Result<Vec<ObjectSummary>, String>),
+    ObjectsLoaded(u64, Result<Vec<ObjectSummary>, String>),
     AddCluster,
     ClusterAdded(Result<(String, String), String>),
     StateLoadedForCluster(String, Result<LoadedState, String>),

@@ -270,10 +270,16 @@ impl App {
             None
         };
         self.stop_object_watch();
+        self.object_load_token = self.object_load_token.saturating_add(1);
+        let token = self.object_load_token;
         self.loading = true;
+        self.objects.clear();
         self.status = tr_format("Loading {resource}...", &[("{resource}", resource.label())]);
         self.sync_status();
-        sender.oneshot_command(async move { list_objects(context, resource, namespace).await });
+        self.rebuild_object_list();
+        sender.oneshot_command(
+            async move { list_objects(token, context, resource, namespace).await },
+        );
     }
 
     pub(super) fn selected_resource_kind(&self) -> Option<&ResourceKind> {
@@ -446,9 +452,9 @@ impl App {
             .set_sensitive(self.selected_context.is_some() && !self.loading);
         self.column_filter_list
             .set_sensitive(self.selected_context.is_some() && !self.loading);
-        self.cluster_back_button.set_sensitive(!self.loading);
+        self.cluster_back_button.set_sensitive(true);
         self.cluster_menu_button
-            .set_sensitive(self.selected_context.is_some() && !self.loading);
+            .set_sensitive(self.selected_context.is_some());
         self.cluster_refresh_button
             .set_sensitive(!self.loading && !self.visible_contexts().is_empty());
         self.add_cluster_button.set_sensitive(!self.loading);

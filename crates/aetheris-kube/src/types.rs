@@ -76,6 +76,8 @@ pub struct ObjectDetail {
     pub age: String,
     pub metrics: Option<ResourceUsage>,
     pub container_metrics: Vec<ContainerUsage>,
+    #[serde(default)]
+    pub container_resources: Vec<ContainerResources>,
     pub yaml: String,
     pub containers: Vec<String>,
     pub related_pods: Vec<ObjectSummary>,
@@ -123,6 +125,15 @@ pub struct ContainerUsage {
     pub name: String,
     pub cpu: String,
     pub memory: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContainerResources {
+    pub name: String,
+    pub cpu_request: String,
+    pub cpu_limit: String,
+    pub memory_request: String,
+    pub memory_limit: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

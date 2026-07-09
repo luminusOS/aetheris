@@ -1,5 +1,9 @@
+use std::time::Duration;
+
 use super::utils::*;
 use super::*;
+
+const CLUSTER_LOAD_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(super) async fn load_state() -> AppMsg {
     let result = async {
@@ -34,27 +38,37 @@ pub(super) async fn load_state() -> AppMsg {
 }
 
 pub(super) async fn load_cluster(context: String) -> AppMsg {
-    let result = async {
-        let manager = KubeManager::load()?;
-        let session = manager.connect_context(&context).await?;
-        let (namespaces, namespace_warning) = match session.list_namespaces().await {
-            Ok(namespaces) => (namespaces, None),
-            Err(error) => (
-                manager.namespace_for_context(&context),
-                Some(format_error(error)),
-            ),
-        };
-        let resources = session.discover_resources().await?;
-        Ok::<_, anyhow::Error>(ClusterState {
-            namespaces,
-            resources,
-            namespace_warning,
-        })
-    }
+    let result = match tokio::time::timeout(CLUSTER_LOAD_TIMEOUT, async {
+        load_cluster_state(context).await
+    })
     .await
+    {
+        Ok(result) => result,
+        Err(_) => Err(anyhow::anyhow!(
+            "Timed out while discovering Kubernetes resources for this cluster. Check that the API server is reachable and try again."
+        )),
+    }
     .map_err(format_error);
 
     AppMsg::ClusterLoaded(result)
+}
+
+async fn load_cluster_state(context: String) -> anyhow::Result<ClusterState> {
+    let manager = KubeManager::load()?;
+    let session = manager.connect_context(&context).await?;
+    let (namespaces, namespace_warning) = match session.list_namespaces().await {
+        Ok(namespaces) => (namespaces, None),
+        Err(error) => (
+            manager.namespace_for_context(&context),
+            Some(format_error(error)),
+        ),
+    };
+    let resources = session.discover_resources().await?;
+    Ok(ClusterState {
+        namespaces,
+        resources,
+        namespace_warning,
+    })
 }
 
 pub(super) async fn load_cluster_summary(context: String) -> AppMsg {
@@ -70,13 +84,14 @@ pub(super) async fn load_cluster_summary(context: String) -> AppMsg {
 }
 
 pub(super) async fn list_objects(
+    token: u64,
     context: String,
     resource: ResourceKind,
     namespace: Option<String>,
 ) -> AppMsg {
     let result = list_objects_snapshot(context, resource, namespace).await;
 
-    AppMsg::ObjectsLoaded(result)
+    AppMsg::ObjectsLoaded(token, result)
 }
 
 pub(super) async fn list_objects_snapshot(
