@@ -1,0 +1,18 @@
+[package]
+name = "aetheris-openconnect"
+description = "OpenConnect integration layer for Aetheris"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+links = "openconnect"
+
+[features]
+default = []
+system-libopenconnect = []
+
+[dependencies]
+thiserror.workspace = true
+
+[build-dependencies]
+pkg-config = "0.3"
