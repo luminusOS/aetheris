@@ -137,7 +137,7 @@ Before finishing a change, check:
 - user-facing strings are concise and GNOME-style;
 - docs and workflows describe behavior that is actually implemented.
 
-## graphify
+## Graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
