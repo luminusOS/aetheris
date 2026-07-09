@@ -61,6 +61,8 @@ pub struct ObjectSummary {
     pub status_ratio: Option<(i64, i64)>,
     pub api_version: String,
     pub age: String,
+    #[serde(default)]
+    pub images: Vec<String>,
     pub metrics: Option<ResourceUsage>,
 }
 

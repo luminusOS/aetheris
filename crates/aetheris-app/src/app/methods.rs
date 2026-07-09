@@ -125,6 +125,10 @@ impl App {
     }
 
     pub(super) fn project_contexts(&self) -> Vec<&ContextInfo> {
+        if self.projects.projects.is_empty() {
+            return Vec::new();
+        }
+
         let Some(project) = self.projects.selected_project() else {
             return self.contexts.iter().collect();
         };
