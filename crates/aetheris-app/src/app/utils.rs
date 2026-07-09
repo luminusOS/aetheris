@@ -76,6 +76,10 @@ pub(super) fn object_matches(object: &ObjectSummary, query: &str) -> bool {
         || object.namespace.to_ascii_lowercase().contains(query)
         || object.status.to_ascii_lowercase().contains(query)
         || object.api_version.to_ascii_lowercase().contains(query)
+        || object
+            .images
+            .iter()
+            .any(|image| image.to_ascii_lowercase().contains(query))
         || object.metrics.as_ref().is_some_and(|usage| {
             usage.cpu.to_ascii_lowercase().contains(query)
                 || usage.memory.to_ascii_lowercase().contains(query)
@@ -132,6 +136,9 @@ pub(super) fn offerable_columns_for(resource: Option<&ResourceKind>) -> Vec<Obje
     ObjectColumn::ALL
         .into_iter()
         .filter(|column| match column {
+            ObjectColumn::Image => {
+                resource.is_some_and(|resource| resource.group.is_empty() && resource.kind == "Pod")
+            }
             ObjectColumn::Namespace => resource.map(ResourceKind::is_namespaced).unwrap_or(true),
             ObjectColumn::Status => has_status_ratio,
             ObjectColumn::Cpu | ObjectColumn::Memory => has_metrics,
@@ -229,9 +236,51 @@ pub(super) fn parse_quantity(raw: &str) -> Option<f64> {
     number.parse::<f64>().ok().map(|value| value * factor)
 }
 
+pub(super) fn shortened_image(image: &str) -> String {
+    let mut image = image;
+    for prefix in [
+        "index.docker.io/library/",
+        "index.docker.io/",
+        "docker.io/library/",
+        "docker.io/",
+    ] {
+        if let Some(stripped) = image.strip_prefix(prefix) {
+            image = stripped;
+            break;
+        }
+    }
+
+    let mut shortened = image.strip_suffix(":latest").unwrap_or(image).to_owned();
+    if let Some((prefix, digest)) = shortened.split_once("@sha256:")
+        && digest.len() > 8
+        && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        shortened = format!("{prefix}@sha256:{}…", &digest[..8]);
+    }
+    shortened
+}
+
+pub(super) fn pod_main_image(images: &[String]) -> Option<String> {
+    const IGNORE_IMAGES: [&str; 3] = [
+        "istio/proxy",
+        "gcr.io/istio-release/proxy",
+        "mirrored-istio-proxy",
+    ];
+
+    let shortened = images
+        .iter()
+        .map(|image| shortened_image(image))
+        .collect::<Vec<_>>();
+    shortened
+        .iter()
+        .find(|image| !IGNORE_IMAGES.iter().any(|ignore| image.contains(ignore)))
+        .or_else(|| shortened.first())
+        .cloned()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{forbidden_summary, offerable_columns_for};
+    use super::{forbidden_summary, offerable_columns_for, pod_main_image, shortened_image};
     use crate::app::projects::ObjectColumn;
     use aetheris_kube::{ResourceKind, ResourceScope};
 
@@ -267,6 +316,33 @@ mod tests {
     }
 
     #[test]
+    fn shortened_image_matches_rancher_display_rules() {
+        assert_eq!(shortened_image("docker.io/library/nginx:latest"), "nginx");
+        assert_eq!(
+            shortened_image("index.docker.io/library/ubuntu:latest"),
+            "ubuntu"
+        );
+        assert_eq!(
+            shortened_image("example.com/my/app:v1.2.3"),
+            "example.com/my/app:v1.2.3"
+        );
+        assert_eq!(
+            shortened_image("myrepo/myimage@sha256:abcdef1234567890abcd"),
+            "myrepo/myimage@sha256:abcdef12…"
+        );
+    }
+
+    #[test]
+    fn pod_main_image_skips_istio_sidecar_images() {
+        let images = vec![
+            String::from("docker.io/istio/proxyv2:latest"),
+            String::from("docker.io/library/nginx:latest"),
+        ];
+
+        assert_eq!(pod_main_image(&images).as_deref(), Some("nginx"));
+    }
+
+    #[test]
     fn offerable_columns_hide_namespace_for_cluster_scoped_resources() {
         let node = ResourceKind {
             group: String::new(),
@@ -282,5 +358,28 @@ mod tests {
         assert!(!columns.contains(&ObjectColumn::Namespace));
         assert!(columns.contains(&ObjectColumn::Cpu));
         assert!(columns.contains(&ObjectColumn::Memory));
+    }
+
+    #[test]
+    fn offerable_columns_show_image_only_for_pods() {
+        let pod = ResourceKind {
+            group: String::new(),
+            version: String::from("v1"),
+            api_version: String::from("v1"),
+            kind: String::from("Pod"),
+            plural: String::from("pods"),
+            scope: ResourceScope::Namespaced,
+        };
+        let deployment = ResourceKind {
+            group: String::from("apps"),
+            version: String::from("v1"),
+            api_version: String::from("apps/v1"),
+            kind: String::from("Deployment"),
+            plural: String::from("deployments"),
+            scope: ResourceScope::Namespaced,
+        };
+
+        assert!(offerable_columns_for(Some(&pod)).contains(&ObjectColumn::Image));
+        assert!(!offerable_columns_for(Some(&deployment)).contains(&ObjectColumn::Image));
     }
 }

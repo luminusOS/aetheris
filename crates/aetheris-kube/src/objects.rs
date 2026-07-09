@@ -298,6 +298,7 @@ impl KubeSession {
                         status_ratio: None,
                         api_version: String::from("v1"),
                         age: String::from("-"),
+                        images: Vec::new(),
                         metrics: None,
                     })
             })
@@ -397,6 +398,7 @@ fn object_summary(
         status_ratio,
         api_version: resource.api_version.clone(),
         age,
+        images: object_images(&object, resource),
     }
 }
 
@@ -520,6 +522,30 @@ fn object_containers(object: &DynamicObject, resource: &ResourceKind) -> Vec<Str
     containers
 }
 
+fn object_images(object: &DynamicObject, resource: &ResourceKind) -> Vec<String> {
+    if resource.kind != "Pod" || !resource.group.is_empty() {
+        return Vec::new();
+    }
+
+    object
+        .data
+        .get("spec")
+        .and_then(|spec| spec.get("containers"))
+        .and_then(serde_json::Value::as_array)
+        .map(|containers| {
+            containers
+                .iter()
+                .filter_map(|container| {
+                    container
+                        .get("image")
+                        .and_then(serde_json::Value::as_str)
+                        .map(ToOwned::to_owned)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn object_replicas(object: &DynamicObject, resource: &ResourceKind) -> Option<i32> {
     (resource.kind == "Deployment" && resource.group == "apps")
         .then(|| {
@@ -590,7 +616,10 @@ fn deployment_label_selector(object: &DynamicObject) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{quantity_as_f64, resource_ratio};
+    use super::{object_images, quantity_as_f64, resource_ratio};
+    use crate::{ResourceKind, ResourceScope};
+    use kube::api::DynamicObject;
+    use serde_json::json;
 
     #[test]
     fn quantity_as_f64_handles_kubernetes_cpu_and_memory_suffixes() {
@@ -606,5 +635,43 @@ mod tests {
         let ratio = resource_ratio("250m", Some(1.0)).expect("ratio should parse");
 
         assert_eq!(ratio.basis_points, 2500);
+    }
+
+    #[test]
+    fn object_images_uses_pod_spec_containers_only() {
+        let pod: DynamicObject = serde_json::from_value(json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "sample",
+                "namespace": "my-namespace"
+            },
+            "spec": {
+                "containers": [
+                    {"name": "app", "image": "docker.io/library/nginx:latest"},
+                    {"name": "sidecar", "image": "example.com/sidecar:v1"}
+                ],
+                "initContainers": [
+                    {"name": "init", "image": "example.com/init:v1"}
+                ]
+            }
+        }))
+        .expect("pod should deserialize");
+        let resource = ResourceKind {
+            group: String::new(),
+            version: String::from("v1"),
+            api_version: String::from("v1"),
+            kind: String::from("Pod"),
+            plural: String::from("pods"),
+            scope: ResourceScope::Namespaced,
+        };
+
+        assert_eq!(
+            object_images(&pod, &resource),
+            vec![
+                String::from("docker.io/library/nginx:latest"),
+                String::from("example.com/sidecar:v1")
+            ]
+        );
     }
 }
