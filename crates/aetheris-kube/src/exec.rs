@@ -1,7 +1,7 @@
-use anyhow::{bail, Context as AnyhowContext, Result};
+use anyhow::{Context as AnyhowContext, Result, bail};
 use k8s_openapi::api::core::v1::Pod;
-use kube::api::AttachParams;
 use kube::Api;
+use kube::api::AttachParams;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 
 use crate::{KubeSession, PodExecEvent, PodExecRequest};
@@ -70,15 +70,15 @@ impl KubeSession {
             .await
             .context("failed to finish exec session")?;
 
-        if let Some(status) = status {
-            if status.status.as_deref() == Some("Failure") {
-                bail!(
-                    "{}",
-                    status
-                        .message
-                        .unwrap_or_else(|| String::from("command failed"))
-                );
-            }
+        if let Some(status) = status
+            && status.status.as_deref() == Some("Failure")
+        {
+            bail!(
+                "{}",
+                status
+                    .message
+                    .unwrap_or_else(|| String::from("command failed"))
+            );
         }
 
         Ok(())
@@ -155,15 +155,15 @@ impl KubeSession {
             .await
             .context("failed to finish terminal session")?;
 
-        if let Some(status) = status {
-            if status.status.as_deref() == Some("Failure") {
-                bail!(
-                    "{}",
-                    status
-                        .message
-                        .unwrap_or_else(|| String::from("terminal session failed"))
-                );
-            }
+        if let Some(status) = status
+            && status.status.as_deref() == Some("Failure")
+        {
+            bail!(
+                "{}",
+                status
+                    .message
+                    .unwrap_or_else(|| String::from("terminal session failed"))
+            );
         }
 
         Ok(())

@@ -1,4 +1,4 @@
-edition = "2021"
+edition = "2024"
 fn_params_layout = "Tall"
 match_arm_leading_pipes = "Preserve"
 merge_derives = true

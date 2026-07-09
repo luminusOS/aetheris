@@ -1,11 +1,11 @@
-use anyhow::{bail, Context as AnyhowContext, Result};
+use anyhow::{Context as AnyhowContext, Result, bail};
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{Node, Pod};
 use kube::api::{DeleteParams, DynamicObject, ListParams, Patch, PatchParams};
 use kube::{Api, ResourceExt};
 use serde_json::Value;
 
-use crate::{api_resource, resource_scope, KubeSession, ObjectDetail, ResourceKind};
+use crate::{KubeSession, ObjectDetail, ResourceKind, api_resource, resource_scope};
 
 impl KubeSession {
     pub async fn apply_object_yaml(

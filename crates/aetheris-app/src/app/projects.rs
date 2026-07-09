@@ -860,9 +860,11 @@ mod tests {
             project.custom_namespaces_for_context(Some("prod")),
             vec![String::from("billing")]
         );
-        assert!(project
-            .custom_namespaces_for_context(Some("stage"))
-            .is_empty());
+        assert!(
+            project
+                .custom_namespaces_for_context(Some("stage"))
+                .is_empty()
+        );
         assert!(!project.has_custom_namespace(Some("stage"), "billing"));
     }
 
@@ -876,9 +878,11 @@ mod tests {
         project.add_custom_namespace("prod", "billing");
 
         assert!(project.remove_custom_namespace("prod", "billing"));
-        assert!(project
-            .custom_namespaces_for_context(Some("prod"))
-            .is_empty());
+        assert!(
+            project
+                .custom_namespaces_for_context(Some("prod"))
+                .is_empty()
+        );
         assert!(project.custom_namespaces_by_context.is_empty());
     }
 

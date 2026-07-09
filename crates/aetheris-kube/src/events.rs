@@ -5,7 +5,7 @@ use kube::api::ListParams;
 use kube::{Api, ResourceExt};
 
 use crate::status::age_label;
-use crate::{resource_scope, KubeSession, ObjectEvent, ResourceKind};
+use crate::{KubeSession, ObjectEvent, ResourceKind, resource_scope};
 
 impl KubeSession {
     pub(crate) async fn object_events(

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{bail, Context as AnyhowContext, Result};
+use anyhow::{Context as AnyhowContext, Result, bail};
 use kube::config::{
     AuthInfo, Cluster, Context as KubeContext, Kubeconfig, NamedAuthInfo, NamedCluster,
     NamedContext,
@@ -96,15 +96,15 @@ impl KubeManager {
         // Renaming a cluster creates fresh entries under the new name above;
         // drop the stale ones left behind under the old name so it doesn't
         // linger as a duplicate in the cluster list.
-        if let Some(original_name) = request.original_context_name.as_deref() {
-            if original_name != request.context_name {
-                kubeconfig
-                    .contexts
-                    .retain(|context| context.name != original_name);
-                kubeconfig
-                    .clusters
-                    .retain(|cluster| cluster.name != original_name);
-            }
+        if let Some(original_name) = request.original_context_name.as_deref()
+            && original_name != request.context_name
+        {
+            kubeconfig
+                .contexts
+                .retain(|context| context.name != original_name);
+            kubeconfig
+                .clusters
+                .retain(|cluster| cluster.name != original_name);
         }
 
         kubeconfig.current_context = Some(request.context_name);
@@ -144,10 +144,10 @@ impl KubeManager {
 
         kubeconfig = Kubeconfig::merge(kubeconfig, imported)
             .context("failed to merge imported kubeconfig")?;
-        if kubeconfig.current_context.is_none() {
-            if let Some(context) = kubeconfig.contexts.first() {
-                kubeconfig.current_context = Some(context.name.clone());
-            }
+        if kubeconfig.current_context.is_none()
+            && let Some(context) = kubeconfig.contexts.first()
+        {
+            kubeconfig.current_context = Some(context.name.clone());
         }
         kubeconfig.api_version = Some(String::from("v1"));
         kubeconfig.kind = Some(String::from("Config"));

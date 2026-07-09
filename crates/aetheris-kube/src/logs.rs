@@ -1,8 +1,8 @@
 use anyhow::{Context as AnyhowContext, Result};
 use futures::{AsyncBufReadExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
-use kube::api::LogParams;
 use kube::Api;
+use kube::api::LogParams;
 
 use crate::{KubeSession, PodLogRequest};
 

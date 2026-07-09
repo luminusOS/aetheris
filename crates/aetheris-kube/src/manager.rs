@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use anyhow::{Context as AnyhowContext, Result};
-use kube::config::{Config, KubeConfigOptions, Kubeconfig};
 use kube::Client;
+use kube::config::{Config, KubeConfigOptions, Kubeconfig};
 
 use crate::kubeconfig::{cluster_server, cluster_skips_tls_verify, server_host};
 use crate::{ContextInfo, KubeSession};
@@ -74,12 +74,10 @@ impl KubeManager {
             .contexts
             .iter()
             .find(|named_context| named_context.name == context)
+            && let Some(context) = &named_context.context
+            && let Some(namespace) = &context.namespace
         {
-            if let Some(context) = &named_context.context {
-                if let Some(namespace) = &context.namespace {
-                    namespaces.insert(namespace.clone());
-                }
-            }
+            namespaces.insert(namespace.clone());
         }
 
         namespaces.into_iter().collect()

@@ -47,12 +47,12 @@ fn app_style_candidates() -> Vec<std::path::PathBuf> {
         paths.extend(std::env::split_paths(&data_dirs).map(|path| path.join(APP_STYLE_RESOURCE)));
     }
 
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(bin_dir) = exe.parent() {
-            paths.push(bin_dir.join("../share").join(APP_STYLE_RESOURCE));
-            paths.push(bin_dir.join("share").join(APP_STYLE_RESOURCE));
-            paths.push(bin_dir.join("../style.css"));
-        }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(bin_dir) = exe.parent()
+    {
+        paths.push(bin_dir.join("../share").join(APP_STYLE_RESOURCE));
+        paths.push(bin_dir.join("share").join(APP_STYLE_RESOURCE));
+        paths.push(bin_dir.join("../style.css"));
     }
 
     if let Some(app_dir) = std::env::var_os("APPDIR") {

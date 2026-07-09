@@ -42,7 +42,9 @@ pub(super) fn terminal_error_message(error: &str) -> String {
         || lower.contains("pods/exec")
         || (lower.contains("cannot create") && lower.contains("exec"))
     {
-        return tr("You do not have permission to open a terminal for this Pod. Your Kubernetes user needs create access to pods/exec in this namespace.");
+        return tr(
+            "You do not have permission to open a terminal for this Pod. Your Kubernetes user needs create access to pods/exec in this namespace.",
+        );
     }
 
     tr_format(

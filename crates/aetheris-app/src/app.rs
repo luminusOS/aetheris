@@ -9,8 +9,8 @@ use aetheris_kube::{
     ObjectDetail, ObjectEvent, ObjectSummary, ObjectWatchEvent, PodExecEvent, PodExecRequest,
     PodLogRequest, PodPortForwardEvent, PodPortForwardRequest, ResourceKind, ResourceUsage,
 };
-use futures::future::{AbortHandle, Abortable};
 use futures::FutureExt;
+use futures::future::{AbortHandle, Abortable};
 use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use relm4::{adw, gtk};

@@ -21,7 +21,7 @@ pub(crate) fn status_label(
             return (
                 spec_string(object, "type").unwrap_or_else(|| String::from("ClusterIP")),
                 None,
-            )
+            );
         }
         ("networking.k8s.io", "Ingress") => return (ingress_status_label(object), None),
         ("", "ConfigMap") => return (data_entries_status_label(object), None),
@@ -37,17 +37,17 @@ pub(crate) fn status_label(
         return (phase.to_owned(), None);
     }
 
-    if let Some(conditions) = status.get("conditions").and_then(|value| value.as_array()) {
-        if let Some(ready) = conditions.iter().find(|condition| {
+    if let Some(conditions) = status.get("conditions").and_then(|value| value.as_array())
+        && let Some(ready) = conditions.iter().find(|condition| {
             condition.get("type").and_then(|value| value.as_str()) == Some("Ready")
-        }) {
-            let label = ready
-                .get("status")
-                .and_then(|value| value.as_str())
-                .map(|status| format!("Ready={status}"))
-                .unwrap_or_else(|| String::from("Ready"));
-            return (label, None);
-        }
+        })
+    {
+        let label = ready
+            .get("status")
+            .and_then(|value| value.as_str())
+            .map(|status| format!("Ready={status}"))
+            .unwrap_or_else(|| String::from("Ready"));
+        return (label, None);
     }
 
     let ready_replicas = status.get("readyReplicas").and_then(|value| value.as_i64());

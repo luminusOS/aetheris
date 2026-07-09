@@ -1,4 +1,4 @@
-use anyhow::{bail, Context as AnyhowContext, Result};
+use anyhow::{Context as AnyhowContext, Result, bail};
 use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
 use tokio::io::copy_bidirectional;
