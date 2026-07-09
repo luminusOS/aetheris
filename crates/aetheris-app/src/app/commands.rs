@@ -84,15 +84,13 @@ pub(super) async fn list_objects_snapshot(
     resource: ResourceKind,
     namespace: Option<String>,
 ) -> Result<Vec<ObjectSummary>, String> {
-    let result = async {
+    async {
         let manager = KubeManager::load()?;
         let session = manager.connect_context(&context).await?;
         session.list_objects(&resource, namespace.as_deref()).await
     }
     .await
-    .map_err(format_error);
-
-    result
+    .map_err(format_error)
 }
 
 pub(super) async fn stream_object_watch(

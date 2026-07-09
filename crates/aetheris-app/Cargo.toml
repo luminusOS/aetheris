@@ -2,7 +2,7 @@
 name = "aetheris-app"
 description = "Aetheris native Kubernetes client for GNOME"
 version = "1.3.0"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0-or-later"
 authors = ["Leandro Rodrigues <leandromqrs@hotmail.com>"]
 

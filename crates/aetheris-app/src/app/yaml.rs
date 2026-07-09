@@ -205,12 +205,12 @@ fn update_yaml_error_state(buffer: &sourceview5::Buffer, error_label: &gtk::Labe
         return;
     };
 
-    if let Some(tag) = text_buffer.tag_table().lookup("yaml-error-line") {
-        if let Some(start) = text_buffer.iter_at_line((line - 1) as i32) {
-            let mut end = start;
-            end.forward_to_line_end();
-            text_buffer.apply_tag(&tag, &start, &end);
-        }
+    if let Some(tag) = text_buffer.tag_table().lookup("yaml-error-line")
+        && let Some(start) = text_buffer.iter_at_line((line - 1) as i32)
+    {
+        let mut end = start;
+        end.forward_to_line_end();
+        text_buffer.apply_tag(&tag, &start, &end);
     }
     error_label.set_label(&tr_format(
         "Line {line}: {message}",
@@ -579,7 +579,9 @@ pub(super) fn desired_state_explanation(kind: &str, mapping: &serde_yaml::Mappin
             "ConfigMap" => {
                 tr("ConfigMaps usually express desired configuration through data instead of spec.")
             }
-            "Secret" => tr("Secrets usually express desired sensitive data through data or stringData instead of spec."),
+            "Secret" => tr(
+                "Secrets usually express desired sensitive data through data or stringData instead of spec.",
+            ),
             _ => tr("This manifest does not include a spec section."),
         };
     }
@@ -863,14 +865,20 @@ pub(super) fn kind_explanation(kind: &str) -> String {
 
 pub(super) fn spec_explanation(kind: &str) -> String {
     match kind {
-        "Pod" => tr("Desired Pod configuration, including containers, volumes, restart policy and scheduling hints."),
-        "Deployment" => tr("Desired Deployment state, usually replicas, selector and the Pod template."),
+        "Pod" => tr(
+            "Desired Pod configuration, including containers, volumes, restart policy and scheduling hints.",
+        ),
+        "Deployment" => {
+            tr("Desired Deployment state, usually replicas, selector and the Pod template.")
+        }
         "Service" => tr("Desired Service routing, including selector, type and exposed ports."),
         "Ingress" => tr("Desired routing rules, TLS configuration and backend Services."),
         "Job" => tr("Desired one-shot workload, including completion policy and Pod template."),
         "CronJob" => tr("Desired schedule and Job template."),
         "Node" => tr("Node spec is mostly managed by Kubernetes and should be edited carefully."),
-        _ => tr("Desired state for this resource. Controllers reconcile the live object toward this section."),
+        _ => tr(
+            "Desired state for this resource. Controllers reconcile the live object toward this section.",
+        ),
     }
 }
 

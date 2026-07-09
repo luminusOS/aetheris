@@ -4,15 +4,15 @@ use anyhow::{Context as AnyhowContext, Result};
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::api::{DynamicObject, ListParams};
-use kube::runtime::watcher::{watcher, Event as WatcherEvent};
+use kube::runtime::watcher::{Event as WatcherEvent, watcher};
 use kube::{Api, ResourceExt};
 use serde_json::Value;
 
 use crate::status::{age_label, status_label};
 use crate::{
-    api_resource, namespace_scope, resource_scope, KubeSession, ObjectCondition, ObjectDetail,
-    ObjectSummary, ObjectWatchEvent, PodSummary, ResourceKind, ResourceRatio, ResourceScope,
-    ResourceUsage,
+    KubeSession, ObjectCondition, ObjectDetail, ObjectSummary, ObjectWatchEvent, PodSummary,
+    ResourceKind, ResourceRatio, ResourceScope, ResourceUsage, api_resource, namespace_scope,
+    resource_scope,
 };
 
 impl KubeSession {

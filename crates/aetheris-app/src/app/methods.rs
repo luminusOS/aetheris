@@ -341,12 +341,11 @@ impl App {
             self.namespaces.push(namespace.to_owned());
         }
 
-        if let Some(context) = self.selected_context.clone() {
-            if let Some(project) = self.projects.selected_project_mut() {
-                if project.add_custom_namespace(&context, namespace) {
-                    self.save_projects_or_toast();
-                }
-            }
+        if let Some(context) = self.selected_context.clone()
+            && let Some(project) = self.projects.selected_project_mut()
+            && project.add_custom_namespace(&context, namespace)
+        {
+            self.save_projects_or_toast();
         }
     }
 

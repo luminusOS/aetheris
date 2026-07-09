@@ -107,30 +107,28 @@ pub(super) fn namespace_selector_row(
         .build();
     action.add_prefix(&gtk::Image::from_icon_name("folder-symbolic"));
 
-    if is_custom {
-        if let Some(sender) = sender {
-            let edit_button = gtk::Button::from_icon_name("document-edit-symbolic");
-            edit_button.add_css_class("flat");
-            edit_button.set_valign(gtk::Align::Center);
-            edit_button.set_tooltip_text(Some(&tr("Rename")));
-            edit_button.connect_clicked({
-                let sender = sender.clone();
-                let namespace = namespace.to_owned();
-                move |_| sender.input(AppMsg::OpenRenameNamespaceDialog(namespace.clone()))
-            });
-            action.add_suffix(&edit_button);
+    if is_custom && let Some(sender) = sender {
+        let edit_button = gtk::Button::from_icon_name("document-edit-symbolic");
+        edit_button.add_css_class("flat");
+        edit_button.set_valign(gtk::Align::Center);
+        edit_button.set_tooltip_text(Some(&tr("Rename")));
+        edit_button.connect_clicked({
+            let sender = sender.clone();
+            let namespace = namespace.to_owned();
+            move |_| sender.input(AppMsg::OpenRenameNamespaceDialog(namespace.clone()))
+        });
+        action.add_suffix(&edit_button);
 
-            let delete_button = gtk::Button::from_icon_name("user-trash-symbolic");
-            delete_button.add_css_class("flat");
-            delete_button.add_css_class("destructive-action");
-            delete_button.set_valign(gtk::Align::Center);
-            delete_button.set_tooltip_text(Some(&tr("Remove")));
-            delete_button.connect_clicked({
-                let namespace = namespace.to_owned();
-                move |_| sender.input(AppMsg::RemoveCustomNamespace(namespace.clone()))
-            });
-            action.add_suffix(&delete_button);
-        }
+        let delete_button = gtk::Button::from_icon_name("user-trash-symbolic");
+        delete_button.add_css_class("flat");
+        delete_button.add_css_class("destructive-action");
+        delete_button.set_valign(gtk::Align::Center);
+        delete_button.set_tooltip_text(Some(&tr("Remove")));
+        delete_button.connect_clicked({
+            let namespace = namespace.to_owned();
+            move |_| sender.input(AppMsg::RemoveCustomNamespace(namespace.clone()))
+        });
+        action.add_suffix(&delete_button);
     }
 
     if selected {
@@ -602,8 +600,8 @@ const RELATED_POD_COLUMNS: [ObjectColumn; 3] = [
 /// same cell factories as the main object table, default widths, no
 /// persistence. Returns the sorted model too — activation positions are
 /// indices into it, not into the unsorted store.
-pub(super) fn related_pods_column_view(
-) -> (gtk::ColumnView, gtk::gio::ListStore, gtk::SortListModel) {
+pub(super) fn related_pods_column_view()
+-> (gtk::ColumnView, gtk::gio::ListStore, gtk::SortListModel) {
     let store = gtk::gio::ListStore::new::<gtk::glib::BoxedAnyObject>();
     let view = gtk::ColumnView::builder()
         .single_click_activate(true)

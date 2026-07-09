@@ -363,16 +363,16 @@ impl App {
                     self.show_custom_namespace_dialog(root);
                     return;
                 }
-                if let Some(namespace) = choices.get(index as usize) {
-                    if self.selected_namespace != *namespace {
-                        self.selected_namespace.clone_from(namespace);
-                        self.remember_selected_namespace();
-                        self.sync_dropdowns(Some(sender.clone()));
-                        self.show_object_list();
-                        self.stop_log_stream();
-                        self.stop_port_forward();
-                        self.refresh_objects(sender);
-                    }
+                if let Some(namespace) = choices.get(index as usize)
+                    && self.selected_namespace != *namespace
+                {
+                    self.selected_namespace.clone_from(namespace);
+                    self.remember_selected_namespace();
+                    self.sync_dropdowns(Some(sender.clone()));
+                    self.show_object_list();
+                    self.stop_log_stream();
+                    self.stop_port_forward();
+                    self.refresh_objects(sender);
                 }
             }
             AppMsg::CustomNamespaceEntered => {

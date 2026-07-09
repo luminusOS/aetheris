@@ -1,7 +1,7 @@
 use anyhow::{Context as AnyhowContext, Result};
 use k8s_openapi::api::core::v1::Namespace;
 use kube::api::{ApiResource, DynamicObject, ListParams};
-use kube::discovery::{verbs, Discovery, Scope};
+use kube::discovery::{Discovery, Scope, verbs};
 use kube::{Api, ResourceExt};
 
 use crate::{KubeSession, ResourceKind, ResourceScope};
@@ -64,10 +64,10 @@ impl KubeSession {
         if let Ok(names) = self.list_openshift_projects().await {
             return Ok(normalized_namespace_names(names));
         }
-        if self.server.contains("/k8s/clusters/") {
-            if let Ok(names) = self.list_rancher_namespaces().await {
-                return Ok(normalized_namespace_names(names));
-            }
+        if self.server.contains("/k8s/clusters/")
+            && let Ok(names) = self.list_rancher_namespaces().await
+        {
+            return Ok(normalized_namespace_names(names));
         }
 
         Err(native_error)
