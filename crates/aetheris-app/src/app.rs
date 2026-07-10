@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeSet, HashMap, VecDeque},
     fs,
     path::PathBuf,
 };
@@ -56,6 +56,7 @@ const OBJECT_API_WIDTH: i32 = 96;
 const OBJECT_AGE_WIDTH: i32 = 56;
 const OBJECT_COLUMN_MIN_WIDTH: i32 = 48;
 const OBJECT_NAME_MIN_WIDTH: i32 = 160;
+const OBJECT_CACHE_LIMIT: usize = 20;
 
 #[derive(Debug, Clone)]
 pub(super) enum ClusterSummaryState {
@@ -180,6 +181,8 @@ pub struct App {
     object_sorted: gtk::SortListModel,
     object_columns: Vec<(ObjectTableColumn, gtk::ColumnViewColumn)>,
     object_list_stack: gtk::Stack,
+    object_cache: HashMap<ObjectCacheKey, Vec<ObjectSummary>>,
+    object_cache_order: VecDeque<ObjectCacheKey>,
     detail: DetailPane,
     object_load_token: u64,
     object_watch_token: u64,
@@ -219,6 +222,16 @@ pub struct App {
     editing_cluster: bool,
     editing_context_name: Option<String>,
     renaming_namespace: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ObjectCacheKey {
+    context: String,
+    group: String,
+    version: String,
+    kind: String,
+    plural: String,
+    namespace: Option<String>,
 }
 
 #[cfg(not(target_os = "windows"))]

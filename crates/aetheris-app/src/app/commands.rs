@@ -4,6 +4,7 @@ use super::utils::*;
 use super::*;
 
 const CLUSTER_LOAD_TIMEOUT: Duration = Duration::from_secs(30);
+const OBJECT_LIST_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(super) async fn load_state() -> AppMsg {
     let result = async {
@@ -89,7 +90,17 @@ pub(super) async fn list_objects(
     resource: ResourceKind,
     namespace: Option<String>,
 ) -> AppMsg {
-    let result = list_objects_snapshot(context, resource, namespace).await;
+    let result = match tokio::time::timeout(
+        OBJECT_LIST_TIMEOUT,
+        list_objects_snapshot(context, resource, namespace),
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(_) => Err(String::from(
+            "Timed out while listing objects for the selected resource. Check that the API server is reachable and try again.",
+        )),
+    };
 
     AppMsg::ObjectsLoaded(token, result)
 }

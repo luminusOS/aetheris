@@ -232,6 +232,8 @@ impl App {
         self.stop_object_watch();
         self.stop_log_stream();
         self.stop_port_forward();
+        self.object_cache.clear();
+        self.object_cache_order.clear();
         self.detail.exec_target = None;
         self.detail.port_forward_target = None;
         self.loading = true;
@@ -275,9 +277,20 @@ impl App {
         self.stop_object_watch();
         self.object_load_token = self.object_load_token.saturating_add(1);
         let token = self.object_load_token;
+        let cache_key = object_cache_key(&context, &resource, namespace.clone());
         self.loading = true;
-        self.objects.clear();
-        self.status = tr_format("Loading {resource}...", &[("{resource}", resource.label())]);
+        if let Some(objects) = self.cached_objects(&cache_key) {
+            let count = objects.len();
+            self.objects = objects;
+            self.set_object_status(count);
+            self.status = tr_format(
+                "Refreshing {resource}...",
+                &[("{resource}", resource.label())],
+            );
+        } else {
+            self.objects.clear();
+            self.status = tr_format("Loading {resource}...", &[("{resource}", resource.label())]);
+        }
         self.sync_status();
         self.rebuild_object_list();
         sender.oneshot_command(
@@ -682,6 +695,47 @@ impl App {
             .splice(0, self.object_store.n_items(), &items);
     }
 
+    pub(super) fn current_object_cache_key(&self) -> Option<ObjectCacheKey> {
+        let context = self.selected_context.as_ref()?;
+        let resource = self.selected_resource_kind()?;
+        let namespace = resource
+            .is_namespaced()
+            .then(|| self.selected_namespace.clone());
+        Some(object_cache_key(context, resource, namespace))
+    }
+
+    pub(super) fn cached_objects(&mut self, key: &ObjectCacheKey) -> Option<Vec<ObjectSummary>> {
+        let objects = self.object_cache.get(key)?.clone();
+        self.touch_object_cache_key(key.clone());
+        Some(objects)
+    }
+
+    pub(super) fn cache_current_objects(&mut self) {
+        if let Some(key) = self.current_object_cache_key() {
+            self.cache_objects(key, self.objects.clone());
+        }
+    }
+
+    pub(super) fn cache_objects(&mut self, key: ObjectCacheKey, objects: Vec<ObjectSummary>) {
+        self.object_cache.insert(key.clone(), objects);
+        self.touch_object_cache_key(key);
+        while self.object_cache_order.len() > OBJECT_CACHE_LIMIT {
+            if let Some(oldest) = self.object_cache_order.pop_front() {
+                self.object_cache.remove(&oldest);
+            }
+        }
+    }
+
+    pub(super) fn touch_object_cache_key(&mut self, key: ObjectCacheKey) {
+        self.object_cache_order.retain(|existing| existing != &key);
+        self.object_cache_order.push_back(key);
+    }
+
+    pub(super) fn clear_object_cache(&mut self) {
+        self.object_cache.clear();
+        self.object_cache_order.clear();
+    }
+
     /// Merges one watch event into `objects` without sorting or repainting;
     /// both are deferred to `flush_object_list_refresh` so an event burst
     /// costs one refresh instead of thousands.
@@ -938,6 +992,21 @@ impl App {
         if visible_child_is_hidden {
             self.detail.stack.set_visible_child_name("yaml");
         }
+    }
+}
+
+fn object_cache_key(
+    context: &str,
+    resource: &ResourceKind,
+    namespace: Option<String>,
+) -> ObjectCacheKey {
+    ObjectCacheKey {
+        context: context.to_owned(),
+        group: resource.group.clone(),
+        version: resource.version.clone(),
+        kind: resource.kind.clone(),
+        plural: resource.plural.clone(),
+        namespace,
     }
 }
 

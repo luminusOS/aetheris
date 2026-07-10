@@ -295,7 +295,7 @@ fn filter_chip(
 
 fn status_filter_tone(filter: StatusFilter) -> StatusTone {
     match filter {
-        StatusFilter::Ready | StatusFilter::Running => StatusTone::Good,
+        StatusFilter::Ready | StatusFilter::Available | StatusFilter::Running => StatusTone::Good,
         StatusFilter::Pending | StatusFilter::Unavailable => StatusTone::Warning,
         StatusFilter::Failed => StatusTone::Bad,
     }
