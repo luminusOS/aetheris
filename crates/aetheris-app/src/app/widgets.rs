@@ -1093,24 +1093,6 @@ fn metric_bar_with_width(
     cell.upcast()
 }
 
-pub(super) fn metric_badge(icon_name: &str, label: &str, value: &str, raw_value: &str) -> gtk::Box {
-    let badge = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    badge.set_valign(gtk::Align::Center);
-    badge.set_tooltip_text(Some(&format!("{label}: {raw_value}")));
-    let icon = gtk::Image::from_icon_name(available_icon_name(
-        icon_name,
-        "applications-system-symbolic",
-    ));
-    icon.add_css_class("dim-label");
-    icon.set_tooltip_text(Some(label));
-    badge.append(&icon);
-    let label = gtk::Label::new(Some(value));
-    label.add_css_class("caption");
-    label.set_tooltip_text(Some(raw_value));
-    badge.append(&label);
-    badge
-}
-
 pub(super) fn available_icon_name<'a>(preferred: &'a str, fallback: &'a str) -> &'a str {
     let Some(display) = gtk::gdk::Display::default() else {
         return fallback;
