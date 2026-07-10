@@ -76,3 +76,6 @@ vte4 = "0.10"
 
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
 gettext-rs = { version = "0.7", features = ["gettext-system"] }
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+embed-resource = "3.0.11"
