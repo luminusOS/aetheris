@@ -404,32 +404,20 @@ pub(super) fn rebuild_container_metrics(list: &gtk::ListBox, detail: &ObjectDeta
 pub(super) fn container_metric_row(
     resources: &ContainerResources,
     usage: Option<&ContainerUsage>,
-) -> adw::ExpanderRow {
-    let action = adw::ExpanderRow::builder()
+) -> adw::ActionRow {
+    let action = adw::ActionRow::builder()
         .title(resources.name.as_str())
-        .expanded(false)
+        .subtitle(if usage.is_some() {
+            tr("Current / Request / Limit")
+        } else {
+            tr("Metrics unavailable; showing requests and limits")
+        })
         .build();
-    if let Some(usage) = usage {
-        let metrics = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-        metrics.set_valign(gtk::Align::Center);
-        metrics.set_margin_start(12);
-        metrics.append(&metric_badge(
-            "applications-engineering-symbolic",
-            &tr("CPU usage"),
-            &format_cpu_quantity(&usage.cpu),
-            &usage.cpu,
-        ));
-        metrics.append(&metric_badge(
-            "drive-harddisk-symbolic",
-            &tr("Memory usage"),
-            &format_memory_quantity(&usage.memory),
-            &usage.memory,
-        ));
-        action.add_suffix(&metrics);
-    } else {
-        action.set_subtitle(&tr("Metrics unavailable"));
-    }
-    action.add_row(&container_resource_row(
+
+    let metrics = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    metrics.set_valign(gtk::Align::Center);
+    metrics.set_margin_start(12);
+    metrics.append(&resource_usage_chip(
         &tr("CPU"),
         usage.map(|usage| usage.cpu.as_str()),
         &resources.cpu_request,
@@ -437,7 +425,7 @@ pub(super) fn container_metric_row(
         "applications-engineering-symbolic",
         format_cpu_quantity,
     ));
-    action.add_row(&container_resource_row(
+    metrics.append(&resource_usage_chip(
         &tr("Memory"),
         usage.map(|usage| usage.memory.as_str()),
         &resources.memory_request,
@@ -445,49 +433,96 @@ pub(super) fn container_metric_row(
         "drive-harddisk-symbolic",
         format_memory_quantity,
     ));
+    action.add_suffix(&metrics);
     action
 }
 
-fn container_resource_row(
+fn resource_usage_chip(
     title: &str,
     current: Option<&str>,
     request: &str,
     limit: &str,
     icon_name: &str,
     formatter: fn(&str) -> String,
-) -> adw::ActionRow {
-    let row = adw::ActionRow::builder().title(title).build();
-    row.add_prefix(&gtk::Image::from_icon_name(available_icon_name(
+) -> gtk::Box {
+    let chip = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    chip.set_valign(gtk::Align::Center);
+    chip.set_size_request(150, -1);
+
+    let icon = gtk::Image::from_icon_name(available_icon_name(
         icon_name,
         "applications-system-symbolic",
-    )));
-    row.add_suffix(&resource_text_pair(
-        &tr("Current"),
-        current.unwrap_or("-"),
-        formatter,
     ));
-    row.add_suffix(&resource_text_pair(&tr("Request"), request, formatter));
-    row.add_suffix(&resource_text_pair(&tr("Limit"), limit, formatter));
-    row
-}
+    icon.add_css_class("dim-label");
+    icon.set_tooltip_text(Some(title));
+    chip.append(&icon);
 
-fn resource_text_pair(label: &str, value: &str, formatter: fn(&str) -> String) -> gtk::Box {
-    let pair = gtk::Box::new(gtk::Orientation::Vertical, 2);
-    pair.set_valign(gtk::Align::Center);
-    pair.set_margin_start(10);
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 1);
+    let heading = gtk::Label::new(Some(title));
+    heading.add_css_class("caption");
+    heading.add_css_class("dim-label");
+    heading.set_xalign(0.0);
+    text.append(&heading);
 
-    let title = gtk::Label::new(Some(label));
-    title.add_css_class("caption");
-    title.add_css_class("dim-label");
-    title.set_xalign(1.0);
-    pair.append(&title);
+    let bar_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    bar_row.set_valign(gtk::Align::Center);
+    let bar = gtk::LevelBar::new();
+    bar.set_size_request(76, -1);
+    bar.set_valign(gtk::Align::Center);
+    bar.set_min_value(0.0);
+    bar.set_max_value(1.0);
+    bar.remove_offset_value(Some("low"));
+    bar.remove_offset_value(Some("high"));
+    bar.add_offset_value("lb-normal", 0.85);
+    bar.add_offset_value("lb-warning", 0.95);
+    bar.add_offset_value("lb-error", 1.0);
 
-    let value_label = gtk::Label::new(Some(&format_resource_value(value, formatter)));
-    value_label.add_css_class("caption");
-    value_label.set_xalign(1.0);
-    value_label.set_tooltip_text(Some(value));
-    pair.append(&value_label);
-    pair
+    let raw_current = current.unwrap_or("-");
+    let base = super::utils::parse_quantity(request)
+        .filter(|value| *value > 0.0)
+        .or_else(|| super::utils::parse_quantity(limit).filter(|value| *value > 0.0));
+    let current_value = super::utils::parse_quantity(raw_current);
+    let percent = current_value
+        .zip(base)
+        .map(|(current, base)| current / base);
+    let formatted_current = format_resource_value(raw_current, formatter);
+    let formatted_request = format_resource_value(request, formatter);
+    let formatted_limit = format_resource_value(limit, formatter);
+
+    if let Some(percent) = percent {
+        bar.set_value(percent.clamp(0.0, 1.0));
+    } else {
+        bar.set_value(0.0);
+    }
+
+    let tooltip = if let Some(percent) = percent {
+        tr_format(
+            "{resource}: {percent}% used. Current {current}, Request {request}, Limit {limit}",
+            &[
+                ("{resource}", title.to_owned()),
+                ("{percent}", format!("{:.0}", percent * 100.0)),
+                ("{current}", formatted_current.clone()),
+                ("{request}", formatted_request),
+                ("{limit}", formatted_limit),
+            ],
+        )
+    } else {
+        tr_format(
+            "{resource}: Current {current}, Request {request}, Limit {limit}",
+            &[
+                ("{resource}", title.to_owned()),
+                ("{current}", formatted_current.clone()),
+                ("{request}", formatted_request),
+                ("{limit}", formatted_limit),
+            ],
+        )
+    };
+    chip.set_tooltip_text(Some(&tooltip));
+    bar.set_tooltip_text(Some(&tooltip));
+    bar_row.append(&bar);
+    text.append(&bar_row);
+    chip.append(&text);
+    chip
 }
 
 fn format_resource_value(value: &str, formatter: fn(&str) -> String) -> String {
