@@ -110,6 +110,8 @@ jobs:
           cp -r /clang64/share/themes "$bundle/share/" || true
           mkdir -p "$bundle/share/aetheris"
           cp data/style.css "$bundle/share/aetheris/style.css"
+          mkdir -p "$bundle/share/icons/hicolor/scalable/actions"
+          cp data/icons/hicolor/scalable/actions/*.svg "$bundle/share/icons/hicolor/scalable/actions/"
           mkdir -p "$bundle/share/locale/pt_BR/LC_MESSAGES"
           cp po/pt_BR/LC_MESSAGES/org.luminusos.Aetheris.mo "$bundle/share/locale/pt_BR/LC_MESSAGES/org.luminusos.Aetheris.mo"
           cp -r /clang64/lib/gdk-pixbuf-2.0 "$bundle/lib/" || true

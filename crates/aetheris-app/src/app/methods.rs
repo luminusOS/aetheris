@@ -72,6 +72,7 @@ impl App {
         self.content_header_stack.set_visible_child_name("search");
         self.detail.back_button.set_visible(false);
         self.detail.delete_button.set_visible(false);
+        self.detail.favorite_button.set_visible(false);
         self.detail.terminal_button.set_visible(false);
     }
 
@@ -112,6 +113,8 @@ impl App {
         self.content_header_stack.set_visible_child_name("title");
         self.detail.back_button.set_visible(true);
         self.detail.delete_button.set_visible(true);
+        self.detail.favorite_button.set_visible(true);
+        self.sync_detail_favorite_button();
         self.sync_terminal_controls();
     }
 
@@ -482,6 +485,9 @@ impl App {
         self.detail
             .delete_button
             .set_sensitive(self.detail.target.is_some() && !self.loading);
+        self.detail
+            .favorite_button
+            .set_sensitive(self.detail.target.is_some() && !self.loading);
         self.detail.terminal_button.set_sensitive(
             self.detail
                 .exec_target
@@ -568,6 +574,7 @@ impl App {
                 .subtitle(tr("Connect to a cluster to load API resources."))
                 .build();
             self.resource_list.append(&row);
+            self.rebuild_favorite_object_list(sender);
             return;
         }
 
@@ -584,12 +591,72 @@ impl App {
 
             for (resource_index, resource) in resources {
                 let child = resource_row(resource, self.selected_resource == Some(resource_index));
-                connect_resource_row(&child, sender.clone(), resource_index);
+                connect_resource_row(&child, sender.clone(), resource_index, section);
                 row.add_row(&child);
             }
 
             self.resource_list.append(&row);
         }
+        self.rebuild_favorite_object_list(sender);
+    }
+
+    pub(super) fn rebuild_favorite_object_list(&self, sender: Option<ComponentSender<Self>>) {
+        while let Some(child) = self.favorite_object_list.first_child() {
+            self.favorite_object_list.remove(&child);
+        }
+
+        let Some(context) = self.selected_context.as_deref() else {
+            let row = adw::ActionRow::builder()
+                .title(tr("No favorites"))
+                .subtitle(tr("Select a cluster to show favorite objects."))
+                .build();
+            self.favorite_object_list.append(&row);
+            return;
+        };
+        let favorites = self.projects.favorite_objects_for_context(context);
+
+        if favorites.is_empty() {
+            let row = adw::ActionRow::builder()
+                .title(tr("No favorites"))
+                .subtitle(tr("Open an object and star it to keep it here."))
+                .build();
+            self.favorite_object_list.append(&row);
+            return;
+        }
+
+        for favorite in favorites {
+            let row = favorite_object_row(&favorite);
+            connect_favorite_object_row(&row, sender.clone(), favorite);
+            self.favorite_object_list.append(&row);
+        }
+    }
+
+    pub(super) fn sync_detail_favorite_button(&self) {
+        let favorited = self
+            .detail
+            .target
+            .as_ref()
+            .is_some_and(|target| self.projects.is_object_favorite(target));
+        self.detail
+            .favorite_button
+            .set_icon_name(available_icon_name(
+                if favorited {
+                    "aetheris-object-favorite-symbolic"
+                } else {
+                    "aetheris-object-favorite-outline-symbolic"
+                },
+                if favorited {
+                    "starred-symbolic"
+                } else {
+                    "non-starred-symbolic"
+                },
+            ));
+        let tooltip = if favorited {
+            tr("Remove from favorites")
+        } else {
+            tr("Add to favorites")
+        };
+        self.detail.favorite_button.set_tooltip_text(Some(&tooltip));
     }
 
     /// Replaces the object table's backing model with the current filtered
@@ -775,6 +842,7 @@ impl App {
                 .unwrap_or("-"),
         );
         self.detail.yaml_buffer.set_text(&detail.yaml);
+        self.sync_detail_favorite_button();
         self.detail.node_unschedulable = detail.node_unschedulable;
         self.detail
             .scale_spin

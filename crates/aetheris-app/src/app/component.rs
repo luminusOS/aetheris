@@ -228,6 +228,9 @@ impl Component for App {
         let resource_list = gtk::ListBox::new();
         resource_list.add_css_class("boxed-list");
         resource_list.set_selection_mode(gtk::SelectionMode::None);
+        let favorite_object_list = gtk::ListBox::new();
+        favorite_object_list.add_css_class("boxed-list");
+        favorite_object_list.set_selection_mode(gtk::SelectionMode::None);
         let object_store = gtk::gio::ListStore::new::<gtk::glib::BoxedAnyObject>();
         let object_view = gtk::ColumnView::builder()
             .single_click_activate(true)
@@ -333,6 +336,18 @@ impl Component for App {
         detail_delete_button.add_css_class("flat");
         detail_delete_button.set_size_request(34, 34);
         detail_delete_button.set_valign(gtk::Align::Center);
+        let detail_favorite_button = gtk::Button::builder()
+            .icon_name(super::widgets::available_icon_name(
+                "aetheris-object-favorite-outline-symbolic",
+                "non-starred-symbolic",
+            ))
+            .tooltip_text(tr("Add to favorites"))
+            .sensitive(false)
+            .visible(false)
+            .build();
+        detail_favorite_button.add_css_class("flat");
+        detail_favorite_button.set_size_request(34, 34);
+        detail_favorite_button.set_valign(gtk::Align::Center);
         let detail_terminal_button = gtk::Button::builder()
             .icon_name("utilities-terminal-symbolic")
             .tooltip_text(tr("Open terminal"))
@@ -606,11 +621,13 @@ impl Component for App {
             cluster_menu_button: &cluster_menu_button,
             namespace_menu_button: &namespace_menu_button,
             resource_list: &resource_list,
+            favorite_object_list: &favorite_object_list,
         });
         let content = build_content(ContentWidgets {
             sidebar_toggle_button: &sidebar_toggle_button,
             detail_back_button: &detail_back_button,
             delete_button: &detail_delete_button,
+            favorite_button: &detail_favorite_button,
             create_yaml_button: &create_yaml_button,
             refresh_button: &refresh_button,
             terminal_button: &detail_terminal_button,
@@ -813,6 +830,10 @@ impl Component for App {
             let sender = sender.clone();
             move |_| sender.input(AppMsg::DeleteObject)
         });
+        detail_favorite_button.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(AppMsg::ToggleCurrentObjectFavorite)
+        });
         detail_terminal_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowPodTerminal)
@@ -916,6 +937,7 @@ impl Component for App {
             status_label,
             spinner,
             resource_list,
+            favorite_object_list,
             object_store,
             object_sorted,
             object_columns,
@@ -940,6 +962,7 @@ impl Component for App {
                 apply_button: detail_apply_button,
                 download_yaml_button: detail_download_yaml_button,
                 delete_button: detail_delete_button,
+                favorite_button: detail_favorite_button,
                 terminal_button: detail_terminal_button,
                 yaml_buffer: detail_yaml_buffer,
                 events_list: detail_events_list,

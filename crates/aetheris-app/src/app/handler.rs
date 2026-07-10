@@ -491,22 +491,40 @@ impl App {
                     self.schedule_project_save(&sender);
                 }
             }
-            AppMsg::ResourceChanged(index) => {
-                if self.resources.get(index).is_some() {
-                    let next = Some(index);
-                    if self.selected_resource != next {
-                        self.selected_resource = next;
-                        self.selected_resource_section =
-                            ResourceSection::for_resource(&self.resources[index]);
-                        self.rebuild_resource_list(Some(sender.clone()));
-                        self.present_content_panel();
-                        self.show_object_list();
-                        self.sync_object_columns();
-                        self.stop_log_stream();
-                        self.stop_port_forward();
-                        self.refresh_objects(sender);
-                    }
+            AppMsg::ResourceChanged(index, _section) => {
+                let Some(resource) = self.resources.get(index) else {
+                    return;
+                };
+                if self.selected_resource == Some(index) {
+                    return;
                 }
+                self.selected_resource = Some(index);
+                self.selected_resource_section = ResourceSection::for_resource(resource);
+                self.rebuild_resource_list(Some(sender.clone()));
+                self.present_content_panel();
+                self.show_object_list();
+                self.sync_object_columns();
+                self.stop_log_stream();
+                self.stop_port_forward();
+                self.refresh_objects(sender);
+            }
+            AppMsg::ToggleCurrentObjectFavorite => {
+                let Some(target) = self.detail.target.clone() else {
+                    return;
+                };
+                self.projects.toggle_object_favorite(&target);
+                self.save_projects_or_toast();
+                self.sync_detail_favorite_button();
+                self.rebuild_favorite_object_list(Some(sender.clone()));
+            }
+            AppMsg::FavoriteObjectActivated(favorite) => {
+                self.open_object_detail(
+                    favorite.context.clone(),
+                    favorite.resource(),
+                    favorite.namespace(),
+                    favorite.name.clone(),
+                    sender,
+                );
             }
             AppMsg::SearchChanged(query) => {
                 self.search_query = query;
@@ -556,13 +574,19 @@ impl App {
                     return;
                 }
                 self.loading = false;
-                self.detail.target = None;
                 self.detail.log_target = None;
                 self.detail.exec_target = None;
                 self.detail.port_forward_target = None;
                 self.sync_log_controls();
-                self.sync_terminal_controls();
-                self.sync_port_forward_controls();
+                // Keep `target` set (rather than clearing it) and still open
+                // the detail page: the object is gone, but this is the only
+                // place with a favorite/star button, so a stale favorite
+                // must be reachable here to unfavorite it.
+                if let Some(target) = self.detail.target.clone() {
+                    let placeholder = unavailable_object_detail(&target);
+                    self.populate_detail_dialog(&placeholder);
+                    self.show_detail_page(&placeholder.name);
+                }
                 self.status = tr("Unable to load object detail.");
                 self.sync_status();
                 self.toaster.add_toast(adw::Toast::new(&error));
@@ -617,6 +641,10 @@ impl App {
                 self.show_object_list();
                 self.stop_log_stream();
                 self.stop_port_forward();
+                self.detail.target = None;
+                self.detail.log_target = None;
+                self.detail.exec_target = None;
+                self.detail.port_forward_target = None;
                 self.sync_log_controls();
                 self.sync_terminal_controls();
                 self.sync_port_forward_controls();
