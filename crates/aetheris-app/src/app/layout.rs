@@ -7,6 +7,7 @@ pub(super) struct SidebarWidgets<'a> {
     pub(super) cluster_menu_button: &'a gtk::MenuButton,
     pub(super) namespace_menu_button: &'a gtk::MenuButton,
     pub(super) resource_list: &'a gtk::ListBox,
+    pub(super) favorite_object_list: &'a gtk::ListBox,
 }
 
 pub(super) fn build_sidebar(widgets: SidebarWidgets<'_>) -> adw::NavigationPage {
@@ -29,10 +30,69 @@ pub(super) fn build_sidebar(widgets: SidebarWidgets<'_>) -> adw::NavigationPage 
 
     container.append(&namespace_group);
 
-    let resources_group = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    resources_group.append(&section_title(&tr("Resources")));
-    resources_group.append(widgets.resource_list);
-    container.append(&resources_group);
+    let resources_page = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    resources_page.append(widgets.resource_list);
+
+    let favorites_page = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    favorites_page.append(widgets.favorite_object_list);
+
+    let sidebar_stack = gtk::Stack::builder()
+        .hhomogeneous(false)
+        .vhomogeneous(false)
+        .build();
+    sidebar_stack.add_named(&resources_page, Some("resources"));
+    sidebar_stack.add_named(&favorites_page, Some("favorites"));
+
+    let toggle_box = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    let resources_toggle = gtk::ToggleButton::builder()
+        .icon_name("view-list-symbolic")
+        .tooltip_text(tr("Resources"))
+        .hexpand(true)
+        .active(true)
+        .css_classes(["flat"])
+        .build();
+    let favorites_toggle = gtk::ToggleButton::builder()
+        .icon_name("aetheris-object-favorite-symbolic")
+        .tooltip_text(tr("Favorites"))
+        .hexpand(true)
+        .css_classes(["flat"])
+        .build();
+    toggle_box.append(&resources_toggle);
+    toggle_box.append(&favorites_toggle);
+
+    resources_toggle.connect_clicked({
+        let resources_toggle = resources_toggle.clone();
+        move |_| resources_toggle.set_active(true)
+    });
+    resources_toggle.connect_toggled({
+        let favorites_toggle = favorites_toggle.clone();
+        let sidebar_stack = sidebar_stack.clone();
+        move |button| {
+            if button.is_active() {
+                favorites_toggle.set_active(false);
+                sidebar_stack.set_visible_child_name("resources");
+            }
+        }
+    });
+    favorites_toggle.connect_clicked({
+        let favorites_toggle = favorites_toggle.clone();
+        move |_| favorites_toggle.set_active(true)
+    });
+    favorites_toggle.connect_toggled({
+        let resources_toggle = resources_toggle.clone();
+        let sidebar_stack = sidebar_stack.clone();
+        move |button| {
+            if button.is_active() {
+                resources_toggle.set_active(false);
+                sidebar_stack.set_visible_child_name("favorites");
+            }
+        }
+    });
+
+    let objects_group = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    objects_group.append(&toggle_box);
+    objects_group.append(&sidebar_stack);
+    container.append(&objects_group);
 
     let scrolled = gtk::ScrolledWindow::builder()
         .vexpand(true)
@@ -50,6 +110,7 @@ pub(super) struct ContentWidgets<'a> {
     pub(super) sidebar_toggle_button: &'a gtk::ToggleButton,
     pub(super) detail_back_button: &'a gtk::Button,
     pub(super) delete_button: &'a gtk::Button,
+    pub(super) favorite_button: &'a gtk::Button,
     pub(super) create_yaml_button: &'a gtk::Button,
     pub(super) refresh_button: &'a gtk::Button,
     pub(super) terminal_button: &'a gtk::Button,
@@ -101,6 +162,7 @@ pub(super) fn build_content(widgets: ContentWidgets<'_>) -> adw::NavigationPage 
     detail_actions.set_valign(gtk::Align::Center);
     detail_actions.set_halign(gtk::Align::End);
     detail_actions.append(widgets.terminal_button);
+    detail_actions.append(widgets.favorite_button);
     detail_actions.append(widgets.delete_button);
     header.pack_end(&detail_actions);
     toolbar.add_top_bar(&header);

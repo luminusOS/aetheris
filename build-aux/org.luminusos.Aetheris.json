@@ -64,7 +64,8 @@
         "install -Dm644 data/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png /app/share/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png",
         "install -Dm644 data/icons/hicolor/512x512/apps/org.luminusos.Aetheris.png /app/share/icons/hicolor/512x512/apps/org.luminusos.Aetheris.png",
         "install -Dm644 data/icons/hicolor/symbolic/apps/org.luminusos.Aetheris-symbolic.svg /app/share/icons/hicolor/symbolic/apps/org.luminusos.Aetheris-symbolic.svg",
-        "install -Dm644 data/icons/hicolor/scalable/actions/nautilus-search-filters-symbolic.svg /app/share/icons/hicolor/scalable/actions/nautilus-search-filters-symbolic.svg"
+        "mkdir -p /app/share/icons/hicolor/scalable/actions",
+        "cp data/icons/hicolor/scalable/actions/*.svg /app/share/icons/hicolor/scalable/actions/"
       ],
       "sources": [{ "type": "dir", "path": ".." }]
     }

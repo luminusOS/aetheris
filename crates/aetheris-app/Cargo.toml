@@ -21,6 +21,7 @@ assets = [
   "../../data/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png",
   "../../data/icons/hicolor/512x512/apps/org.luminusos.Aetheris.png",
   "../../data/icons/hicolor/symbolic/apps/org.luminusos.Aetheris-symbolic.svg",
+  "../../data/icons/hicolor/scalable/actions",
   "../../po/pt_BR/LC_MESSAGES/org.luminusos.Aetheris.mo",
 ]
 auto_link = true

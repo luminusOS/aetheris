@@ -37,8 +37,8 @@ mod yaml;
 
 use i18n::{tr, tr_format, trn};
 use projects::{
-    DetailTarget, ObjectColumn, ObjectTableColumn, PodLogTarget, Project, ProjectStore,
-    ResourceSection, StatusFilter,
+    DetailTarget, ObjectColumn, ObjectFavorite, ObjectTableColumn, PodLogTarget, Project,
+    ProjectStore, ResourceSection, StatusFilter,
 };
 use widgets::{
     is_access_resource, is_cluster_resource, is_configuration_resource, is_network_resource,
@@ -83,6 +83,7 @@ pub(super) struct DetailPane {
     apply_button: gtk::Button,
     download_yaml_button: gtk::Button,
     delete_button: gtk::Button,
+    favorite_button: gtk::Button,
     terminal_button: gtk::Button,
     yaml_buffer: sourceview5::Buffer,
     events_list: gtk::ListBox,
@@ -168,6 +169,7 @@ pub struct App {
     status_label: gtk::Label,
     spinner: gtk::Spinner,
     resource_list: gtk::ListBox,
+    favorite_object_list: gtk::ListBox,
     /// Backing model for `object_view`. The `ColumnView` only realizes
     /// widgets for on-screen rows, so this can hold tens of thousands of
     /// objects without the widget tree growing with it.
@@ -254,7 +256,9 @@ pub enum AppMsg {
     ObjectColumnToggled(u32),
     ObjectColumnResized(ObjectTableColumn, i32),
     EditCurrentCluster,
-    ResourceChanged(usize),
+    ResourceChanged(usize, ResourceSection),
+    ToggleCurrentObjectFavorite,
+    FavoriteObjectActivated(ObjectFavorite),
     SearchChanged(String),
     ObjectActivated(i32),
     RelatedPodActivated(i32),

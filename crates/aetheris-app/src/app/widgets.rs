@@ -483,13 +483,28 @@ pub(super) fn connect_resource_row(
     row: &adw::ActionRow,
     sender: Option<ComponentSender<App>>,
     resource_index: usize,
+    section: ResourceSection,
 ) {
     let Some(sender) = sender else {
         return;
     };
 
     row.connect_activated(move |_| {
-        sender.input(AppMsg::ResourceChanged(resource_index));
+        sender.input(AppMsg::ResourceChanged(resource_index, section));
+    });
+}
+
+pub(super) fn connect_favorite_object_row(
+    row: &adw::ActionRow,
+    sender: Option<ComponentSender<App>>,
+    favorite: ObjectFavorite,
+) {
+    let Some(sender) = sender else {
+        return;
+    };
+
+    row.connect_activated(move |_| {
+        sender.input(AppMsg::FavoriteObjectActivated(favorite.clone()));
     });
 }
 
@@ -507,12 +522,101 @@ pub(super) fn resource_row(resource: &ResourceKind, selected: bool) -> adw::Acti
         ))
         .activatable(true)
         .build();
+    let icon = gtk::Image::from_icon_name(available_icon_name(
+        resource_icon_name(resource),
+        "application-x-addon-symbolic",
+    ));
+    row.add_prefix(&icon);
 
     if selected {
         row.add_css_class("resource-row-selected");
     }
 
     row
+}
+
+pub(super) fn favorite_object_row(favorite: &ObjectFavorite) -> adw::ActionRow {
+    let row = adw::ActionRow::builder()
+        .title(favorite.name.as_str())
+        .subtitle(favorite.kind())
+        .title_lines(1)
+        .subtitle_lines(1)
+        .activatable(true)
+        .tooltip_text(favorite.name.as_str())
+        .build();
+    let icon = gtk::Image::from_icon_name(available_icon_name(
+        resource_icon_name(&favorite.resource()),
+        "application-x-addon-symbolic",
+    ));
+    row.add_prefix(&icon);
+    row
+}
+
+pub(super) fn resource_icon_name(resource: &ResourceKind) -> &'static str {
+    match resource.group.as_str() {
+        "" => match resource.kind.as_str() {
+            "Pod" => "lucide-box-symbolic",
+            "ConfigMap" => "lucide-file-sliders-symbolic",
+            "Secret" => "lucide-file-key-2-symbolic",
+            "Namespace" => "lucide-orbit-symbolic",
+            "Service" => "lucide-waypoints-symbolic",
+            "Node" => "lucide-server-symbolic",
+            "PersistentVolume" => "lucide-hard-drive-download-symbolic",
+            "PersistentVolumeClaim" => "lucide-hard-drive-upload-symbolic",
+            "Event" => "dialog-information-symbolic",
+            "ServiceAccount" => "lucide-user-symbolic",
+            _ => "lucide-blocks-symbolic",
+        },
+        "apps" => match resource.kind.as_str() {
+            "ReplicaSet" => "lucide-layers-2-symbolic",
+            "Deployment" => "lucide-layers-3-symbolic",
+            "StatefulSet" => "lucide-database-symbolic",
+            "DaemonSet" => "lucide-server-cog-symbolic",
+            _ => "lucide-blocks-symbolic",
+        },
+        "batch" => match resource.kind.as_str() {
+            "Job" => "lucide-cloud-cog-symbolic",
+            "CronJob" => "lucide-timer-reset-symbolic",
+            _ => "lucide-blocks-symbolic",
+        },
+        "networking.k8s.io" => match resource.kind.as_str() {
+            "Ingress" => "lucide-radio-tower-symbolic",
+            "IngressClass" => "lucide-cast-symbolic",
+            "NetworkPolicy" => "lucide-globe-lock-symbolic",
+            _ => "lucide-blocks-symbolic",
+        },
+        "events.k8s.io" => match resource.kind.as_str() {
+            "Event" => "dialog-information-symbolic",
+            _ => "lucide-blocks-symbolic",
+        },
+        "apiextensions.k8s.io" => match resource.kind.as_str() {
+            "CustomResourceDefinition" => "lucide-toy-brick-symbolic",
+            _ => "lucide-blocks-symbolic",
+        },
+        "storage.k8s.io" => match resource.kind.as_str() {
+            "CSIDriver" => "lucide-warehouse-symbolic",
+            "CSINode" => "lucide-cylinder-symbolic",
+            "StorageClass" => "lucide-import-symbolic",
+            _ => "lucide-blocks-symbolic",
+        },
+        "helm.toolkit.fluxcd.io" => match resource.kind.as_str() {
+            "HelmRelease" => "lucide-package-open-symbolic",
+            _ => "lucide-blocks-symbolic",
+        },
+        "source.toolkit.fluxcd.io" => match resource.kind.as_str() {
+            "HelmChart" => "lucide-map-symbolic",
+            "HelmRepository" => "lucide-library-symbolic",
+            "GitRepository" => "lucide-folder-git-symbolic",
+            "Bucket" => "lucide-paint-bucket-symbolic",
+            "OCIRepository" => "lucide-container-symbolic",
+            _ => "lucide-blocks-symbolic",
+        },
+        "monitoring.coreos.com" => match resource.kind.as_str() {
+            "PodMonitor" => "lucide-package-search-symbolic",
+            _ => "lucide-blocks-symbolic",
+        },
+        _ => "lucide-blocks-symbolic",
+    }
 }
 
 pub(super) fn is_workload_resource(resource: &ResourceKind) -> bool {

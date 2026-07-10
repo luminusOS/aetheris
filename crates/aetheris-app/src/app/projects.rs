@@ -14,6 +14,8 @@ pub struct ProjectStore {
     pub(super) object_name_width: Option<i32>,
     #[serde(default)]
     pub(super) object_column_widths: Vec<ObjectColumnWidth>,
+    #[serde(default)]
+    pub(super) favorite_objects: Vec<ObjectFavorite>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,7 +55,7 @@ pub(super) struct PodLogTarget {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ResourceSection {
+pub(crate) enum ResourceSection {
     Workloads,
     Network,
     Storage,
@@ -94,6 +96,64 @@ pub(crate) enum ObjectTableColumn {
 pub(super) struct ObjectColumnWidth {
     column: ObjectColumn,
     width: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct ObjectFavorite {
+    pub(super) context: String,
+    group: String,
+    version: String,
+    api_version: String,
+    kind: String,
+    plural: String,
+    namespace: Option<String>,
+    pub(super) name: String,
+}
+
+impl ObjectFavorite {
+    fn from_target(target: &DetailTarget) -> Self {
+        Self {
+            context: target.context.clone(),
+            group: target.resource.group.clone(),
+            version: target.resource.version.clone(),
+            api_version: target.resource.api_version.clone(),
+            kind: target.resource.kind.clone(),
+            plural: target.resource.plural.clone(),
+            namespace: target.namespace.clone(),
+            name: target.name.clone(),
+        }
+    }
+
+    fn matches_target(&self, target: &DetailTarget) -> bool {
+        self.context == target.context
+            && self.group == target.resource.group
+            && self.kind == target.resource.kind
+            && self.namespace == target.namespace
+            && self.name == target.name
+    }
+
+    pub(super) fn resource(&self) -> ResourceKind {
+        ResourceKind {
+            group: self.group.clone(),
+            version: self.version.clone(),
+            api_version: self.api_version.clone(),
+            kind: self.kind.clone(),
+            plural: self.plural.clone(),
+            scope: if self.namespace.is_some() {
+                aetheris_kube::ResourceScope::Namespaced
+            } else {
+                aetheris_kube::ResourceScope::Cluster
+            },
+        }
+    }
+
+    pub(super) fn namespace(&self) -> Option<String> {
+        self.namespace.clone()
+    }
+
+    pub(super) fn kind(&self) -> &str {
+        &self.kind
+    }
 }
 
 impl ObjectColumn {
@@ -273,6 +333,7 @@ impl ProjectStore {
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
+            favorite_objects: Vec::new(),
         }
     }
 
@@ -289,6 +350,7 @@ impl ProjectStore {
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
+            favorite_objects: Vec::new(),
         }
     }
 
@@ -300,6 +362,7 @@ impl ProjectStore {
         store.normalize_object_columns();
         store.normalize_object_column_widths();
         store.normalize_object_name_width();
+        store.normalize_favorite_objects();
         store.normalize_contexts(contexts);
         store.normalize_last_namespaces(contexts);
         if let Err(error) = store.save() {
@@ -335,6 +398,34 @@ impl ProjectStore {
                 .retain(|visible_column| *visible_column != column);
         }
         self.normalize_object_columns();
+    }
+
+    pub(super) fn favorite_objects_for_context(&self, context: &str) -> Vec<ObjectFavorite> {
+        self.favorite_objects
+            .iter()
+            .filter(|favorite| favorite.context == context)
+            .cloned()
+            .collect()
+    }
+
+    pub(super) fn is_object_favorite(&self, target: &DetailTarget) -> bool {
+        self.favorite_objects
+            .iter()
+            .any(|favorite| favorite.matches_target(target))
+    }
+
+    pub(super) fn toggle_object_favorite(&mut self, target: &DetailTarget) -> bool {
+        let favorite = ObjectFavorite::from_target(target);
+        let previous_len = self.favorite_objects.len();
+        self.favorite_objects
+            .retain(|existing| existing != &favorite);
+
+        if previous_len == self.favorite_objects.len() {
+            self.favorite_objects.push(favorite);
+        }
+
+        self.normalize_favorite_objects();
+        true
     }
 
     pub(super) fn object_column_width(&self, column: ObjectColumn) -> i32 {
@@ -483,6 +574,36 @@ impl ProjectStore {
             .object_name_width
             .map(|width| width.max(OBJECT_NAME_MIN_WIDTH))
             .filter(|width| *width != OBJECT_NAME_WIDTH);
+    }
+
+    fn normalize_favorite_objects(&mut self) {
+        for favorite in &mut self.favorite_objects {
+            favorite.context = favorite.context.trim().to_owned();
+            favorite.group = favorite.group.trim().to_owned();
+            favorite.version = favorite.version.trim().to_owned();
+            favorite.api_version = favorite.api_version.trim().to_owned();
+            favorite.kind = favorite.kind.trim().to_owned();
+            favorite.plural = favorite.plural.trim().to_owned();
+            favorite.namespace = favorite
+                .namespace
+                .as_deref()
+                .map(str::trim)
+                .filter(|namespace| !namespace.is_empty())
+                .map(str::to_owned);
+            favorite.name = favorite.name.trim().to_owned();
+        }
+        self.favorite_objects.retain(|favorite| {
+            !favorite.context.is_empty() && !favorite.kind.is_empty() && !favorite.name.is_empty()
+        });
+        self.favorite_objects.sort_by(|left, right| {
+            left.context
+                .cmp(&right.context)
+                .then(left.group.cmp(&right.group))
+                .then(left.kind.cmp(&right.kind))
+                .then(left.namespace.cmp(&right.namespace))
+                .then(left.name.cmp(&right.name))
+        });
+        self.favorite_objects.dedup();
     }
 
     pub(super) fn save(&self) -> Result<(), String> {
@@ -749,6 +870,7 @@ impl Project {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aetheris_kube::ResourceScope;
 
     fn context(name: &str) -> ContextInfo {
         ContextInfo {
@@ -759,6 +881,21 @@ mod tests {
             user: format!("{name}-user"),
             is_current: false,
             insecure_skip_tls_verify: false,
+        }
+    }
+
+    fn resource(group: &str, kind: &str) -> ResourceKind {
+        ResourceKind {
+            group: group.to_owned(),
+            version: String::from("v1"),
+            api_version: if group.is_empty() {
+                String::from("v1")
+            } else {
+                format!("{group}/v1")
+            },
+            kind: kind.to_owned(),
+            plural: format!("{}s", kind.to_ascii_lowercase()),
+            scope: ResourceScope::Namespaced,
         }
     }
 
@@ -776,6 +913,7 @@ mod tests {
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
+            favorite_objects: Vec::new(),
         };
 
         store.normalize_contexts(&[context("local"), context("external")]);
@@ -814,6 +952,7 @@ mod tests {
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
+            favorite_objects: Vec::new(),
         };
 
         store.normalize_contexts(&[]);
@@ -881,6 +1020,28 @@ mod tests {
     }
 
     #[test]
+    fn toggle_object_favorite_tracks_object_by_context_resource_namespace_and_name() {
+        let mut store = ProjectStore::default();
+        let target = DetailTarget {
+            context: String::from("prod"),
+            resource: resource("apps", "Deployment"),
+            namespace: Some(String::from("my-namespace")),
+            name: String::from("sample-deploy"),
+        };
+
+        assert!(!store.is_object_favorite(&target));
+        assert!(store.toggle_object_favorite(&target));
+        assert!(store.is_object_favorite(&target));
+        assert_eq!(
+            store.favorite_objects_for_context("prod")[0].kind(),
+            "Deployment"
+        );
+
+        assert!(store.toggle_object_favorite(&target));
+        assert!(!store.is_object_favorite(&target));
+    }
+
+    #[test]
     fn normalize_contexts_prunes_last_namespaces_for_deleted_contexts() {
         let mut store = ProjectStore {
             projects: vec![Project {
@@ -903,6 +1064,7 @@ mod tests {
             visible_object_columns: default_object_columns(),
             object_name_width: None,
             object_column_widths: Vec::new(),
+            favorite_objects: Vec::new(),
         };
 
         store.normalize_last_namespaces(&[context("prod")]);

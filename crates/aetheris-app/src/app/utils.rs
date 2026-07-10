@@ -278,6 +278,32 @@ pub(super) fn pod_main_image(images: &[String]) -> Option<String> {
         .cloned()
 }
 
+/// A placeholder `ObjectDetail` for a target whose load failed (e.g. a
+/// favorited object that no longer exists in the cluster). Lets the detail
+/// page still open so its favorite/star button is reachable, instead of
+/// leaving a stale favorite with no way to unfavorite it.
+pub(super) fn unavailable_object_detail(target: &DetailTarget) -> ObjectDetail {
+    ObjectDetail {
+        name: target.name.clone(),
+        namespace: target.namespace.clone().unwrap_or_default(),
+        status: tr("Unavailable"),
+        api_version: target.resource.api_version.clone(),
+        kind: target.resource.kind.clone(),
+        age: String::from("-"),
+        metrics: None,
+        container_metrics: Vec::new(),
+        container_resources: Vec::new(),
+        yaml: String::new(),
+        containers: Vec::new(),
+        related_pods: Vec::new(),
+        replicas: None,
+        node_unschedulable: None,
+        conditions: Vec::new(),
+        events: Vec::new(),
+        events_error: None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{forbidden_summary, offerable_columns_for, pod_main_image, shortened_image};
