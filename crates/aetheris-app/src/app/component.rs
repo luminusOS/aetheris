@@ -942,6 +942,8 @@ impl Component for App {
             object_sorted,
             object_columns,
             object_list_stack,
+            object_cache: HashMap::new(),
+            object_cache_order: VecDeque::new(),
             detail: DetailPane {
                 back_button: detail_back_button,
                 stack: detail_stack,

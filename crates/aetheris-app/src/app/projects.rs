@@ -68,6 +68,7 @@ pub(crate) enum ResourceSection {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum StatusFilter {
     Ready,
+    Available,
     Unavailable,
     Running,
     Pending,
@@ -198,8 +199,9 @@ pub(super) fn default_object_columns() -> Vec<ObjectColumn> {
 const OBJECT_COLUMN_SCHEMA_VERSION: u32 = 1;
 
 impl StatusFilter {
-    pub(super) const ALL: [Self; 5] = [
+    pub(super) const ALL: [Self; 6] = [
         Self::Ready,
+        Self::Available,
         Self::Unavailable,
         Self::Running,
         Self::Pending,
@@ -209,6 +211,7 @@ impl StatusFilter {
     pub(super) fn label(self) -> String {
         match self {
             Self::Ready => tr("Ready"),
+            Self::Available => tr("Available"),
             Self::Unavailable => tr("Unavailable"),
             Self::Running => tr("Running"),
             Self::Pending => tr("Pending"),
@@ -237,6 +240,7 @@ impl StatusFilter {
     pub(super) fn keyword(self) -> &'static str {
         match self {
             Self::Ready => "Ready",
+            Self::Available => "Available",
             Self::Unavailable => "Unavailable",
             Self::Running => "Running",
             Self::Pending => "Pending",

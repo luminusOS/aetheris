@@ -686,6 +686,7 @@ impl App {
             }
             AppMsg::ObjectCreated(Ok(name)) => {
                 self.loading = false;
+                self.clear_object_cache();
                 self.create_yaml_dialog.close();
                 self.create_yaml_buffer.set_text("");
                 self.toaster.add_toast(adw::Toast::new(&tr_format(
@@ -722,6 +723,7 @@ impl App {
                     return;
                 }
                 self.loading = false;
+                self.clear_object_cache();
                 self.status = tr_format("Scaled {name}", &[("{name}", detail.name.clone())]);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
@@ -761,6 +763,7 @@ impl App {
                     return;
                 }
                 self.loading = false;
+                self.clear_object_cache();
                 self.status = tr_format("Updated {name}", &[("{name}", detail.name.clone())]);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
@@ -822,6 +825,7 @@ impl App {
                     return;
                 }
                 self.loading = false;
+                self.clear_object_cache();
                 self.status = tr_format("Drained {name}", &[("{name}", detail.name.clone())]);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
@@ -861,6 +865,7 @@ impl App {
                     return;
                 }
                 self.loading = false;
+                self.clear_object_cache();
                 self.status = tr_format("Applied {name}", &[("{name}", detail.name.clone())]);
                 self.populate_detail_dialog(&detail);
                 self.update_log_target_containers(&detail);
@@ -1014,6 +1019,7 @@ impl App {
                     return;
                 }
                 self.loading = false;
+                self.clear_object_cache();
                 self.detail.target = None;
                 self.detail.log_target = None;
                 self.detail.exec_target = None;
@@ -1162,6 +1168,7 @@ impl App {
                 self.loading = false;
                 let count = objects.len();
                 self.objects = objects;
+                self.cache_current_objects();
                 self.set_object_status(count);
                 self.sync_status();
                 self.rebuild_object_list();
@@ -1173,7 +1180,14 @@ impl App {
                 }
                 self.loading = false;
                 self.stop_object_watch();
-                self.objects.clear();
+                if let Some(objects) = self
+                    .current_object_cache_key()
+                    .and_then(|key| self.cached_objects(&key))
+                {
+                    self.objects = objects;
+                } else {
+                    self.objects.clear();
+                }
                 self.status = tr("Unable to list selected resource.");
                 self.sync_status();
                 self.rebuild_object_list();
@@ -1186,14 +1200,17 @@ impl App {
                 match event {
                     ObjectWatchEvent::Restarted(objects) => {
                         self.objects = objects;
+                        self.cache_current_objects();
                         self.schedule_object_list_refresh(&sender);
                     }
                     ObjectWatchEvent::Applied(object) => {
                         self.upsert_object(object);
+                        self.cache_current_objects();
                         self.schedule_object_list_refresh(&sender);
                     }
                     ObjectWatchEvent::Deleted(object) => {
                         self.remove_object(&object);
+                        self.cache_current_objects();
                         self.schedule_object_list_refresh(&sender);
                     }
                     ObjectWatchEvent::Error(error) => {
