@@ -11,8 +11,8 @@ use serde_json::Value;
 use crate::status::{age_label, status_label};
 use crate::{
     ContainerResources, KubeSession, ObjectCondition, ObjectDetail, ObjectSummary,
-    ObjectWatchEvent, PodSummary, ResourceKind, ResourceRatio, ResourceScope, ResourceUsage,
-    api_resource, namespace_scope, resource_scope,
+    ObjectWatchEvent, PodStateCount, PodSummary, ResourceKind, ResourceRatio, ResourceScope,
+    ResourceUsage, api_resource, namespace_scope, resource_scope,
 };
 
 impl KubeSession {
@@ -228,7 +228,7 @@ impl KubeSession {
         };
         let summary = object_summary(object.clone(), resource, &metrics);
         let yaml = serde_yaml::to_string(&object).context("failed to serialize object YAML")?;
-        let related_pods = self
+        let deployment_pods = self
             .deployment_pods(resource, &summary.namespace, &object)
             .await
             .unwrap_or_default();
@@ -253,7 +253,8 @@ impl KubeSession {
             container_resources,
             yaml,
             containers,
-            related_pods,
+            related_pods: deployment_pods.summaries,
+            related_pod_states: deployment_pods.states,
             replicas,
             node_unschedulable,
             conditions,
@@ -267,12 +268,12 @@ impl KubeSession {
         resource: &ResourceKind,
         namespace: &str,
         object: &DynamicObject,
-    ) -> Result<Vec<ObjectSummary>> {
+    ) -> Result<DeploymentPods> {
         if resource.kind != "Deployment" || resource.group != "apps" || namespace == "-" {
-            return Ok(Vec::new());
+            return Ok(DeploymentPods::default());
         }
         let Some(selector) = deployment_label_selector(object) else {
-            return Ok(Vec::new());
+            return Ok(DeploymentPods::default());
         };
 
         let pods: Api<Pod> = Api::namespaced(self.client.clone(), namespace);
@@ -288,7 +289,7 @@ impl KubeSession {
             .resource_metrics(&pod_resource, Some(namespace))
             .await
             .unwrap_or_default();
-        let mut summaries = pods
+        let pods = pods
             .list(&ListParams::default().labels(&selector))
             .await
             .with_context(|| {
@@ -297,7 +298,9 @@ impl KubeSession {
                     object.name_any()
                 )
             })?
-            .items
+            .items;
+        let states = pod_state_counts(&pods);
+        let mut summaries = pods
             .into_iter()
             .map(|pod| {
                 let object = serde_json::to_value(&pod)
@@ -319,8 +322,44 @@ impl KubeSession {
             .collect::<Vec<_>>();
         summaries.sort_by(|left, right| left.name.cmp(&right.name));
 
-        Ok(summaries)
+        Ok(DeploymentPods { summaries, states })
     }
+}
+
+#[derive(Default)]
+struct DeploymentPods {
+    summaries: Vec<ObjectSummary>,
+    states: Vec<PodStateCount>,
+}
+
+fn pod_state_counts(pods: &[Pod]) -> Vec<PodStateCount> {
+    const ORDER: [&str; 5] = ["Running", "Pending", "Succeeded", "Failed", "Unknown"];
+
+    let mut counts = BTreeMap::<String, u32>::new();
+    for pod in pods {
+        let state = pod
+            .status
+            .as_ref()
+            .and_then(|status| status.phase.as_deref())
+            .unwrap_or("Unknown");
+        *counts.entry(state.to_owned()).or_default() += 1;
+    }
+
+    let mut states = ORDER
+        .into_iter()
+        .filter_map(|state| {
+            counts.remove(state).map(|count| PodStateCount {
+                state: state.to_owned(),
+                count,
+            })
+        })
+        .collect::<Vec<_>>();
+    states.extend(
+        counts
+            .into_iter()
+            .map(|(state, count)| PodStateCount { state, count }),
+    );
+    states
 }
 
 fn sort_object_summaries(objects: &mut [ObjectSummary]) {
@@ -651,8 +690,12 @@ fn deployment_label_selector(object: &DynamicObject) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{object_container_resources, object_images, quantity_as_f64, resource_ratio};
+    use super::{
+        object_container_resources, object_images, pod_state_counts, quantity_as_f64,
+        resource_ratio,
+    };
     use crate::{ContainerResources, ResourceKind, ResourceScope};
+    use k8s_openapi::api::core::v1::Pod;
     use kube::api::DynamicObject;
     use serde_json::json;
 
@@ -778,6 +821,40 @@ mod tests {
                     cpu_limit: String::from("-"),
                     memory_request: String::from("-"),
                     memory_limit: String::from("64Mi"),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn pod_state_counts_groups_phases_in_dashboard_order() {
+        let pods: Vec<Pod> = serde_json::from_value(json!([
+            {"apiVersion": "v1", "kind": "Pod", "status": {"phase": "Pending"}},
+            {"apiVersion": "v1", "kind": "Pod", "status": {"phase": "Running"}},
+            {"apiVersion": "v1", "kind": "Pod", "status": {"phase": "Running"}},
+            {"apiVersion": "v1", "kind": "Pod", "status": {"phase": "Failed"}},
+            {"apiVersion": "v1", "kind": "Pod", "status": {}}
+        ]))
+        .expect("pods should deserialize");
+
+        assert_eq!(
+            pod_state_counts(&pods),
+            vec![
+                crate::PodStateCount {
+                    state: String::from("Running"),
+                    count: 2
+                },
+                crate::PodStateCount {
+                    state: String::from("Pending"),
+                    count: 1
+                },
+                crate::PodStateCount {
+                    state: String::from("Failed"),
+                    count: 1
+                },
+                crate::PodStateCount {
+                    state: String::from("Unknown"),
+                    count: 1
                 },
             ]
         );

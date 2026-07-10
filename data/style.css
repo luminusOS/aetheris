@@ -42,6 +42,48 @@
   background-color: alpha(currentColor, 0.10);
 }
 
+.deployment-pod-states {
+  margin-top: 8px;
+}
+
+.pod-state-card {
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+flowbox.deployment-pod-state-grid > flowboxchild,
+flowbox.deployment-pod-state-grid > flowboxchild:hover,
+flowbox.deployment-pod-state-grid > flowboxchild:selected,
+flowbox.deployment-pod-state-grid > flowboxchild:selected:hover {
+  background: transparent;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.pod-state-running {
+  background-color: alpha(@success_color, 0.16);
+  color: @success_color;
+}
+
+.pod-state-pending {
+  background-color: alpha(@warning_color, 0.18);
+  color: @warning_color;
+}
+
+.pod-state-succeeded {
+  background-color: alpha(@accent_color, 0.15);
+  color: @accent_color;
+}
+
+.pod-state-failed {
+  background-color: alpha(@error_color, 0.16);
+  color: @error_color;
+}
+
+.pod-state-unknown {
+  background-color: alpha(currentColor, 0.10);
+}
+
 .status-icon-good {
   color: @success_color;
 }

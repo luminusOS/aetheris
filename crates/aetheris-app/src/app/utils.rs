@@ -296,6 +296,7 @@ pub(super) fn unavailable_object_detail(target: &DetailTarget) -> ObjectDetail {
         yaml: String::new(),
         containers: Vec::new(),
         related_pods: Vec::new(),
+        related_pod_states: Vec::new(),
         replicas: None,
         node_unschedulable: None,
         conditions: Vec::new(),

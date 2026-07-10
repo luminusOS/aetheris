@@ -20,6 +20,6 @@ pub use session::KubeSession;
 pub use types::{
     AddClusterRequest, ClusterSummary, ContainerResources, ContainerUsage, ContextInfo,
     ObjectCondition, ObjectDetail, ObjectEvent, ObjectSummary, ObjectWatchEvent, PodExecEvent,
-    PodExecRequest, PodLogRequest, PodPortForwardEvent, PodPortForwardRequest, PodSummary,
-    ResourceKind, ResourceRatio, ResourceScope, ResourceUsage,
+    PodExecRequest, PodLogRequest, PodPortForwardEvent, PodPortForwardRequest, PodStateCount,
+    PodSummary, ResourceKind, ResourceRatio, ResourceScope, ResourceUsage,
 };

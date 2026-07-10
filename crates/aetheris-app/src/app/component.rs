@@ -374,6 +374,17 @@ impl Component for App {
         detail_conditions_list.set_selection_mode(gtk::SelectionMode::None);
         let (detail_related_pods_view, detail_related_pods_store, detail_related_pods_sorted) =
             super::widgets::related_pods_column_view();
+        let detail_related_pod_states = gtk::FlowBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .column_spacing(8)
+            .row_spacing(8)
+            .max_children_per_line(4)
+            .min_children_per_line(1)
+            .homogeneous(true)
+            .hexpand(true)
+            .build();
+        detail_related_pod_states.add_css_class("deployment-pod-state-grid");
+        let detail_related_pod_states_section = gtk::Box::new(gtk::Orientation::Vertical, 8);
         let detail_related_pods_stack = gtk::Stack::builder()
             .hhomogeneous(false)
             .vhomogeneous(false)
@@ -479,6 +490,8 @@ impl Component for App {
             events_list: &detail_events_list,
             conditions_list: &detail_conditions_list,
             related_pods_view: &detail_related_pods_view,
+            related_pod_states_section: &detail_related_pod_states_section,
+            related_pod_states: &detail_related_pod_states,
             related_pods_stack: &detail_related_pods_stack,
             related_pods_message: &detail_related_pods_message,
             log_container_dropdown: &detail_log_container_dropdown,
@@ -971,6 +984,8 @@ impl Component for App {
                 conditions_list: detail_conditions_list,
                 related_pods_store: detail_related_pods_store,
                 related_pods_sorted: detail_related_pods_sorted,
+                related_pod_states_section: detail_related_pod_states_section,
+                related_pod_states: detail_related_pod_states,
                 related_pods_stack: detail_related_pods_stack,
                 related_pods_message: detail_related_pods_message,
                 log_container_dropdown: detail_log_container_dropdown,
