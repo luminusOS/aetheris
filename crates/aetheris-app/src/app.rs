@@ -6,9 +6,9 @@ use std::{
 
 use aetheris_kube::{
     AddClusterRequest, ClusterSummary, ContainerResources, ContainerUsage, ContextInfo,
-    KubeManager, ObjectCondition, ObjectDetail, ObjectEvent, ObjectSummary, ObjectWatchEvent,
-    PodExecEvent, PodExecRequest, PodLogRequest, PodPortForwardEvent, PodPortForwardRequest,
-    ResourceKind, ResourceUsage,
+    IngressRule, KubeManager, ObjectCondition, ObjectDetail, ObjectEvent, ObjectSummary,
+    ObjectWatchEvent, PodExecEvent, PodExecRequest, PodLogRequest, PodPortForwardEvent,
+    PodPortForwardRequest, ResourceKind, ResourceUsage, ServicePort,
 };
 use futures::FutureExt;
 use futures::future::{AbortHandle, Abortable};
@@ -90,6 +90,9 @@ pub(super) struct DetailPane {
     yaml_buffer: sourceview5::Buffer,
     events_list: gtk::ListBox,
     conditions_list: gtk::ListBox,
+    service_ports_list: gtk::ListBox,
+    service_selectors_list: gtk::ListBox,
+    ingress_rules_list: gtk::ListBox,
     related_pods_store: gtk::gio::ListStore,
     related_pods_sorted: gtk::SortListModel,
     related_pod_states_section: gtk::Box,

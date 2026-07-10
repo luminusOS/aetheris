@@ -372,6 +372,15 @@ impl Component for App {
         let detail_conditions_list = gtk::ListBox::new();
         detail_conditions_list.add_css_class("boxed-list");
         detail_conditions_list.set_selection_mode(gtk::SelectionMode::None);
+        let detail_service_ports_list = gtk::ListBox::new();
+        detail_service_ports_list.add_css_class("boxed-list");
+        detail_service_ports_list.set_selection_mode(gtk::SelectionMode::None);
+        let detail_service_selectors_list = gtk::ListBox::new();
+        detail_service_selectors_list.add_css_class("boxed-list");
+        detail_service_selectors_list.set_selection_mode(gtk::SelectionMode::None);
+        let detail_ingress_rules_list = gtk::ListBox::new();
+        detail_ingress_rules_list.add_css_class("boxed-list");
+        detail_ingress_rules_list.set_selection_mode(gtk::SelectionMode::None);
         let (detail_related_pods_view, detail_related_pods_store, detail_related_pods_sorted) =
             super::widgets::related_pods_column_view();
         let detail_related_pod_states = gtk::FlowBox::builder()
@@ -489,6 +498,9 @@ impl Component for App {
             yaml_error_label: &detail_yaml_error_label,
             events_list: &detail_events_list,
             conditions_list: &detail_conditions_list,
+            service_ports_list: &detail_service_ports_list,
+            service_selectors_list: &detail_service_selectors_list,
+            ingress_rules_list: &detail_ingress_rules_list,
             related_pods_view: &detail_related_pods_view,
             related_pod_states_section: &detail_related_pod_states_section,
             related_pod_states: &detail_related_pod_states,
@@ -982,6 +994,9 @@ impl Component for App {
                 yaml_buffer: detail_yaml_buffer,
                 events_list: detail_events_list,
                 conditions_list: detail_conditions_list,
+                service_ports_list: detail_service_ports_list,
+                service_selectors_list: detail_service_selectors_list,
+                ingress_rules_list: detail_ingress_rules_list,
                 related_pods_store: detail_related_pods_store,
                 related_pods_sorted: detail_related_pods_sorted,
                 related_pod_states_section: detail_related_pod_states_section,

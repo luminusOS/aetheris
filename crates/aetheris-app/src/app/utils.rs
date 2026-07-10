@@ -125,6 +125,14 @@ pub(super) fn supports_metrics(resource: &ResourceKind) -> bool {
     resource.group.is_empty() && matches!(resource.kind.as_str(), "Pod" | "Node")
 }
 
+fn is_service_resource(resource: &ResourceKind) -> bool {
+    resource.group.is_empty() && resource.kind == "Service"
+}
+
+fn is_ingress_resource(resource: &ResourceKind) -> bool {
+    resource.group == "networking.k8s.io" && resource.kind == "Ingress"
+}
+
 /// Columns that make sense to render for `resource` (e.g. "Status" only for
 /// kinds with a ready/desired ratio; "CPU"/"Memory" only for Pods and
 /// Nodes). Shared by the main object list and the related-Pods table in the
@@ -140,6 +148,11 @@ pub(super) fn offerable_columns_for(resource: Option<&ResourceKind>) -> Vec<Obje
                 resource.is_some_and(|resource| resource.group.is_empty() && resource.kind == "Pod")
             }
             ObjectColumn::Namespace => resource.map(ResourceKind::is_namespaced).unwrap_or(true),
+            ObjectColumn::Target => resource.is_some_and(|resource| {
+                is_service_resource(resource) || is_ingress_resource(resource)
+            }),
+            ObjectColumn::Selector => resource.is_some_and(is_service_resource),
+            ObjectColumn::IngressClass => resource.is_some_and(is_ingress_resource),
             ObjectColumn::Status => has_status_ratio,
             ObjectColumn::Cpu | ObjectColumn::Memory => has_metrics,
             _ => true,
@@ -297,6 +310,9 @@ pub(super) fn unavailable_object_detail(target: &DetailTarget) -> ObjectDetail {
         containers: Vec::new(),
         related_pods: Vec::new(),
         related_pod_states: Vec::new(),
+        service_ports: Vec::new(),
+        service_selectors: Vec::new(),
+        ingress_rules: Vec::new(),
         replicas: None,
         node_unschedulable: None,
         conditions: Vec::new(),
@@ -408,5 +424,58 @@ mod tests {
 
         assert!(offerable_columns_for(Some(&pod)).contains(&ObjectColumn::Image));
         assert!(!offerable_columns_for(Some(&deployment)).contains(&ObjectColumn::Image));
+    }
+
+    #[test]
+    fn offerable_columns_show_target_and_selector_only_for_services() {
+        let service = ResourceKind {
+            group: String::new(),
+            version: String::from("v1"),
+            api_version: String::from("v1"),
+            kind: String::from("Service"),
+            plural: String::from("services"),
+            scope: ResourceScope::Namespaced,
+        };
+        let pod = ResourceKind {
+            group: String::new(),
+            version: String::from("v1"),
+            api_version: String::from("v1"),
+            kind: String::from("Pod"),
+            plural: String::from("pods"),
+            scope: ResourceScope::Namespaced,
+        };
+
+        let service_columns = offerable_columns_for(Some(&service));
+        assert!(service_columns.contains(&ObjectColumn::Target));
+        assert!(service_columns.contains(&ObjectColumn::Selector));
+        let pod_columns = offerable_columns_for(Some(&pod));
+        assert!(!pod_columns.contains(&ObjectColumn::Target));
+        assert!(!pod_columns.contains(&ObjectColumn::Selector));
+    }
+
+    #[test]
+    fn offerable_columns_show_target_and_class_only_for_ingresses() {
+        let ingress = ResourceKind {
+            group: String::from("networking.k8s.io"),
+            version: String::from("v1"),
+            api_version: String::from("networking.k8s.io/v1"),
+            kind: String::from("Ingress"),
+            plural: String::from("ingresses"),
+            scope: ResourceScope::Namespaced,
+        };
+        let service = ResourceKind {
+            group: String::new(),
+            version: String::from("v1"),
+            api_version: String::from("v1"),
+            kind: String::from("Service"),
+            plural: String::from("services"),
+            scope: ResourceScope::Namespaced,
+        };
+
+        let ingress_columns = offerable_columns_for(Some(&ingress));
+        assert!(ingress_columns.contains(&ObjectColumn::Target));
+        assert!(ingress_columns.contains(&ObjectColumn::IngressClass));
+        assert!(!ingress_columns.contains(&ObjectColumn::Selector));
+        assert!(!offerable_columns_for(Some(&service)).contains(&ObjectColumn::IngressClass));
     }
 }

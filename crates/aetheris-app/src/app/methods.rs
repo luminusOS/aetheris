@@ -924,6 +924,9 @@ impl App {
         }
         rebuild_detail_events(&self.detail.events_list, detail);
         rebuild_detail_conditions(&self.detail.conditions_list, detail);
+        rebuild_service_ports(&self.detail.service_ports_list, detail);
+        rebuild_service_selectors(&self.detail.service_selectors_list, detail);
+        rebuild_ingress_rules(&self.detail.ingress_rules_list, detail);
         rebuild_related_pods(
             &self.detail.related_pods_store,
             &self.detail.related_pods_stack,
@@ -949,6 +952,8 @@ impl App {
         let show_pods = detail.kind == "Deployment";
         let show_conditions = !detail.conditions.is_empty();
         let show_containers = detail.kind == "Pod";
+        let show_service_tabs = detail.kind == "Service";
+        let show_ingress_rules = detail.kind == "Ingress";
 
         set_stack_page(
             &self.detail.stack,
@@ -975,6 +980,33 @@ impl App {
             &tr_format(
                 "Containers ({count})",
                 &[("{count}", detail.containers.len().to_string())],
+            ),
+        );
+        set_stack_page(
+            &self.detail.stack,
+            "service-ports",
+            show_service_tabs,
+            &tr_format(
+                "Ports ({count})",
+                &[("{count}", detail.service_ports.len().to_string())],
+            ),
+        );
+        set_stack_page(
+            &self.detail.stack,
+            "service-selectors",
+            show_service_tabs,
+            &tr_format(
+                "Selectors ({count})",
+                &[("{count}", detail.service_selectors.len().to_string())],
+            ),
+        );
+        set_stack_page(
+            &self.detail.stack,
+            "ingress-rules",
+            show_ingress_rules,
+            &tr_format(
+                "Rules ({count})",
+                &[("{count}", detail.ingress_rules.len().to_string())],
             ),
         );
         set_stack_page(
