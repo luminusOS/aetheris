@@ -92,6 +92,8 @@ pub(super) struct DetailPane {
     conditions_list: gtk::ListBox,
     related_pods_store: gtk::gio::ListStore,
     related_pods_sorted: gtk::SortListModel,
+    related_pod_states_section: gtk::Box,
+    related_pod_states: gtk::FlowBox,
     related_pods_stack: gtk::Stack,
     related_pods_message: adw::StatusPage,
     log_container_dropdown: gtk::DropDown,

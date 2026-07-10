@@ -81,11 +81,20 @@ pub struct ObjectDetail {
     pub yaml: String,
     pub containers: Vec<String>,
     pub related_pods: Vec<ObjectSummary>,
+    /// Counts of Pods selected by a Deployment, grouped by their Kubernetes
+    /// lifecycle phase (Running, Pending, Succeeded, Failed, or Unknown).
+    pub related_pod_states: Vec<PodStateCount>,
     pub replicas: Option<i32>,
     pub node_unschedulable: Option<bool>,
     pub conditions: Vec<ObjectCondition>,
     pub events: Vec<ObjectEvent>,
     pub events_error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PodStateCount {
+    pub state: String,
+    pub count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

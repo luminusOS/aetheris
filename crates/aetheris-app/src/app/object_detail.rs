@@ -25,6 +25,8 @@ pub(super) struct ObjectDetailWidgets<'a> {
     pub(super) events_list: &'a gtk::ListBox,
     pub(super) conditions_list: &'a gtk::ListBox,
     pub(super) related_pods_view: &'a gtk::ColumnView,
+    pub(super) related_pod_states_section: &'a gtk::Box,
+    pub(super) related_pod_states: &'a gtk::FlowBox,
     pub(super) related_pods_stack: &'a gtk::Stack,
     pub(super) related_pods_message: &'a adw::StatusPage,
     pub(super) log_container_dropdown: &'a gtk::DropDown,
@@ -70,6 +72,17 @@ pub(super) fn build_object_detail_page(widgets: ObjectDetailWidgets<'_>) -> gtk:
     actions.append(widgets.cordon_button);
     actions.append(widgets.drain_button);
     overview.append(&actions);
+
+    widgets
+        .related_pod_states_section
+        .add_css_class("deployment-pod-states");
+    widgets
+        .related_pod_states_section
+        .append(&section_title(&tr("Pods by State")));
+    widgets
+        .related_pod_states_section
+        .append(widgets.related_pod_states);
+    overview.append(widgets.related_pod_states_section);
 
     widgets
         .port_forward_group
@@ -370,6 +383,49 @@ pub(super) fn rebuild_related_pods(
         detail.related_pods.iter().map(boxed_object).collect();
     store.splice(0, store.n_items(), &items);
     stack.set_visible_child_name("table");
+}
+
+pub(super) fn rebuild_related_pod_states(
+    section: &gtk::Box,
+    states: &gtk::FlowBox,
+    detail: &ObjectDetail,
+) {
+    while let Some(child) = states.first_child() {
+        states.remove(&child);
+    }
+
+    section.set_visible(detail.kind == "Deployment" && !detail.related_pod_states.is_empty());
+    for state in &detail.related_pod_states {
+        let card = gtk::Box::new(gtk::Orientation::Vertical, 2);
+        card.add_css_class("pod-state-card");
+        card.add_css_class(pod_state_css_class(&state.state));
+        card.set_hexpand(true);
+        card.set_size_request(170, -1);
+
+        let count = gtk::Label::builder()
+            .label(state.count.to_string())
+            .xalign(0.0)
+            .css_classes(["title-1"])
+            .build();
+        let label = gtk::Label::builder()
+            .label(&state.state)
+            .xalign(0.0)
+            .css_classes(["caption"])
+            .build();
+        card.append(&count);
+        card.append(&label);
+        states.insert(&card, -1);
+    }
+}
+
+fn pod_state_css_class(state: &str) -> &'static str {
+    match state {
+        "Running" => "pod-state-running",
+        "Pending" => "pod-state-pending",
+        "Succeeded" => "pod-state-succeeded",
+        "Failed" => "pod-state-failed",
+        _ => "pod-state-unknown",
+    }
 }
 
 pub(super) fn rebuild_container_metrics(list: &gtk::ListBox, detail: &ObjectDetail) {

@@ -930,6 +930,11 @@ impl App {
             &self.detail.related_pods_message,
             detail,
         );
+        rebuild_related_pod_states(
+            &self.detail.related_pod_states_section,
+            &self.detail.related_pod_states,
+            detail,
+        );
         rebuild_container_metrics(&self.detail.container_metrics_list, detail);
         self.sync_detail_tabs(detail);
         self.sync_terminal_controls();
