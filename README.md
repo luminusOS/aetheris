@@ -60,3 +60,8 @@ scale, cordon, drain, and port forwarding.
 [Libadwaita](https://gitlab.gnome.org/GNOME/libadwaita) ·
 [Relm4](https://relm4.org/) · [kube-rs](https://kube.rs/) ·
 [GtkSourceView](https://gitlab.gnome.org/GNOME/gtksourceview) · [VTE](https://gitlab.gnome.org/GNOME/vte)
+
+## Acknowledgements
+
+Aetheris was inspired by and exists thanks to
+[Seabird](https://github.com/getseabird/seabird).
