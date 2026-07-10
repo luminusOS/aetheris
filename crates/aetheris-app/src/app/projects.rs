@@ -80,6 +80,9 @@ pub(super) enum StatusFilter {
 pub(crate) enum ObjectColumn {
     Image,
     Namespace,
+    Target,
+    Selector,
+    IngressClass,
     Status,
     Cpu,
     Memory,
@@ -158,9 +161,12 @@ impl ObjectFavorite {
 }
 
 impl ObjectColumn {
-    pub(super) const ALL: [Self; 7] = [
+    pub(super) const ALL: [Self; 10] = [
         Self::Image,
         Self::Namespace,
+        Self::Target,
+        Self::Selector,
+        Self::IngressClass,
         Self::Status,
         Self::Cpu,
         Self::Memory,
@@ -172,6 +178,9 @@ impl ObjectColumn {
         match self {
             Self::Image => tr("Image"),
             Self::Namespace => tr("Namespace"),
+            Self::Target => tr("Target"),
+            Self::Selector => tr("Selector"),
+            Self::IngressClass => tr("Ingress Class"),
             Self::Status => tr("Status"),
             Self::Cpu => tr("CPU"),
             Self::Memory => tr("Memory"),
@@ -184,6 +193,9 @@ impl ObjectColumn {
         match self {
             Self::Image => OBJECT_IMAGE_WIDTH,
             Self::Namespace => OBJECT_NAMESPACE_WIDTH,
+            Self::Target => 156,
+            Self::Selector => 180,
+            Self::IngressClass => 144,
             Self::Status => OBJECT_STATUS_WIDTH,
             Self::Cpu | Self::Memory => OBJECT_METRIC_WIDTH,
             Self::Api => OBJECT_API_WIDTH,
@@ -196,7 +208,7 @@ pub(super) fn default_object_columns() -> Vec<ObjectColumn> {
     ObjectColumn::ALL.to_vec()
 }
 
-const OBJECT_COLUMN_SCHEMA_VERSION: u32 = 1;
+const OBJECT_COLUMN_SCHEMA_VERSION: u32 = 3;
 
 impl StatusFilter {
     pub(super) const ALL: [Self; 6] = [
@@ -552,6 +564,13 @@ impl ProjectStore {
             && !self.visible_object_columns.contains(&ObjectColumn::Image)
         {
             self.visible_object_columns.push(ObjectColumn::Image);
+        }
+        if self.object_column_schema_version < 2 {
+            self.visible_object_columns
+                .extend([ObjectColumn::Target, ObjectColumn::Selector]);
+        }
+        if self.object_column_schema_version < 3 {
+            self.visible_object_columns.push(ObjectColumn::IngressClass);
         }
         self.object_column_schema_version = OBJECT_COLUMN_SCHEMA_VERSION;
     }

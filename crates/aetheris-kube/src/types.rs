@@ -63,6 +63,16 @@ pub struct ObjectSummary {
     pub age: String,
     #[serde(default)]
     pub images: Vec<String>,
+    /// Service-only summary values. Empty for other resource kinds.
+    #[serde(default)]
+    pub service_target: String,
+    #[serde(default)]
+    pub service_selector: String,
+    /// Ingress-only summary values. Empty for other resource kinds.
+    #[serde(default)]
+    pub ingress_target: String,
+    #[serde(default)]
+    pub ingress_class: String,
     pub metrics: Option<ResourceUsage>,
 }
 
@@ -84,6 +94,12 @@ pub struct ObjectDetail {
     /// Counts of Pods selected by a Deployment, grouped by their Kubernetes
     /// lifecycle phase (Running, Pending, Succeeded, Failed, or Unknown).
     pub related_pod_states: Vec<PodStateCount>,
+    #[serde(default)]
+    pub service_ports: Vec<ServicePort>,
+    #[serde(default)]
+    pub service_selectors: Vec<ServiceSelector>,
+    #[serde(default)]
+    pub ingress_rules: Vec<IngressRule>,
     pub replicas: Option<i32>,
     pub node_unschedulable: Option<bool>,
     pub conditions: Vec<ObjectCondition>,
@@ -95,6 +111,30 @@ pub struct ObjectDetail {
 pub struct PodStateCount {
     pub state: String,
     pub count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ServicePort {
+    pub name: String,
+    pub protocol: String,
+    pub port: String,
+    pub target_port: String,
+    pub node_port: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ServiceSelector {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IngressRule {
+    pub host: String,
+    pub path: String,
+    pub path_type: String,
+    pub service: String,
+    pub port: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

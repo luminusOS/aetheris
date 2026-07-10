@@ -19,7 +19,8 @@ pub use manager::KubeManager;
 pub use session::KubeSession;
 pub use types::{
     AddClusterRequest, ClusterSummary, ContainerResources, ContainerUsage, ContextInfo,
-    ObjectCondition, ObjectDetail, ObjectEvent, ObjectSummary, ObjectWatchEvent, PodExecEvent,
-    PodExecRequest, PodLogRequest, PodPortForwardEvent, PodPortForwardRequest, PodStateCount,
-    PodSummary, ResourceKind, ResourceRatio, ResourceScope, ResourceUsage,
+    IngressRule, ObjectCondition, ObjectDetail, ObjectEvent, ObjectSummary, ObjectWatchEvent,
+    PodExecEvent, PodExecRequest, PodLogRequest, PodPortForwardEvent, PodPortForwardRequest,
+    PodStateCount, PodSummary, ResourceKind, ResourceRatio, ResourceScope, ResourceUsage,
+    ServicePort, ServiceSelector,
 };

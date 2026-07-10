@@ -10,9 +10,9 @@ use serde_json::Value;
 
 use crate::status::{age_label, status_label};
 use crate::{
-    ContainerResources, KubeSession, ObjectCondition, ObjectDetail, ObjectSummary,
+    ContainerResources, IngressRule, KubeSession, ObjectCondition, ObjectDetail, ObjectSummary,
     ObjectWatchEvent, PodStateCount, PodSummary, ResourceKind, ResourceRatio, ResourceScope,
-    ResourceUsage, api_resource, namespace_scope, resource_scope,
+    ResourceUsage, ServicePort, ServiceSelector, api_resource, namespace_scope, resource_scope,
 };
 
 impl KubeSession {
@@ -232,6 +232,8 @@ impl KubeSession {
             .deployment_pods(resource, &summary.namespace, &object)
             .await
             .unwrap_or_default();
+        let (service_ports, service_selectors) = service_details(&object, resource);
+        let ingress_rules = ingress_rules(&object, resource);
         let events = self
             .object_events(resource, &summary.namespace, name)
             .await
@@ -255,6 +257,9 @@ impl KubeSession {
             containers,
             related_pods: deployment_pods.summaries,
             related_pod_states: deployment_pods.states,
+            service_ports,
+            service_selectors,
+            ingress_rules,
             replicas,
             node_unschedulable,
             conditions,
@@ -316,6 +321,10 @@ impl KubeSession {
                         api_version: String::from("v1"),
                         age: String::from("-"),
                         images: Vec::new(),
+                        service_target: String::new(),
+                        service_selector: String::new(),
+                        ingress_target: String::new(),
+                        ingress_class: String::new(),
                         metrics: None,
                     })
             })
@@ -452,7 +461,193 @@ fn object_summary(
         api_version: resource.api_version.clone(),
         age,
         images: object_images(&object, resource),
+        service_target: service_target(&object, resource),
+        service_selector: service_selector(&object, resource),
+        ingress_target: ingress_target(&object, resource),
+        ingress_class: ingress_class(&object, resource),
     }
+}
+
+fn is_ingress(resource: &ResourceKind) -> bool {
+    resource.group == "networking.k8s.io" && resource.kind == "Ingress"
+}
+
+fn ingress_target(object: &DynamicObject, resource: &ResourceKind) -> String {
+    ingress_rules(object, resource)
+        .into_iter()
+        .map(|rule| {
+            format!(
+                "{}{} → {}:{}",
+                rule.host, rule.path, rule.service, rule.port
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn ingress_class(object: &DynamicObject, resource: &ResourceKind) -> String {
+    if !is_ingress(resource) {
+        return String::new();
+    }
+
+    object
+        .data
+        .get("spec")
+        .and_then(|spec| spec.get("ingressClassName"))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned()
+}
+
+fn ingress_rules(object: &DynamicObject, resource: &ResourceKind) -> Vec<IngressRule> {
+    if !is_ingress(resource) {
+        return Vec::new();
+    }
+
+    let Some(spec) = object.data.get("spec") else {
+        return Vec::new();
+    };
+    let mut rules = Vec::new();
+    if let Some(backend) = spec.get("defaultBackend")
+        && let Some(rule) = ingress_rule_from_backend(backend, "*", "/", "Default")
+    {
+        rules.push(rule);
+    }
+    if let Some(ingress_rules) = spec.get("rules").and_then(Value::as_array) {
+        for rule in ingress_rules {
+            let host = rule.get("host").and_then(Value::as_str).unwrap_or("*");
+            let Some(paths) = rule
+                .get("http")
+                .and_then(|http| http.get("paths"))
+                .and_then(Value::as_array)
+            else {
+                continue;
+            };
+            for path in paths {
+                let path_value = path.get("path").and_then(Value::as_str).unwrap_or("/");
+                let path_type = path
+                    .get("pathType")
+                    .and_then(Value::as_str)
+                    .unwrap_or("ImplementationSpecific");
+                if let Some(rule) = path.get("backend").and_then(|backend| {
+                    ingress_rule_from_backend(backend, host, path_value, path_type)
+                }) {
+                    rules.push(rule);
+                }
+            }
+        }
+    }
+    rules
+}
+
+fn ingress_rule_from_backend(
+    backend: &Value,
+    host: &str,
+    path: &str,
+    path_type: &str,
+) -> Option<IngressRule> {
+    let service = backend.get("service")?;
+    let service_name = service.get("name").and_then(Value::as_str)?;
+    let port = service.get("port")?;
+    let port = value_string(port.get("name")).or_else(|| value_string(port.get("number")))?;
+    Some(IngressRule {
+        host: host.to_owned(),
+        path: path.to_owned(),
+        path_type: path_type.to_owned(),
+        service: service_name.to_owned(),
+        port,
+    })
+}
+
+fn service_target(object: &DynamicObject, resource: &ResourceKind) -> String {
+    service_ports(object, resource)
+        .into_iter()
+        .map(|port| format!("{}:{}/{}", port.port, port.target_port, port.protocol))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn service_selector(object: &DynamicObject, resource: &ResourceKind) -> String {
+    service_selectors(object, resource)
+        .into_iter()
+        .map(|selector| format!("{}={}", selector.key, selector.value))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn service_details(
+    object: &DynamicObject,
+    resource: &ResourceKind,
+) -> (Vec<ServicePort>, Vec<ServiceSelector>) {
+    (
+        service_ports(object, resource),
+        service_selectors(object, resource),
+    )
+}
+
+fn service_ports(object: &DynamicObject, resource: &ResourceKind) -> Vec<ServicePort> {
+    if resource.kind != "Service" || !resource.group.is_empty() {
+        return Vec::new();
+    }
+
+    object
+        .data
+        .get("spec")
+        .and_then(|spec| spec.get("ports"))
+        .and_then(Value::as_array)
+        .map(|ports| {
+            ports
+                .iter()
+                .filter_map(|port| {
+                    let port_number = value_string(port.get("port"))?;
+                    let target_port =
+                        value_string(port.get("targetPort")).unwrap_or_else(|| port_number.clone());
+                    Some(ServicePort {
+                        name: value_string(port.get("name")).unwrap_or_default(),
+                        protocol: value_string(port.get("protocol"))
+                            .unwrap_or_else(|| String::from("TCP")),
+                        port: port_number,
+                        target_port,
+                        node_port: value_string(port.get("nodePort")),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn service_selectors(object: &DynamicObject, resource: &ResourceKind) -> Vec<ServiceSelector> {
+    if resource.kind != "Service" || !resource.group.is_empty() {
+        return Vec::new();
+    }
+
+    let mut selectors = object
+        .data
+        .get("spec")
+        .and_then(|spec| spec.get("selector"))
+        .and_then(Value::as_object)
+        .map(|selectors| {
+            selectors
+                .iter()
+                .filter_map(|(key, value)| {
+                    value_string(Some(value)).map(|value| ServiceSelector {
+                        key: key.clone(),
+                        value,
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    selectors.sort_by(|left, right| left.key.cmp(&right.key));
+    selectors
+}
+
+fn value_string(value: Option<&Value>) -> Option<String> {
+    value.and_then(|value| match value {
+        Value::String(value) => Some(value.clone()),
+        Value::Number(value) => Some(value.to_string()),
+        _ => None,
+    })
 }
 
 fn attach_resource_ratios(
@@ -691,10 +886,13 @@ fn deployment_label_selector(object: &DynamicObject) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        object_container_resources, object_images, pod_state_counts, quantity_as_f64,
-        resource_ratio,
+        ingress_class, ingress_rules, ingress_target, object_container_resources, object_images,
+        pod_state_counts, quantity_as_f64, resource_ratio, service_details, service_selector,
+        service_target,
     };
-    use crate::{ContainerResources, ResourceKind, ResourceScope};
+    use crate::{
+        ContainerResources, IngressRule, ResourceKind, ResourceScope, ServicePort, ServiceSelector,
+    };
     use k8s_openapi::api::core::v1::Pod;
     use kube::api::DynamicObject;
     use serde_json::json;
@@ -857,6 +1055,139 @@ mod tests {
                     count: 1
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn service_details_extract_ports_targets_and_sorted_selectors() {
+        let service: DynamicObject = serde_json::from_value(json!({
+            "apiVersion": "v1",
+            "kind": "Service",
+            "spec": {
+                "selector": {"tier": "frontend", "app": "web"},
+                "ports": [
+                    {"name": "http", "port": 80, "targetPort": 8080, "protocol": "TCP"},
+                    {"name": "metrics", "port": 9090, "targetPort": "metrics", "protocol": "TCP", "nodePort": 32090}
+                ]
+            }
+        }))
+        .expect("service should deserialize");
+        let resource = ResourceKind {
+            group: String::new(),
+            version: String::from("v1"),
+            api_version: String::from("v1"),
+            kind: String::from("Service"),
+            plural: String::from("services"),
+            scope: ResourceScope::Namespaced,
+        };
+
+        let (ports, selectors) = service_details(&service, &resource);
+        assert_eq!(
+            ports,
+            vec![
+                ServicePort {
+                    name: String::from("http"),
+                    protocol: String::from("TCP"),
+                    port: String::from("80"),
+                    target_port: String::from("8080"),
+                    node_port: None,
+                },
+                ServicePort {
+                    name: String::from("metrics"),
+                    protocol: String::from("TCP"),
+                    port: String::from("9090"),
+                    target_port: String::from("metrics"),
+                    node_port: Some(String::from("32090")),
+                },
+            ]
+        );
+        assert_eq!(
+            selectors,
+            vec![
+                ServiceSelector {
+                    key: String::from("app"),
+                    value: String::from("web")
+                },
+                ServiceSelector {
+                    key: String::from("tier"),
+                    value: String::from("frontend")
+                },
+            ]
+        );
+        assert_eq!(
+            service_target(&service, &resource),
+            "80:8080/TCP, 9090:metrics/TCP"
+        );
+        assert_eq!(
+            service_selector(&service, &resource),
+            "app=web, tier=frontend"
+        );
+    }
+
+    #[test]
+    fn ingress_rules_extract_targets_and_ingress_class() {
+        let ingress: DynamicObject = serde_json::from_value(json!({
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "Ingress",
+            "spec": {
+                "ingressClassName": "nginx",
+                "defaultBackend": {
+                    "service": {"name": "fallback", "port": {"number": 80}}
+                },
+                "rules": [{
+                    "host": "app.example.com",
+                    "http": {"paths": [{
+                        "path": "/api",
+                        "pathType": "Prefix",
+                        "backend": {"service": {"name": "api", "port": {"number": 8080}}}
+                    }, {
+                        "path": "/metrics",
+                        "pathType": "Exact",
+                        "backend": {"service": {"name": "metrics", "port": {"name": "http"}}}
+                    }]}
+                }]
+            }
+        }))
+        .expect("ingress should deserialize");
+        let resource = ResourceKind {
+            group: String::from("networking.k8s.io"),
+            version: String::from("v1"),
+            api_version: String::from("networking.k8s.io/v1"),
+            kind: String::from("Ingress"),
+            plural: String::from("ingresses"),
+            scope: ResourceScope::Namespaced,
+        };
+
+        assert_eq!(ingress_class(&ingress, &resource), "nginx");
+        assert_eq!(
+            ingress_rules(&ingress, &resource),
+            vec![
+                IngressRule {
+                    host: String::from("*"),
+                    path: String::from("/"),
+                    path_type: String::from("Default"),
+                    service: String::from("fallback"),
+                    port: String::from("80"),
+                },
+                IngressRule {
+                    host: String::from("app.example.com"),
+                    path: String::from("/api"),
+                    path_type: String::from("Prefix"),
+                    service: String::from("api"),
+                    port: String::from("8080"),
+                },
+                IngressRule {
+                    host: String::from("app.example.com"),
+                    path: String::from("/metrics"),
+                    path_type: String::from("Exact"),
+                    service: String::from("metrics"),
+                    port: String::from("http"),
+                },
+            ]
+        );
+        assert_eq!(
+            ingress_target(&ingress, &resource),
+            "*/ → fallback:80, app.example.com/api → api:8080, app.example.com/metrics → metrics:http"
         );
     }
 }

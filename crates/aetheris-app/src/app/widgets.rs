@@ -806,6 +806,21 @@ pub(super) fn object_column_sorter(column: ObjectColumn) -> Option<gtk::CustomSo
                 .cmp(&b.namespace)
                 .then_with(|| a.name.cmp(&b.name))
         })),
+        ObjectColumn::Target => Some(summary_sorter(|a, b| {
+            a.service_target
+                .cmp(&b.service_target)
+                .then_with(|| a.name.cmp(&b.name))
+        })),
+        ObjectColumn::Selector => Some(summary_sorter(|a, b| {
+            a.service_selector
+                .cmp(&b.service_selector)
+                .then_with(|| a.name.cmp(&b.name))
+        })),
+        ObjectColumn::IngressClass => Some(summary_sorter(|a, b| {
+            a.ingress_class
+                .cmp(&b.ingress_class)
+                .then_with(|| a.name.cmp(&b.name))
+        })),
         ObjectColumn::Cpu | ObjectColumn::Memory => Some(summary_sorter(move |a, b| {
             // Usage percentage is the primary key; raw quantity only breaks
             // ties among objects with no percentage (no requests set), and
@@ -976,6 +991,22 @@ pub(super) fn object_data_column_factory(column: ObjectColumn) -> gtk::SignalLis
                 let object = boxed.borrow::<ObjectSummary>();
                 let (text, tooltip) = match column {
                     ObjectColumn::Namespace => (object.namespace.clone(), None),
+                    ObjectColumn::Target => {
+                        let target = object_target(&object);
+                        (
+                            target.to_owned(),
+                            (!target.is_empty()).then(|| target.to_owned()),
+                        )
+                    }
+                    ObjectColumn::Selector => (
+                        object.service_selector.clone(),
+                        (!object.service_selector.is_empty())
+                            .then(|| object.service_selector.clone()),
+                    ),
+                    ObjectColumn::IngressClass => (
+                        object.ingress_class.clone(),
+                        (!object.ingress_class.is_empty()).then(|| object.ingress_class.clone()),
+                    ),
                     ObjectColumn::Image => {
                         let Some(main_image) = super::utils::pod_main_image(&object.images) else {
                             return;
@@ -1014,6 +1045,14 @@ pub(super) fn object_data_column_factory(column: ObjectColumn) -> gtk::SignalLis
         }
     }
     factory
+}
+
+fn object_target(object: &ObjectSummary) -> &str {
+    if object.service_target.is_empty() {
+        &object.ingress_target
+    } else {
+        &object.service_target
+    }
 }
 
 /// Whether a status string is actual information rather than the "no
