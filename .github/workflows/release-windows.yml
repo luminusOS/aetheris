@@ -60,7 +60,6 @@ jobs:
             mingw-w64-clang-x86_64-gtk4
             mingw-w64-clang-x86_64-gtksourceview5
             mingw-w64-clang-x86_64-libadwaita
-            mingw-w64-clang-x86_64-imagemagick
             mingw-w64-clang-x86_64-openssl
             mingw-w64-clang-x86_64-pkg-config
             mingw-w64-clang-x86_64-toolchain
@@ -117,18 +116,6 @@ jobs:
           cp /clang64/ssl/certs/ca-bundle.crt "$bundle/ssl/certs/" 2>/dev/null || true
           cp /clang64/etc/ssl/certs/ca-bundle.crt "$bundle/ssl/certs/" 2>/dev/null || true
 
-          cat > "$bundle/aetheris.bat" <<'EOF'
-          @echo off
-          set "AETHERIS_DIR=%~dp0"
-          set "PATH=%AETHERIS_DIR%bin;%PATH%"
-          set "XDG_DATA_DIRS=%AETHERIS_DIR%share"
-          set "GSETTINGS_SCHEMA_DIR=%AETHERIS_DIR%share\glib-2.0\schemas"
-          set "GDK_PIXBUF_MODULEDIR=%AETHERIS_DIR%lib\gdk-pixbuf-2.0\2.10.0\loaders"
-          set "GIO_MODULE_DIR=%AETHERIS_DIR%lib\gio\modules"
-          set "SSL_CERT_FILE=%AETHERIS_DIR%ssl\certs\ca-bundle.crt"
-          "%AETHERIS_DIR%bin\aetheris.exe" %*
-          EOF
-
           (
             cd target/windows
             zip -r "../../dist/${{ steps.names.outputs.windows_name }}" aetheris
@@ -144,18 +131,9 @@ jobs:
         shell: msys2 {0}
         run: |
           set -euo pipefail
-          mkdir -p target/windows
-          magick \
-            data/icons/hicolor/64x64/apps/org.luminusos.Aetheris.png \
-            data/icons/hicolor/128x128/apps/org.luminusos.Aetheris.png \
-            data/icons/hicolor/256x256/apps/org.luminusos.Aetheris.png \
-            data/icons/hicolor/512x512/apps/org.luminusos.Aetheris.png \
-            target/windows/aetheris.ico
-          cp target/windows/aetheris.ico target/windows/aetheris/aetheris.ico
-
           source_dir="$(cygpath -w "$(pwd)/target/windows/aetheris")"
           output_dir="$(cygpath -w "$(pwd)/dist")"
-          setup_icon_file="$(cygpath -w "$(pwd)/target/windows/aetheris.ico")"
+          setup_icon_file="$(cygpath -w "$(pwd)/data/icons/windows/aetheris.ico")"
           inno_script="$(cygpath -w "$(pwd)/build-aux/inno/aetheris.iss")"
 
           MSYS2_ARG_CONV_EXCL='*' iscc \

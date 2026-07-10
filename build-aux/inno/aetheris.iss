@@ -32,7 +32,7 @@ AppSupportURL=https://github.com/luminusOS/aetheris/issues
 AppUpdatesURL=https://github.com/luminusOS/aetheris/releases
 DefaultDirName={localappdata}\Programs\Aetheris
 DefaultGroupName=Aetheris
-UninstallDisplayIcon={app}\aetheris.ico
+UninstallDisplayIcon={app}\bin\aetheris.exe
 OutputDir={#OutputDir}
 OutputBaseFilename=aetheris-setup
 Compression=lzma2/ultra64
@@ -66,9 +66,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Aetheris"; Filename: "{app}\aetheris.bat"; IconFilename: "{app}\aetheris.ico"
+Name: "{group}\Aetheris"; Filename: "{app}\bin\aetheris.exe"
 Name: "{group}\Uninstall Aetheris"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Aetheris"; Filename: "{app}\aetheris.bat"; IconFilename: "{app}\aetheris.ico"; Tasks: desktopicon
+Name: "{autodesktop}\Aetheris"; Filename: "{app}\bin\aetheris.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\aetheris.bat"; Description: "Launch Aetheris"; Flags: nowait postinstall skipifnotsilent
+Filename: "{app}\bin\aetheris.exe"; Description: "Launch Aetheris"; Flags: nowait postinstall skipifnotsilent

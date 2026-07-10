@@ -15,10 +15,6 @@ pub(super) fn setup_log_highlighting(buffer: &gtk::TextBuffer) {
     ensure_text_tag(buffer, "ansi-fg-white", &[("foreground", &"#f6f5f4")]);
 }
 
-/// Appends `line` to `buffer`, translating ANSI SGR color/bold escape
-/// codes (the ones frameworks like Logback/Spring Boot emit for console
-/// output) into GTK text tags instead of leaving the raw escape bytes in
-/// the log text.
 pub(super) fn insert_ansi_line(buffer: &gtk::TextBuffer, line: &str) {
     let mut iter = buffer.end_iter();
     for (text, tags) in parse_ansi_line(line) {
@@ -33,8 +29,6 @@ pub(super) fn insert_ansi_line(buffer: &gtk::TextBuffer, line: &str) {
     }
 }
 
-/// Splits `line` into (text, active-tag-names) segments, dropping the
-/// escape sequences themselves from the text.
 fn parse_ansi_line(line: &str) -> Vec<(String, Vec<&'static str>)> {
     let mut segments = Vec::new();
     let mut current_text = String::new();
@@ -46,7 +40,7 @@ fn parse_ansi_line(line: &str) -> Vec<(String, Vec<&'static str>)> {
             current_text.push(ch);
             continue;
         }
-        chars.next(); // consume '['
+        chars.next();
 
         let mut code = String::new();
         let mut terminator = None;
