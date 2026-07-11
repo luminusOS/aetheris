@@ -3,16 +3,16 @@ use super::commands::*;
 use super::dialogs::*;
 use super::layout::*;
 use super::object_detail::*;
-use super::widgets::{
-    rebuild_column_filter_list, rebuild_status_filter_list, selector_button_child, selector_popover,
-};
+use super::widgets::{rebuild_column_filter_list, rebuild_status_filter_list};
 use super::yaml::*;
 use super::*;
 
 mod detail_signals;
+mod namespaces;
 mod projects;
 mod window_actions;
 use detail_signals::{DetailSignalWidgets, connect_detail_signals};
+use namespaces::NamespacesWidgets;
 use projects::ProjectsWidgets;
 
 #[relm4::component(pub)]
@@ -105,27 +105,17 @@ impl Component for App {
             .build();
         clusters_empty_page.set_child(Some(&clusters_empty_add_button));
         let clusters_content_stack = gtk::Stack::new();
-        let namespace_selector_label = gtk::Label::new(Some("default"));
-        let namespace_menu_button = gtk::MenuButton::new();
-        namespace_menu_button.set_size_request(170, -1);
-        namespace_menu_button.set_child(Some(&selector_button_child(&namespace_selector_label)));
-        let namespace_list = gtk::ListBox::new();
-        namespace_menu_button.set_popover(Some(&selector_popover(&namespace_list)));
-        let custom_namespace_entry = adw::EntryRow::builder()
-            .title(tr("Namespace"))
-            .hexpand(true)
-            .build();
-        let custom_namespace_button = gtk::Button::builder()
-            .label(tr("Use"))
-            .tooltip_text(tr("Use and save this namespace"))
-            .build();
-        custom_namespace_button.add_css_class("suggested-action");
-        let rename_namespace_entry = adw::EntryRow::builder()
-            .title(tr("Namespace"))
-            .hexpand(true)
-            .build();
-        let rename_namespace_button = gtk::Button::builder().label(tr("Rename")).build();
-        rename_namespace_button.add_css_class("suggested-action");
+        let NamespacesWidgets {
+            namespace_menu_button,
+            namespace_selector_label,
+            namespace_list,
+            custom_namespace_entry,
+            custom_namespace_button,
+            custom_namespace_dialog,
+            rename_namespace_entry,
+            rename_namespace_button,
+            rename_namespace_dialog,
+        } = namespaces::build(&sender);
         // width-chars is the entry's *minimum* width and the header bar
         // passes it straight up to the window: at 28 chars the whole content
         // pane bottomed out around 589px and the window refused to shrink
@@ -520,10 +510,6 @@ impl Component for App {
         let cluster_token_back_button = gtk::Button::builder()
             .icon_name("go-previous-symbolic")
             .build();
-        let custom_namespace_dialog =
-            build_custom_namespace_dialog(&custom_namespace_entry, &custom_namespace_button);
-        let rename_namespace_dialog =
-            build_rename_namespace_dialog(&rename_namespace_entry, &rename_namespace_button);
         let create_yaml_buffer = sourceview5::Buffer::new(None);
         let create_yaml_error_label = gtk::Label::new(None);
         setup_yaml_buffer(&create_yaml_buffer, &create_yaml_error_label);
@@ -679,26 +665,6 @@ impl Component for App {
         cluster_refresh_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::RefreshClusters)
-        });
-        namespace_list.connect_row_activated({
-            let sender = sender.clone();
-            move |_, row| sender.input(AppMsg::NamespaceChanged(row.index() as u32))
-        });
-        custom_namespace_entry.connect_entry_activated({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::CustomNamespaceEntered)
-        });
-        custom_namespace_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::CustomNamespaceEntered)
-        });
-        rename_namespace_entry.connect_entry_activated({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::RenameNamespaceConfirmed)
-        });
-        rename_namespace_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::RenameNamespaceConfirmed)
         });
         status_filter_list.connect_child_activated({
             let sender = sender.clone();
