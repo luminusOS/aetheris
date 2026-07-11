@@ -80,7 +80,7 @@ cargo test --workspace
   - `metrics.rs`, `events.rs`, `cluster.rs`, `status.rs` — supporting domain behavior.
 - `crates/aetheris-app/` — Relm4/GTK4/Libadwaita application.
   - `app.rs` — component state and message definitions.
-  - `app/component.rs` + `component/detail_signals.rs` — widget construction (`init`) and signal wiring; detail-page button wiring lives in `detail_signals.rs`.
+  - `app/component.rs` — window shell assembly (`init`: CSS, the 6 domain builders below, split-view/breakpoint setup, page registration) and the `App{}` model literal; widget construction + signal wiring per GTK domain lives in `component/{window_actions,projects,namespaces,clusters,object_table,detail_pane}.rs` (each exposes a `build(sender)` returning an owned `*Widgets` struct — or `(DetailPane, gtk::Box)` for `detail_pane` — that `init` destructures back into identically-named locals, so the `App{}` literal never needs to change).
   - `app/handler.rs` — `AppMsg` dispatch (`handle_msg`'s match); each arm's body is a one-line call into `handler/{cluster,project,namespace,object_list,mutations,nodes,logs,exec,port_forward}.rs`, one file per message domain.
   - `app/methods.rs` — just `mod` declarations; state helpers live in `methods/{navigation,clusters,namespaces,object_cache,detail,sync,persistence,objects}.rs`, one `impl App` block per concern.
   - `app/widgets.rs` — re-exports; widget builders live in `widgets/{filters,cluster,rows,classify,table,logs}.rs` by concern.
