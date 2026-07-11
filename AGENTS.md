@@ -86,9 +86,11 @@ cargo test --workspace
   - `app/widgets.rs` — re-exports; widget builders live in `widgets/{filters,cluster,rows,classify,table,logs}.rs` by concern.
   - `app/layout.rs`, `app/dialogs.rs` — UI builders.
   - `app/object_detail.rs` + `object_detail/{events,network,pods}.rs` — detail-pane UI builders, split by section.
-  - `app/commands.rs`, `app/streams.rs` — async command bridges to `aetheris-kube`.
+  - `app/commands.rs` — async command bridges to `aetheris-kube`.
+  - `app/streams.rs` — just `mod` declarations; streaming state lives in `streams/{object_watch,logs,exec,port_forward,yaml_explanation}.rs`, one `impl App` block per concern.
   - `app/projects.rs` — re-exports + shared type/struct definitions; `ProjectStore`/`Project`/`ObjectFavorite`/`ObjectColumn`/`StatusFilter`/`ResourceSection` impls (and their colocated tests) live in `projects/{store,project,favorite,column,status_filter,resource_section}.rs`.
-  - `app/yaml.rs`, `app/ansi.rs`, `app/utils.rs` — focused helpers.
+  - `app/yaml.rs` — re-exports; the YAML editor (buffer/view/search) lives in `yaml/editor.rs`, the "explain this manifest" generator lives in `yaml/explain.rs` — two unrelated features that used to share one file.
+  - `app/ansi.rs`, `app/utils.rs` — focused helpers.
   - `crates/aetheris-kube/src/objects.rs` + `objects/{ingress,resources,services,summaries}.rs` — object discovery/detail, split by resource concern.
 - `data/` — desktop file, AppStream metadata, icons.
 - `build-aux/` — Flatpak manifest.
