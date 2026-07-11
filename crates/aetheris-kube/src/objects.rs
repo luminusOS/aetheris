@@ -8,11 +8,23 @@ use kube::runtime::watcher::{Event as WatcherEvent, watcher};
 use kube::{Api, ResourceExt};
 use serde_json::Value;
 
-use crate::status::{age_label, status_label};
 use crate::{
-    ContainerResources, IngressRule, KubeSession, ObjectCondition, ObjectDetail, ObjectSummary,
-    ObjectWatchEvent, PodStateCount, PodSummary, ResourceKind, ResourceRatio, ResourceScope,
-    ResourceUsage, ServicePort, ServiceSelector, api_resource, namespace_scope, resource_scope,
+    ContainerResources, KubeSession, ObjectCondition, ObjectDetail, ObjectSummary,
+    ObjectWatchEvent, PodStateCount, PodSummary, ResourceKind, ResourceScope, api_resource,
+    namespace_scope, resource_scope,
+};
+
+mod ingress;
+mod resources;
+mod services;
+mod summaries;
+
+use ingress::ingress_rules;
+pub(crate) use resources::quantity_as_f64;
+use services::service_details;
+use summaries::{
+    object_key, object_summaries, object_summary, pod_state_counts, pod_summary,
+    sort_object_summaries, supports_metrics,
 };
 
 impl KubeSession {
@@ -341,411 +353,6 @@ struct DeploymentPods {
     states: Vec<PodStateCount>,
 }
 
-fn pod_state_counts(pods: &[Pod]) -> Vec<PodStateCount> {
-    const ORDER: [&str; 5] = ["Running", "Pending", "Succeeded", "Failed", "Unknown"];
-
-    let mut counts = BTreeMap::<String, u32>::new();
-    for pod in pods {
-        let state = pod
-            .status
-            .as_ref()
-            .and_then(|status| status.phase.as_deref())
-            .unwrap_or("Unknown");
-        *counts.entry(state.to_owned()).or_default() += 1;
-    }
-
-    let mut states = ORDER
-        .into_iter()
-        .filter_map(|state| {
-            counts.remove(state).map(|count| PodStateCount {
-                state: state.to_owned(),
-                count,
-            })
-        })
-        .collect::<Vec<_>>();
-    states.extend(
-        counts
-            .into_iter()
-            .map(|(state, count)| PodStateCount { state, count }),
-    );
-    states
-}
-
-fn sort_object_summaries(objects: &mut [ObjectSummary]) {
-    objects.sort_by(|left, right| {
-        left.namespace
-            .cmp(&right.namespace)
-            .then_with(|| left.name.cmp(&right.name))
-    });
-}
-
-fn pod_summary(pod: Pod) -> PodSummary {
-    let namespace = pod.namespace().unwrap_or_else(|| String::from("<cluster>"));
-    let status = pod.status.as_ref();
-    let phase = status
-        .and_then(|status| status.phase.clone())
-        .unwrap_or_else(|| String::from("Unknown"));
-    let node = pod
-        .spec
-        .as_ref()
-        .and_then(|spec| spec.node_name.clone())
-        .unwrap_or_else(|| String::from("-"));
-    let age = pod
-        .metadata
-        .creation_timestamp
-        .as_ref()
-        .map(|timestamp| age_label(timestamp.0))
-        .unwrap_or_else(|| String::from("-"));
-
-    PodSummary {
-        name: pod.name_any(),
-        namespace,
-        phase,
-        node,
-        age,
-    }
-}
-
-fn supports_metrics(resource: &ResourceKind) -> bool {
-    resource.group.is_empty() && matches!(resource.kind.as_str(), "Pod" | "Node")
-}
-
-fn object_key(object: &DynamicObject) -> (String, String) {
-    (
-        object.namespace().unwrap_or_else(|| String::from("-")),
-        object.name_any(),
-    )
-}
-
-fn object_summaries<I>(
-    objects: I,
-    resource: &ResourceKind,
-    metrics: &BTreeMap<(String, String), ResourceUsage>,
-) -> Vec<ObjectSummary>
-where
-    I: IntoIterator<Item = DynamicObject>,
-{
-    let mut summaries = objects
-        .into_iter()
-        .map(|object| object_summary(object, resource, metrics))
-        .collect::<Vec<_>>();
-    sort_object_summaries(&mut summaries);
-    summaries
-}
-
-fn object_summary(
-    object: DynamicObject,
-    resource: &ResourceKind,
-    metrics: &BTreeMap<(String, String), ResourceUsage>,
-) -> ObjectSummary {
-    let namespace = object.namespace().unwrap_or_else(|| String::from("-"));
-    let name = object.name_any();
-    let (status, status_ratio) = status_label(&object, resource);
-    let age = object
-        .metadata
-        .creation_timestamp
-        .as_ref()
-        .map(|timestamp| age_label(timestamp.0))
-        .unwrap_or_else(|| String::from("-"));
-    let mut usage = metrics.get(&(namespace.clone(), name.clone())).cloned();
-    if let Some(usage) = usage.as_mut() {
-        attach_resource_ratios(usage, &object, resource);
-    }
-
-    ObjectSummary {
-        name,
-        metrics: usage,
-        namespace,
-        status,
-        status_ratio,
-        api_version: resource.api_version.clone(),
-        age,
-        images: object_images(&object, resource),
-        service_target: service_target(&object, resource),
-        service_selector: service_selector(&object, resource),
-        ingress_target: ingress_target(&object, resource),
-        ingress_class: ingress_class(&object, resource),
-    }
-}
-
-fn is_ingress(resource: &ResourceKind) -> bool {
-    resource.group == "networking.k8s.io" && resource.kind == "Ingress"
-}
-
-fn ingress_target(object: &DynamicObject, resource: &ResourceKind) -> String {
-    ingress_rules(object, resource)
-        .into_iter()
-        .map(|rule| {
-            format!(
-                "{}{} → {}:{}",
-                rule.host, rule.path, rule.service, rule.port
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-fn ingress_class(object: &DynamicObject, resource: &ResourceKind) -> String {
-    if !is_ingress(resource) {
-        return String::new();
-    }
-
-    object
-        .data
-        .get("spec")
-        .and_then(|spec| spec.get("ingressClassName"))
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_owned()
-}
-
-fn ingress_rules(object: &DynamicObject, resource: &ResourceKind) -> Vec<IngressRule> {
-    if !is_ingress(resource) {
-        return Vec::new();
-    }
-
-    let Some(spec) = object.data.get("spec") else {
-        return Vec::new();
-    };
-    let mut rules = Vec::new();
-    if let Some(backend) = spec.get("defaultBackend")
-        && let Some(rule) = ingress_rule_from_backend(backend, "*", "/", "Default")
-    {
-        rules.push(rule);
-    }
-    if let Some(ingress_rules) = spec.get("rules").and_then(Value::as_array) {
-        for rule in ingress_rules {
-            let host = rule.get("host").and_then(Value::as_str).unwrap_or("*");
-            let Some(paths) = rule
-                .get("http")
-                .and_then(|http| http.get("paths"))
-                .and_then(Value::as_array)
-            else {
-                continue;
-            };
-            for path in paths {
-                let path_value = path.get("path").and_then(Value::as_str).unwrap_or("/");
-                let path_type = path
-                    .get("pathType")
-                    .and_then(Value::as_str)
-                    .unwrap_or("ImplementationSpecific");
-                if let Some(rule) = path.get("backend").and_then(|backend| {
-                    ingress_rule_from_backend(backend, host, path_value, path_type)
-                }) {
-                    rules.push(rule);
-                }
-            }
-        }
-    }
-    rules
-}
-
-fn ingress_rule_from_backend(
-    backend: &Value,
-    host: &str,
-    path: &str,
-    path_type: &str,
-) -> Option<IngressRule> {
-    let service = backend.get("service")?;
-    let service_name = service.get("name").and_then(Value::as_str)?;
-    let port = service.get("port")?;
-    let port = value_string(port.get("name")).or_else(|| value_string(port.get("number")))?;
-    Some(IngressRule {
-        host: host.to_owned(),
-        path: path.to_owned(),
-        path_type: path_type.to_owned(),
-        service: service_name.to_owned(),
-        port,
-    })
-}
-
-fn service_target(object: &DynamicObject, resource: &ResourceKind) -> String {
-    service_ports(object, resource)
-        .into_iter()
-        .map(|port| format!("{}:{}/{}", port.port, port.target_port, port.protocol))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-fn service_selector(object: &DynamicObject, resource: &ResourceKind) -> String {
-    service_selectors(object, resource)
-        .into_iter()
-        .map(|selector| format!("{}={}", selector.key, selector.value))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-fn service_details(
-    object: &DynamicObject,
-    resource: &ResourceKind,
-) -> (Vec<ServicePort>, Vec<ServiceSelector>) {
-    (
-        service_ports(object, resource),
-        service_selectors(object, resource),
-    )
-}
-
-fn service_ports(object: &DynamicObject, resource: &ResourceKind) -> Vec<ServicePort> {
-    if resource.kind != "Service" || !resource.group.is_empty() {
-        return Vec::new();
-    }
-
-    object
-        .data
-        .get("spec")
-        .and_then(|spec| spec.get("ports"))
-        .and_then(Value::as_array)
-        .map(|ports| {
-            ports
-                .iter()
-                .filter_map(|port| {
-                    let port_number = value_string(port.get("port"))?;
-                    let target_port =
-                        value_string(port.get("targetPort")).unwrap_or_else(|| port_number.clone());
-                    Some(ServicePort {
-                        name: value_string(port.get("name")).unwrap_or_default(),
-                        protocol: value_string(port.get("protocol"))
-                            .unwrap_or_else(|| String::from("TCP")),
-                        port: port_number,
-                        target_port,
-                        node_port: value_string(port.get("nodePort")),
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn service_selectors(object: &DynamicObject, resource: &ResourceKind) -> Vec<ServiceSelector> {
-    if resource.kind != "Service" || !resource.group.is_empty() {
-        return Vec::new();
-    }
-
-    let mut selectors = object
-        .data
-        .get("spec")
-        .and_then(|spec| spec.get("selector"))
-        .and_then(Value::as_object)
-        .map(|selectors| {
-            selectors
-                .iter()
-                .filter_map(|(key, value)| {
-                    value_string(Some(value)).map(|value| ServiceSelector {
-                        key: key.clone(),
-                        value,
-                    })
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    selectors.sort_by(|left, right| left.key.cmp(&right.key));
-    selectors
-}
-
-fn value_string(value: Option<&Value>) -> Option<String> {
-    value.and_then(|value| match value {
-        Value::String(value) => Some(value.clone()),
-        Value::Number(value) => Some(value.to_string()),
-        _ => None,
-    })
-}
-
-fn attach_resource_ratios(
-    usage: &mut ResourceUsage,
-    object: &DynamicObject,
-    resource: &ResourceKind,
-) {
-    match (resource.group.as_str(), resource.kind.as_str()) {
-        ("", "Pod") => {
-            usage.cpu_ratio =
-                resource_ratio(&usage.cpu, pod_container_requests_total(object, "cpu"));
-            usage.memory_ratio = resource_ratio(
-                &usage.memory,
-                pod_container_requests_total(object, "memory"),
-            );
-        }
-        ("", "Node") => {
-            usage.cpu_ratio = resource_ratio(&usage.cpu, node_allocatable(object, "cpu"));
-            usage.memory_ratio = resource_ratio(&usage.memory, node_allocatable(object, "memory"));
-        }
-        _ => {}
-    }
-}
-
-fn pod_container_requests_total(object: &DynamicObject, resource_name: &str) -> Option<f64> {
-    object
-        .data
-        .get("spec")?
-        .get("containers")?
-        .as_array()?
-        .iter()
-        .filter_map(|container| {
-            container
-                .get("resources")?
-                .get("requests")?
-                .get(resource_name)?
-                .as_str()
-                .and_then(quantity_as_f64)
-        })
-        .reduce(|total, quantity| total + quantity)
-}
-
-fn node_allocatable(object: &DynamicObject, resource_name: &str) -> Option<f64> {
-    object
-        .data
-        .get("status")?
-        .get("allocatable")?
-        .get(resource_name)?
-        .as_str()
-        .and_then(quantity_as_f64)
-}
-
-fn resource_ratio(used: &str, base: Option<f64>) -> Option<ResourceRatio> {
-    let used = quantity_as_f64(used)?;
-    let base = base?;
-    if !used.is_finite() || !base.is_finite() || base <= 0.0 {
-        return None;
-    }
-
-    Some(ResourceRatio {
-        basis_points: ((used / base) * 10_000.0)
-            .round()
-            .clamp(0.0, u32::MAX as f64) as u32,
-    })
-}
-
-pub(crate) fn quantity_as_f64(value: &str) -> Option<f64> {
-    let value = value.trim();
-    if value.is_empty() || value == "-" {
-        return None;
-    }
-
-    for (suffix, multiplier) in [
-        ("Ki", 1024.0),
-        ("Mi", 1024.0_f64.powi(2)),
-        ("Gi", 1024.0_f64.powi(3)),
-        ("Ti", 1024.0_f64.powi(4)),
-        ("Pi", 1024.0_f64.powi(5)),
-        ("Ei", 1024.0_f64.powi(6)),
-        ("n", 0.000_000_001),
-        ("u", 0.000_001),
-        ("m", 0.001),
-        ("k", 1_000.0),
-        ("K", 1_000.0),
-        ("M", 1_000_000.0),
-        ("G", 1_000_000_000.0),
-        ("T", 1_000_000_000_000.0),
-        ("P", 1_000_000_000_000_000.0),
-        ("E", 1_000_000_000_000_000_000.0),
-    ] {
-        if let Some(number) = value.strip_suffix(suffix) {
-            return number.parse::<f64>().ok().map(|number| number * multiplier);
-        }
-    }
-
-    value.parse::<f64>().ok()
-}
-
 fn object_container_resources(
     object: &DynamicObject,
     resource: &ResourceKind,
@@ -789,30 +396,6 @@ fn resource_quantity(resources: Option<&Value>, section: &str, name: &str) -> St
         .filter(|value| !value.is_empty())
         .unwrap_or("-")
         .to_owned()
-}
-
-fn object_images(object: &DynamicObject, resource: &ResourceKind) -> Vec<String> {
-    if resource.kind != "Pod" || !resource.group.is_empty() {
-        return Vec::new();
-    }
-
-    object
-        .data
-        .get("spec")
-        .and_then(|spec| spec.get("containers"))
-        .and_then(serde_json::Value::as_array)
-        .map(|containers| {
-            containers
-                .iter()
-                .filter_map(|container| {
-                    container
-                        .get("image")
-                        .and_then(serde_json::Value::as_str)
-                        .map(ToOwned::to_owned)
-                })
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 fn object_replicas(object: &DynamicObject, resource: &ResourceKind) -> Option<i32> {
@@ -886,9 +469,11 @@ fn deployment_label_selector(object: &DynamicObject) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        ingress_class, ingress_rules, ingress_target, object_container_resources, object_images,
-        pod_state_counts, quantity_as_f64, resource_ratio, service_details, service_selector,
-        service_target,
+        ingress::{ingress_class, ingress_rules, ingress_target},
+        object_container_resources, quantity_as_f64,
+        resources::{object_images, resource_ratio},
+        services::{service_details, service_selector, service_target},
+        summaries::pod_state_counts,
     };
     use crate::{
         ContainerResources, IngressRule, ResourceKind, ResourceScope, ServicePort, ServiceSelector,
