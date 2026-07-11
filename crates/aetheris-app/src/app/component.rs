@@ -7,10 +7,12 @@ use super::widgets::{rebuild_column_filter_list, rebuild_status_filter_list};
 use super::yaml::*;
 use super::*;
 
+mod clusters;
 mod detail_signals;
 mod namespaces;
 mod projects;
 mod window_actions;
+use clusters::ClustersWidgets;
 use detail_signals::{DetailSignalWidgets, connect_detail_signals};
 use namespaces::NamespacesWidgets;
 use projects::ProjectsWidgets;
@@ -56,55 +58,29 @@ impl Component for App {
             projects_home_button,
         } = projects::build(&sender);
 
-        let context_selector_label = gtk::Label::new(Some(&tr("No cluster")));
-        context_selector_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-        context_selector_label.set_max_width_chars(22);
-        let cluster_back_button = gtk::Button::builder()
-            .icon_name("go-previous-symbolic")
-            .tooltip_text(tr("Back to clusters"))
-            .build();
-        cluster_back_button.add_css_class("flat");
-        let cluster_menu = gtk::gio::Menu::new();
-        cluster_menu.append(Some(&tr("Edit Cluster...")), Some("win.cluster-edit"));
-        cluster_menu.append(Some(&tr("Remove from Project")), Some("win.cluster-remove"));
-        let cluster_menu_button = gtk::MenuButton::builder()
-            .icon_name("open-menu-symbolic")
-            .tooltip_text(tr("Cluster options"))
-            .menu_model(&cluster_menu)
-            .build();
-        let cluster_refresh_button = gtk::Button::builder()
-            .icon_name("view-refresh-symbolic")
-            .tooltip_text(tr("Refresh cluster health"))
-            .build();
-        cluster_refresh_button.add_css_class("flat");
-        let cluster_list = gtk::ListBox::new();
-        cluster_list.set_hexpand(true);
-        cluster_list.add_css_class("boxed-list");
-        cluster_list.set_selection_mode(gtk::SelectionMode::None);
-        let add_cluster_button = gtk::Button::builder()
-            .icon_name("list-add-symbolic")
-            .tooltip_text(tr("Add cluster"))
-            .build();
-        let import_cluster_button = gtk::Button::builder().label(tr("Import")).build();
-        let clusters_empty_add_button = gtk::Button::builder()
-            .child(
-                &adw::ButtonContent::builder()
-                    .icon_name("list-add-symbolic")
-                    .label(tr("Add Cluster"))
-                    .build(),
-            )
-            .halign(gtk::Align::Center)
-            .build();
-        clusters_empty_add_button.add_css_class("suggested-action");
-        let clusters_empty_page = adw::StatusPage::builder()
-            .icon_name("network-server-symbolic")
-            .title(tr("No Clusters Yet"))
-            .description(tr("Add a cluster to start browsing this project."))
-            .valign(gtk::Align::Center)
-            .vexpand(true)
-            .build();
-        clusters_empty_page.set_child(Some(&clusters_empty_add_button));
-        let clusters_content_stack = gtk::Stack::new();
+        let ClustersWidgets {
+            context_selector_label,
+            cluster_back_button,
+            cluster_menu_button,
+            cluster_refresh_button,
+            cluster_list,
+            add_cluster_button,
+            import_cluster_button,
+            clusters_empty_page,
+            clusters_content_stack,
+            resource_list,
+            favorite_object_list,
+            cluster_dialog_stack,
+            setup_name_entry,
+            setup_server_entry,
+            setup_token_entry,
+            setup_ca_entry,
+            setup_insecure_check,
+            setup_button,
+            cluster_token_title_label,
+            cluster_token_back_button,
+            cluster_dialog,
+        } = clusters::build(&sender);
         let NamespacesWidgets {
             namespace_menu_button,
             namespace_selector_label,
@@ -179,12 +155,6 @@ impl Component for App {
             .ellipsize(gtk::pango::EllipsizeMode::End)
             .build();
         let spinner = gtk::Spinner::builder().spinning(true).visible(true).build();
-        let resource_list = gtk::ListBox::new();
-        resource_list.add_css_class("boxed-list");
-        resource_list.set_selection_mode(gtk::SelectionMode::None);
-        let favorite_object_list = gtk::ListBox::new();
-        favorite_object_list.add_css_class("boxed-list");
-        favorite_object_list.set_selection_mode(gtk::SelectionMode::None);
         let object_store = gtk::gio::ListStore::new::<gtk::glib::BoxedAnyObject>();
         let object_view = gtk::ColumnView::builder()
             .single_click_activate(true)
@@ -479,37 +449,6 @@ impl Component for App {
             expand_logs_button: &detail_expand_logs_button,
         });
 
-        let setup_name_entry = adw::EntryRow::builder()
-            .title(tr("Name"))
-            .hexpand(true)
-            .build();
-        let setup_server_entry = adw::EntryRow::builder()
-            .title(tr("API Server"))
-            .hexpand(true)
-            .build();
-        let setup_token_entry = adw::PasswordEntryRow::builder()
-            .title(tr("Bearer Token"))
-            .hexpand(true)
-            .build();
-        let setup_ca_entry = adw::EntryRow::builder()
-            .title(tr("CA Certificate"))
-            .hexpand(true)
-            .build();
-        let setup_ca_file_button = gtk::Button::builder()
-            .icon_name("document-open-symbolic")
-            .build();
-        let setup_insecure_check = adw::SwitchRow::builder()
-            .title(tr("Skip TLS Verification"))
-            .build();
-        let setup_button = gtk::Button::builder()
-            .label(tr("Add Cluster"))
-            .sensitive(true)
-            .build();
-        setup_button.add_css_class("suggested-action");
-        let cluster_token_title_label = gtk::Label::new(Some(&tr("Connect with token")));
-        let cluster_token_back_button = gtk::Button::builder()
-            .icon_name("go-previous-symbolic")
-            .build();
         let create_yaml_buffer = sourceview5::Buffer::new(None);
         let create_yaml_error_label = gtk::Label::new(None);
         setup_yaml_buffer(&create_yaml_buffer, &create_yaml_error_label);
@@ -519,23 +458,6 @@ impl Component for App {
             &create_yaml_buffer,
             &create_yaml_apply_button,
             &create_yaml_error_label,
-        );
-
-        let cluster_dialog_stack = gtk::Stack::new();
-        let cluster_dialog = build_cluster_dialog(
-            ClusterDialogWidgets {
-                stack: &cluster_dialog_stack,
-                name_entry: &setup_name_entry,
-                server_entry: &setup_server_entry,
-                token_entry: &setup_token_entry,
-                ca_entry: &setup_ca_entry,
-                ca_file_button: &setup_ca_file_button,
-                insecure_check: &setup_insecure_check,
-                add_button: &setup_button,
-                title_label: &cluster_token_title_label,
-                back_button: &cluster_token_back_button,
-            },
-            sender.clone(),
         );
 
         let toaster = adw::ToastOverlay::new();
@@ -641,31 +563,7 @@ impl Component for App {
         root_stack.add_named(&split_view, Some("browser"));
         root_stack.set_visible_child_name("projects");
 
-        cluster_list.connect_row_activated({
-            let sender = sender.clone();
-            move |_, row| sender.input(AppMsg::ClusterChanged(row.index() as u32))
-        });
-        cluster_back_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ShowClusters)
-        });
         window_actions::connect(&root, &sender);
-        add_cluster_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ShowAddClusterDialog)
-        });
-        clusters_empty_add_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ShowAddClusterDialog)
-        });
-        import_cluster_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ShowImportFile)
-        });
-        cluster_refresh_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::RefreshClusters)
-        });
         status_filter_list.connect_child_activated({
             let sender = sender.clone();
             move |_, child| sender.input(AppMsg::StatusFilterChanged(child.index() as u32))
@@ -727,14 +625,6 @@ impl Component for App {
         refresh_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::Refresh)
-        });
-        setup_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::AddCluster)
-        });
-        setup_ca_file_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ShowCaFile)
         });
 
         let model = App {
