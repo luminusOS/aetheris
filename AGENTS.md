@@ -80,13 +80,16 @@ cargo test --workspace
   - `metrics.rs`, `events.rs`, `cluster.rs`, `status.rs` — supporting domain behavior.
 - `crates/aetheris-app/` — Relm4/GTK4/Libadwaita application.
   - `app.rs` — component state and message definitions.
-  - `app/component.rs` — widget construction and signal wiring.
-  - `app/handler.rs` — `AppMsg` handling.
-  - `app/methods.rs` — state helpers and UI synchronization.
-  - `app/widgets.rs`, `app/layout.rs`, `app/dialogs.rs`, `app/object_detail.rs` — UI builders.
+  - `app/component.rs` + `component/detail_signals.rs` — widget construction (`init`) and signal wiring; detail-page button wiring lives in `detail_signals.rs`.
+  - `app/handler.rs` — `AppMsg` dispatch (`handle_msg`'s match); each arm's body is a one-line call into `handler/{cluster,project,namespace,object_list,mutations,nodes,logs,exec,port_forward}.rs`, one file per message domain.
+  - `app/methods.rs` — just `mod` declarations; state helpers live in `methods/{navigation,clusters,namespaces,object_cache,detail,sync,persistence,objects}.rs`, one `impl App` block per concern.
+  - `app/widgets.rs` — re-exports; widget builders live in `widgets/{filters,cluster,rows,classify,table,logs}.rs` by concern.
+  - `app/layout.rs`, `app/dialogs.rs` — UI builders.
+  - `app/object_detail.rs` + `object_detail/{events,network,pods}.rs` — detail-pane UI builders, split by section.
   - `app/commands.rs`, `app/streams.rs` — async command bridges to `aetheris-kube`.
-  - `app/projects.rs` — project persistence, filters, visible columns, and table widths.
+  - `app/projects.rs` — re-exports + shared type/struct definitions; `ProjectStore`/`Project`/`ObjectFavorite`/`ObjectColumn`/`StatusFilter`/`ResourceSection` impls (and their colocated tests) live in `projects/{store,project,favorite,column,status_filter,resource_section}.rs`.
   - `app/yaml.rs`, `app/ansi.rs`, `app/utils.rs` — focused helpers.
+  - `crates/aetheris-kube/src/objects.rs` + `objects/{ingress,resources,services,summaries}.rs` — object discovery/detail, split by resource concern.
 - `data/` — desktop file, AppStream metadata, icons.
 - `build-aux/` — Flatpak manifest.
 - `.github/workflows/` — CI and release automation.
