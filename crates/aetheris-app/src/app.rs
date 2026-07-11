@@ -230,7 +230,7 @@ pub struct App {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct ObjectCacheKey {
+pub(crate) struct ObjectCacheKey {
     context: String,
     group: String,
     version: String,
