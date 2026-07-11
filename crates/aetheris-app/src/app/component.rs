@@ -9,6 +9,9 @@ use super::widgets::{
 use super::yaml::*;
 use super::*;
 
+mod detail_signals;
+use detail_signals::{DetailSignalWidgets, connect_detail_signals};
+
 #[relm4::component(pub)]
 impl Component for App {
     type Init = ();
@@ -823,86 +826,33 @@ impl Component for App {
             let sender = sender.clone();
             move |_, position| sender.input(AppMsg::RelatedPodActivated(position as i32))
         });
-        detail_back_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::BackToObjects)
-        });
         projects_home_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowProjects)
         });
-        detail_stack.connect_visible_child_name_notify({
-            let sender = sender.clone();
-            move |stack| {
-                if let Some(name) = stack.visible_child_name() {
-                    sender.input(AppMsg::DetailTabChanged(name.to_string()));
-                }
-            }
-        });
-        detail_apply_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ApplyYaml)
-        });
-        detail_explain_yaml_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ExplainYaml)
-        });
-        detail_download_yaml_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::DownloadYaml)
-        });
-        detail_delete_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::DeleteObject)
-        });
-        detail_favorite_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ToggleCurrentObjectFavorite)
-        });
-        detail_terminal_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ShowPodTerminal)
-        });
-        detail_scale_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ScaleDeployment)
-        });
-        detail_cordon_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ToggleNodeScheduling)
-        });
-        detail_drain_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::DrainNode)
-        });
-        detail_log_start_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::StartPodLogs)
-        });
-        detail_log_stop_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::StopPodLogs)
-        });
-        detail_log_clear_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ClearPodLogs)
-        });
-        detail_expand_logs_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::ToggleDetailOverview)
-        });
-        detail_log_download_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::DownloadLogs)
-        });
-        detail_port_start_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::StartPodPortForward)
-        });
-        detail_port_stop_button.connect_clicked({
-            let sender = sender.clone();
-            move |_| sender.input(AppMsg::StopPodPortForward)
-        });
+        connect_detail_signals(
+            DetailSignalWidgets {
+                back_button: &detail_back_button,
+                stack: &detail_stack,
+                apply_button: &detail_apply_button,
+                explain_yaml_button: &detail_explain_yaml_button,
+                download_yaml_button: &detail_download_yaml_button,
+                delete_button: &detail_delete_button,
+                favorite_button: &detail_favorite_button,
+                terminal_button: &detail_terminal_button,
+                scale_button: &detail_scale_button,
+                cordon_button: &detail_cordon_button,
+                drain_button: &detail_drain_button,
+                log_start_button: &detail_log_start_button,
+                log_stop_button: &detail_log_stop_button,
+                log_clear_button: &detail_log_clear_button,
+                expand_logs_button: &detail_expand_logs_button,
+                log_download_button: &detail_log_download_button,
+                port_start_button: &detail_port_start_button,
+                port_stop_button: &detail_port_stop_button,
+            },
+            &sender,
+        );
         refresh_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::Refresh)
