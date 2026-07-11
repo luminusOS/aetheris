@@ -10,6 +10,7 @@ use super::yaml::*;
 use super::*;
 
 mod detail_signals;
+mod window_actions;
 use detail_signals::{DetailSignalWidgets, connect_detail_signals};
 
 #[relm4::component(pub)]
@@ -711,34 +712,7 @@ impl Component for App {
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowClusters)
         });
-        type MenuAction = (&'static str, &'static [&'static str], fn() -> AppMsg);
-        let menu_actions: [MenuAction; 5] = [
-            ("cluster-edit", &["<primary>E"], || {
-                AppMsg::EditCurrentCluster
-            }),
-            ("cluster-remove", &["<primary><shift>Delete"], || {
-                AppMsg::RemoveClusterFromProject
-            }),
-            ("project-rename", &["F2"], || {
-                AppMsg::ShowRenameProjectDialog
-            }),
-            ("project-duplicate", &["<primary>D"], || {
-                AppMsg::DuplicateProject
-            }),
-            ("project-delete", &["<primary>Delete"], || {
-                AppMsg::DeleteProject
-            }),
-        ];
-        let application = relm4::main_application();
-        for (name, accels, message) in menu_actions {
-            let action = gtk::gio::SimpleAction::new(name, None);
-            action.connect_activate({
-                let sender = sender.clone();
-                move |_, _| sender.input(message())
-            });
-            root.add_action(&action);
-            application.set_accels_for_action(&format!("win.{name}"), accels);
-        }
+        window_actions::connect(&root, &sender);
         add_cluster_button.connect_clicked({
             let sender = sender.clone();
             move |_| sender.input(AppMsg::ShowAddClusterDialog)
