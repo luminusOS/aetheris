@@ -1,5 +1,6 @@
 use super::super::commands::*;
 use super::super::utils::*;
+use super::super::yaml::{build_apply_yaml_dialog, yaml_diff};
 use super::super::*;
 
 pub(super) fn handle_object_detail_loaded_ok(
@@ -167,11 +168,35 @@ pub(super) fn handle_explain_yaml(app: &mut App, root: &<App as Component>::Root
     app.show_yaml_explanation(root);
 }
 
-pub(super) fn handle_apply_yaml(app: &mut App, sender: ComponentSender<App>) {
+pub(super) fn handle_apply_yaml(
+    app: &mut App,
+    sender: ComponentSender<App>,
+    root: &<App as Component>::Root,
+) {
     let Some(target) = app.detail.target.clone() else {
         return;
     };
     let yaml = text_buffer_text(&app.detail.yaml_buffer);
+    let Some(diff) = yaml_diff(&app.detail.yaml_baseline, &yaml) else {
+        app.toaster
+            .add_toast(adw::Toast::new(&tr("No YAML changes to apply.")));
+        return;
+    };
+    let dialog = build_apply_yaml_dialog(&target, &diff);
+    let sender = sender.clone();
+    dialog.choose(Some(root), gtk::gio::Cancellable::NONE, move |response| {
+        if response.as_str() == "apply" {
+            sender.input(AppMsg::ConfirmApplyYaml(target, yaml));
+        }
+    });
+}
+
+pub(super) fn handle_confirm_apply_yaml(
+    app: &mut App,
+    sender: ComponentSender<App>,
+    target: DetailTarget,
+    yaml: String,
+) {
     app.detail.request_token = app.detail.request_token.saturating_add(1);
     let token = app.detail.request_token;
     app.loading = true;

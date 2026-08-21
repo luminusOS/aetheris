@@ -48,7 +48,7 @@ pub(super) struct ContextNamespaceSelection {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct DetailTarget {
+pub(crate) struct DetailTarget {
     pub(super) context: String,
     pub(super) resource: ResourceKind,
     pub(super) namespace: Option<String>,

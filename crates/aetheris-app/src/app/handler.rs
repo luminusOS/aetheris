@@ -199,7 +199,10 @@ impl App {
                 nodes::handle_node_drained_err(self, token, error)
             }
             AppMsg::ExplainYaml => mutations::handle_explain_yaml(self, root),
-            AppMsg::ApplyYaml => mutations::handle_apply_yaml(self, sender),
+            AppMsg::ApplyYaml => mutations::handle_apply_yaml(self, sender, root),
+            AppMsg::ConfirmApplyYaml(target, yaml) => {
+                mutations::handle_confirm_apply_yaml(self, sender, target, yaml)
+            }
             AppMsg::ObjectApplied(token, Ok(detail)) => {
                 mutations::handle_object_applied_ok(self, token, detail)
             }
