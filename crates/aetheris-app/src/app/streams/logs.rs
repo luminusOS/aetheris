@@ -1,5 +1,5 @@
-use super::super::ansi::*;
 use super::super::commands::*;
+use super::super::log_highlighting::insert_highlighted_line;
 use super::super::utils::*;
 use super::super::*;
 
@@ -41,6 +41,7 @@ impl App {
             tail_lines: Some(if follow { 200 } else { 500 }),
         };
         let context = target.context;
+        let highlighter = Arc::clone(&self.log_highlighter);
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         self.log_abort_handle = Some(abort_handle);
         self.log_streaming = true;
@@ -51,9 +52,10 @@ impl App {
                 .register(
                     Abortable::new(
                         async move {
-                            let result = stream_pod_logs(context, request, token, out.clone())
-                                .await
-                                .map_err(format_error);
+                            let result =
+                                stream_pod_logs(context, request, token, highlighter, out.clone())
+                                    .await
+                                    .map_err(format_error);
                             let _ = out.send(AppMsg::PodLogFinished(token, result));
                         },
                         abort_registration,
@@ -153,8 +155,8 @@ impl App {
         self.detail.log_status_label.set_label(&status);
     }
 
-    pub(crate) fn append_log_line(&self, line: &str) {
-        insert_ansi_line(&self.detail.log_buffer, line);
+    pub(crate) fn append_log_line(&self, line: &HighlightedLine) {
+        insert_highlighted_line(&self.detail.log_buffer, line);
         let mut iter = self.detail.log_buffer.end_iter();
         self.detail.log_buffer.insert(&mut iter, "\n");
         let mark =

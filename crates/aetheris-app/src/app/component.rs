@@ -122,6 +122,10 @@ impl Component for App {
             .build();
         let spinner = gtk::Spinner::builder().spinning(true).visible(true).build();
         let (detail, detail_page) = detail_pane::build(&sender);
+        let log_highlighter = Arc::new(LogHighlighter::new().unwrap_or_else(|error| {
+            tracing::warn!("Unable to initialize semantic log highlighting: {error}");
+            LogHighlighter::disabled()
+        }));
 
         let toaster = adw::ToastOverlay::new();
         let root_stack = gtk::Stack::new();
@@ -288,6 +292,7 @@ impl Component for App {
             log_streaming: false,
             log_stream_token: 0,
             log_abort_handle: None,
+            log_highlighter,
             exec_token: 0,
             terminal_sessions: HashMap::new(),
             port_forwarding: false,
