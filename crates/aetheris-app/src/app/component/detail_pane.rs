@@ -1,4 +1,4 @@
-use super::super::ansi::*;
+use super::super::log_highlighting::setup_log_tags;
 use super::super::object_detail::*;
 use super::super::widgets::{available_icon_name, related_pods_column_view};
 use super::super::yaml::*;
@@ -186,8 +186,8 @@ pub(super) fn build(sender: &ComponentSender<App>) -> (DetailPane, gtk::Box) {
         .hexpand(true)
         .build();
     let detail_log_buffer = gtk::TextBuffer::new(None::<&gtk::TextTagTable>);
-    setup_log_highlighting(&detail_log_buffer);
     let detail_log_view = gtk::TextView::with_buffer(&detail_log_buffer);
+    setup_log_tags(&detail_log_view, &detail_log_buffer);
     let detail_port_local_spin = gtk::SpinButton::with_range(0.0, 65535.0, 1.0);
     detail_port_local_spin.set_numeric(true);
     detail_port_local_spin.set_value(0.0);

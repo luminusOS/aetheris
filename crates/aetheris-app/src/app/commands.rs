@@ -159,12 +159,14 @@ pub(super) async fn stream_pod_logs(
     context: String,
     request: PodLogRequest,
     token: u64,
+    highlighter: Arc<LogHighlighter>,
     out: relm4::Sender<AppMsg>,
 ) -> anyhow::Result<()> {
     let manager = KubeManager::load()?;
     let session = manager.connect_context(&context).await?;
     session
         .stream_pod_logs(request, move |line| {
+            let line = highlighter.highlight_line(&line);
             let _ = out.send(AppMsg::PodLogLine(token, line));
         })
         .await
