@@ -14,7 +14,7 @@ pub(super) fn handle_clear_pod_logs(app: &mut App) {
     app.detail.log_buffer.set_text("");
 }
 
-pub(super) fn handle_pod_log_line(app: &mut App, token: u64, line: String) {
+pub(super) fn handle_pod_log_line(app: &mut App, token: u64, line: HighlightedLine) {
     if token == app.log_stream_token {
         app.append_log_line(&line);
     }

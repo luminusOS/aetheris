@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeSet, HashMap, VecDeque},
     fs,
     path::PathBuf,
+    sync::Arc,
 };
 
 use aetheris_kube::{
@@ -20,13 +21,13 @@ use sourceview5::prelude::*;
 #[cfg(not(target_os = "windows"))]
 use vte4::prelude::*;
 
-mod ansi;
 mod commands;
 mod component;
 mod dialogs;
 mod handler;
 pub(crate) mod i18n;
 mod layout;
+mod log_highlighting;
 mod methods;
 mod object_detail;
 mod projects;
@@ -37,6 +38,7 @@ mod widgets;
 mod yaml;
 
 use i18n::{tr, tr_format, trn};
+use log_highlighting::{HighlightedLine, LogHighlighter};
 use projects::{
     DetailTarget, ObjectColumn, ObjectFavorite, ObjectTableColumn, PodLogTarget, Project,
     ProjectStore, ResourceSection, StatusFilter,
@@ -196,6 +198,7 @@ pub struct App {
     log_streaming: bool,
     log_stream_token: u64,
     log_abort_handle: Option<AbortHandle>,
+    log_highlighter: Arc<LogHighlighter>,
     exec_token: u64,
     terminal_sessions: HashMap<u64, TerminalSession>,
     port_forwarding: bool,
@@ -316,7 +319,7 @@ pub enum AppMsg {
     StopPodLogs,
     ClearPodLogs,
     ToggleDetailOverview,
-    PodLogLine(u64, String),
+    PodLogLine(u64, HighlightedLine),
     PodLogFinished(u64, Result<(), String>),
     ShowPodTerminal,
     RestartPodTerminal(u64),
