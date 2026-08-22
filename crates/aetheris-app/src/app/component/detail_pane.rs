@@ -373,6 +373,7 @@ pub(super) fn build(sender: &ComponentSender<App>) -> (DetailPane, gtk::Box) {
         favorite_button: detail_favorite_button,
         terminal_button: detail_terminal_button,
         yaml_buffer: detail_yaml_buffer,
+        yaml_baseline: String::new(),
         events_list: detail_events_list,
         conditions_list: detail_conditions_list,
         service_ports_list: detail_service_ports_list,

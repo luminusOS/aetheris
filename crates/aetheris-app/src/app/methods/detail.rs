@@ -96,6 +96,7 @@ impl App {
                 .map(|usage| usage.memory.as_str())
                 .unwrap_or("-"),
         );
+        self.detail.yaml_baseline.clone_from(&detail.yaml);
         self.detail.yaml_buffer.set_text(&detail.yaml);
         self.sync_detail_favorite_button();
         self.detail.node_unschedulable = detail.node_unschedulable;
