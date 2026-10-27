@@ -111,6 +111,14 @@ class FlatpakPackaging(unittest.TestCase):
             if not use.startswith("./"):
                 self.assertRegex(use + " ", PINNED, use)
 
+    def test_windows_installer_version_info_is_numeric_for_release_candidates(self):
+        _, text = workflow("release-windows.yml")
+        self.assertIn("/DNumericVersion=${{ steps.names.outputs.numeric_version }}", text)
+        self.assertIn('numeric_version=${BASE_VERSION}', text)
+        script = (ROOT / "build-aux" / "inno" / "aetheris.iss").read_text()
+        self.assertIn("VersionInfoVersion={#NumericVersion}", script)
+        self.assertNotIn("VersionInfoVersion={#AppVersion}", script)
+
     def test_release_publishes_checksums_and_every_flatpak_bundle(self):
         loaded, text = workflow("release.yml")
         release = loaded["jobs"]["release"]

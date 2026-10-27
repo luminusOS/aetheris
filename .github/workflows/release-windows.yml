@@ -44,6 +44,7 @@ jobs:
           fi
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "numeric_version=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
           echo "artifact_name=windows-bundle" >> "$GITHUB_OUTPUT"
           echo "windows_name=aetheris-${VERSION}-windows-x86_64.zip" >> "$GITHUB_OUTPUT"
           echo "setup_name=aetheris-${VERSION}-windows-x86_64-setup.exe" >> "$GITHUB_OUTPUT"
@@ -140,6 +141,7 @@ jobs:
 
           MSYS2_ARG_CONV_EXCL='*' iscc \
             "/DAppVersion=${{ steps.names.outputs.version }}" \
+            "/DNumericVersion=${{ steps.names.outputs.numeric_version }}" \
             "/DSourceDir=${source_dir}" \
             "/DOutputDir=${output_dir}" \
             "/DTargetArch=x64" \
