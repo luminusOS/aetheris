@@ -55,6 +55,13 @@ class FlatpakPackaging(unittest.TestCase):
         vte = next(module for module in self.manifest["modules"] if module["name"] == "vte")
         self.assertEqual(vte["sources"][0]["tag"], "0.83.91")
 
+    def test_simdutf_is_built_before_vte_and_vte_cannot_fall_back_to_its_subproject(self):
+        names = [module["name"] for module in self.manifest["modules"]]
+        self.assertLess(names.index("simdutf"), names.index("vte"))
+        simdutf = self.manifest["modules"][names.index("simdutf")]
+        self.assertEqual(simdutf["sources"][0]["tag"], "v7.7.1")
+        self.assertIn("--wrap-mode=nofallback", self.manifest["modules"][names.index("vte")]["config-opts"])
+
     def test_newest_metainfo_release_matches_the_workspace_version(self):
         cargo = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
         metainfo = ET.parse(ROOT / "data" / f"{APP_ID}.metainfo.xml").getroot()

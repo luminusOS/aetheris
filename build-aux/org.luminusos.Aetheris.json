@@ -22,10 +22,30 @@
   },
   "modules": [
     {
+      "name": "simdutf",
+      "buildsystem": "cmake-ninja",
+      "config-opts": [
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_INSTALL_LIBDIR=lib",
+        "-DBUILD_SHARED_LIBS=ON",
+        "-DSIMDUTF_TESTS=OFF",
+        "-DSIMDUTF_TOOLS=OFF",
+        "-DSIMDUTF_BENCHMARKS=OFF"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/simdutf/simdutf.git",
+          "tag": "v7.7.1"
+        }
+      ]
+    },
+    {
       "name": "vte",
       "buildsystem": "meson",
       "config-opts": [
         "--libdir=lib",
+        "--wrap-mode=nofallback",
         "-Dgtk4=true",
         "-Dgtk3=false",
         "-Dgir=false",
