@@ -1,12 +1,10 @@
 {
   "id": "org.luminusos.Aetheris",
-  "branch": "stable",
   "runtime": "org.gnome.Platform",
   "runtime-version": "50",
   "sdk": "org.gnome.Sdk",
   "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
   "command": "aetheris",
-  "appstream-compose": false,
   "finish-args": [
     "--socket=wayland",
     "--socket=fallback-x11",
@@ -19,10 +17,29 @@
     "build-args": ["--share=network"],
     "env": {
       "CARGO_HOME": "/run/build/aetheris/cargo",
-      "PKG_CONFIG_PATH": "/app/lib/pkgconfig:/app/lib64/pkgconfig:/app/lib/x86_64-linux-gnu/pkgconfig:/app/share/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
+      "PKG_CONFIG_PATH": "/app/lib/pkgconfig:/app/lib64/pkgconfig:/app/lib/x86_64-linux-gnu/pkgconfig:/app/lib/aarch64-linux-gnu/pkgconfig:/app/share/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig"
     }
   },
   "modules": [
+    {
+      "name": "simdutf",
+      "buildsystem": "cmake-ninja",
+      "config-opts": [
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_INSTALL_LIBDIR=lib",
+        "-DBUILD_SHARED_LIBS=ON",
+        "-DSIMDUTF_TESTS=OFF",
+        "-DSIMDUTF_TOOLS=OFF",
+        "-DSIMDUTF_BENCHMARKS=OFF"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/simdutf/simdutf.git",
+          "tag": "v7.7.1"
+        }
+      ]
+    },
     {
       "name": "vte",
       "buildsystem": "meson",

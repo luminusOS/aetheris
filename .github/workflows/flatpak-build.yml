@@ -1,0 +1,38 @@
+name: Build Flatpak
+
+on:
+  pull_request:
+    paths:
+      - build-aux/org.luminusos.Aetheris.json
+      - data/**
+      - .github/workflows/release-flatpak.yml
+      - .github/workflows/flatpak-build.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Read workspace version
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Derive the tag from Cargo.toml
+        id: version
+        run: |
+          version="$(python3 -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("Cargo.toml").read_text())["workspace"]["package"]["version"])')"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+
+  flatpak:
+    name: Flatpak
+    needs: plan
+    uses: ./.github/workflows/release-flatpak.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}

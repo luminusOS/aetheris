@@ -42,8 +42,9 @@ jobs:
       - name: Download Flatpak assets
         uses: actions/download-artifact@v4
         with:
-          name: ${{ needs.flatpak.outputs.artifact-name }}
+          pattern: flatpak-*
           path: dist
+          merge-multiple: true
 
       - name: Download AppImage assets
         uses: actions/download-artifact@v4
@@ -64,15 +65,35 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Verify Flatpak assets
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          for arch in x86_64 aarch64; do
+            test -s "dist/aetheris-${TAG#v}-linux-${arch}.flatpak"
+          done
+
+      - name: Checksums
+        working-directory: dist
+        env:
+          APPIMAGE: ${{ needs.appimage.outputs.appimage-name }}
+          WINDOWS_BUNDLE: ${{ needs.windows.outputs.bundle-name }}
+          WINDOWS_SETUP: ${{ needs.windows.outputs.setup-name }}
+        run: |
+          set -euo pipefail
+          sha256sum aetheris-*-linux-*.flatpak "$APPIMAGE" aetheris-*-macos-*.dmg "$WINDOWS_BUNDLE" "$WINDOWS_SETUP" > checksums.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           files: |
-            dist/${{ needs.flatpak.outputs.bundle-name }}
+            dist/aetheris-*-linux-*.flatpak
             dist/${{ needs.appimage.outputs.appimage-name }}
             dist/aetheris-*-macos-*.dmg
             dist/${{ needs.windows.outputs.bundle-name }}
             dist/${{ needs.windows.outputs.setup-name }}
+            dist/checksums.txt
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
