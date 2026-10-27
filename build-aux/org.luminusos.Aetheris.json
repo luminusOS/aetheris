@@ -45,7 +45,6 @@
       "buildsystem": "meson",
       "config-opts": [
         "--libdir=lib",
-        "--wrap-mode=nofallback",
         "-Dgtk4=true",
         "-Dgtk3=false",
         "-Dgir=false",
