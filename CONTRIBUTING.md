@@ -102,9 +102,13 @@ kubectl auth can-i create pods/portforward -n <namespace>
 The Flatpak manifest lives at `build-aux/org.luminusos.Aetheris.json`.
 It builds the VTE GTK4 library inside the Flatpak environment, so installing
 `vte291-gtk4` on the host does not satisfy the Flatpak build dependency.
-The manifest disables automatic AppStream compose during local bundle builds;
-validate `data/org.luminusos.Aetheris.metainfo.xml` separately when changing
-application metadata.
+The manifest leaves AppStream compose on, so the bundle carries the catalog
+data that software centers read; `appstreamcli validate` runs on
+`data/org.luminusos.Aetheris.metainfo.xml` in CI. The manifest has no `branch`:
+the release workflow passes `--default-branch` (`stable` for final tags,
+`testing` for release candidates) and builds on native x86_64 and aarch64
+runners. `python3 build-aux/test-packaging.py` checks the manifest and the
+release workflows.
 
 To build a local Flatpak bundle:
 
@@ -119,6 +123,7 @@ flatpak-builder \
   --force-clean \
   --disable-rofiles-fuse \
   --install-deps-from=flathub \
+  --default-branch=stable \
   --repo=target/flatpak/repo \
   target/flatpak/build \
   build-aux/org.luminusos.Aetheris.json

@@ -2,54 +2,89 @@ name: Release Flatpak
 
 on:
   workflow_call:
-    outputs:
-      artifact-name:
-        value: ${{ jobs.flatpak.outputs.artifact-name }}
-      bundle-name:
-        value: ${{ jobs.flatpak.outputs.bundle-name }}
+    inputs:
+      tag:
+        description: Release tag to build; defaults to the tag that triggered the run
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
 
 jobs:
   flatpak:
-    name: Build Flatpak
-    runs-on: ubuntu-latest
-    outputs:
-      artifact-name: ${{ steps.names.outputs.artifact_name }}
-      bundle-name: ${{ steps.names.outputs.bundle_name }}
+    name: Build Flatpak (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
     steps:
       - name: Check out sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Read release metadata
         id: names
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
 
-          TAG="${GITHUB_REF_NAME}"
+          if ! printf '%s' "$TAG" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.?[1-9][0-9]*)?$'; then
+            echo "Invalid release tag: ${TAG}" >&2
+            exit 1
+          fi
+
           VERSION="${TAG#v}"
           BASE_VERSION="${VERSION%%-*}"
           CARGO_VERSION="$(
             python3 -c 'import pathlib, tomllib; data = tomllib.loads(pathlib.Path("Cargo.toml").read_text()); print(data["workspace"]["package"]["version"])'
+          )"
+          METAINFO_VERSION="$(
+            python3 -c 'import xml.etree.ElementTree as ET; print(ET.parse("data/org.luminusos.Aetheris.metainfo.xml").getroot().find("releases/release").get("version"))'
           )"
 
           if [ "$BASE_VERSION" != "$CARGO_VERSION" ]; then
             echo "Tag ${TAG} does not match workspace version ${CARGO_VERSION}." >&2
             exit 1
           fi
+          if [ "$BASE_VERSION" != "$METAINFO_VERSION" ]; then
+            echo "Newest metainfo release ${METAINFO_VERSION} does not match ${BASE_VERSION}." >&2
+            exit 1
+          fi
+          if [ "$(uname -m)" != "$ARCH" ]; then
+            echo "Runner architecture $(uname -m) is not ${ARCH}." >&2
+            exit 1
+          fi
+
+          case "$TAG" in
+            *-rc*) BRANCH=testing ;;
+            *) BRANCH=stable ;;
+          esac
 
           mkdir -p dist
-          ARCH="$(uname -m)"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "arch=${ARCH}" >> "$GITHUB_OUTPUT"
-          echo "artifact_name=flatpak-bundle" >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
           echo "bundle_name=aetheris-${VERSION}-linux-${ARCH}.flatpak" >> "$GITHUB_OUTPUT"
 
       - name: Install Flatpak builder
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
+          sudo apt-get install -y appstream flatpak flatpak-builder ostree
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
       - name: Build Flatpak
+        env:
+          BRANCH: ${{ steps.names.outputs.branch }}
+          BUNDLE: ${{ steps.names.outputs.bundle_name }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
           flatpak-builder \
@@ -57,19 +92,34 @@ jobs:
             --force-clean \
             --disable-rofiles-fuse \
             --install-deps-from=flathub \
+            --default-branch="${BRANCH}" \
             --repo=target/flatpak/repo \
             target/flatpak/build \
             build-aux/org.luminusos.Aetheris.json
           flatpak build-bundle \
+            --arch="${ARCH}" \
             target/flatpak/repo \
-            "target/flatpak/${{ steps.names.outputs.bundle_name }}" \
+            "target/flatpak/${BUNDLE}" \
             org.luminusos.Aetheris \
-            stable
-          cp "target/flatpak/${{ steps.names.outputs.bundle_name }}" "dist/${{ steps.names.outputs.bundle_name }}"
+            "${BRANCH}"
+          cp "target/flatpak/${BUNDLE}" "dist/${BUNDLE}"
+
+      - name: Verify the bundle ref
+        env:
+          BRANCH: ${{ steps.names.outputs.branch }}
+          BUNDLE: ${{ steps.names.outputs.bundle_name }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          check="$(mktemp -d)"
+          ostree init --repo="${check}/repo" --mode=archive-z2
+          flatpak build-import-bundle --no-update-summary "${check}/repo" "dist/${BUNDLE}"
+          test "$(ostree refs --repo="${check}/repo" --list)" = "app/org.luminusos.Aetheris/${ARCH}/${BRANCH}"
+          rm -rf "${check}"
 
       - name: Upload release assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: flatpak-bundle
+          name: flatpak-${{ matrix.arch }}
           path: dist/${{ steps.names.outputs.bundle_name }}
-          retention-days: 1
+          if-no-files-found: error

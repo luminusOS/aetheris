@@ -8,6 +8,22 @@ on:
   workflow_call:
 
 jobs:
+  packaging:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Check Flatpak packaging and release workflows
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y appstream
+          python3 -m venv /tmp/packaging-venv
+          /tmp/packaging-venv/bin/pip install PyYAML
+          /tmp/packaging-venv/bin/python build-aux/test-packaging.py
+
   rust:
     runs-on: ubuntu-latest
     container:
