@@ -1,7 +1,8 @@
 ; Aetheris — Inno Setup installer script
 ;
 ; Preprocessor defines passed by CI:
-;   AppVersion    — e.g. "0.1.0"
+;   AppVersion    — e.g. "0.1.0" or "0.1.0-rc.1"
+;   NumericVersion — dotted numbers only, e.g. "0.1.0"; defaults to AppVersion
 ;   SourceDir     — path to the bundled Windows folder
 ;   OutputDir     — where to write the installer exe
 ;   TargetArch    — "x64" or "arm64"
@@ -9,6 +10,9 @@
 
 #ifndef AppVersion
   #define AppVersion "1.4.1"
+#endif
+#ifndef NumericVersion
+  #define NumericVersion AppVersion
 #endif
 #ifndef SourceDir
   #define SourceDir "..\..\target\windows\aetheris"
@@ -25,7 +29,7 @@ AppName=Aetheris
 AppVersion={#AppVersion}
 AppVerName=Aetheris
 AppId={{7F9E4C2A-5425-4A7E-8A0B-CA8B395E7C21}
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#NumericVersion}
 AppPublisher=LuminusOS
 AppPublisherURL=https://github.com/luminusOS/aetheris
 AppSupportURL=https://github.com/luminusOS/aetheris/issues
