@@ -119,6 +119,11 @@ class FlatpakPackaging(unittest.TestCase):
         self.assertIn("VersionInfoVersion={#NumericVersion}", script)
         self.assertNotIn("VersionInfoVersion={#AppVersion}", script)
 
+    def test_macos_release_builds_only_the_apple_silicon_dmg(self):
+        loaded, _ = workflow("release-macos.yml")
+        include = loaded["jobs"]["macos"]["strategy"]["matrix"]["include"]
+        self.assertEqual([(item["arch"], item["runner"]) for item in include], [("aarch64", "macos-15")])
+
     def test_release_publishes_checksums_and_every_flatpak_bundle(self):
         loaded, text = workflow("release.yml")
         release = loaded["jobs"]["release"]
