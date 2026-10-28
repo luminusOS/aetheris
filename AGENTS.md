@@ -124,7 +124,6 @@ publishes:
 - `aetheris-<version>.flatpak`
 - `aetheris-<version>-x86_64.AppImage`
 - `aetheris-<version>-macos-aarch64.dmg`
-- `aetheris-<version>-macos-x86_64.dmg`
 - `aetheris-<version>-windows-x86_64.zip`
 - `aetheris-<version>-windows-x86_64-setup.exe`
 - `aetheris-<version>-source.zip`

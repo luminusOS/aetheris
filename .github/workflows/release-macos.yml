@@ -12,8 +12,6 @@ jobs:
         include:
           - arch: aarch64
             runner: macos-15
-          - arch: x86_64
-            runner: macos-15-intel
     steps:
       - name: Check out sources
         uses: actions/checkout@v4
