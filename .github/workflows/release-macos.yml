@@ -59,7 +59,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-bundle
-        run: cargo install cargo-bundle
+        run: cargo install cargo-bundle --locked
 
       - name: Build app bundle
         run: |
